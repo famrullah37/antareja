@@ -1,0 +1,29 @@
+services:
+  antareja:
+    image: ghcr.io/famrullah37/antareja:latest
+    container_name: antareja
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      NEXTAUTH_URL: ${NEXTAUTH_URL}
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
+      CLOUDINARY_URL: ${CLOUDINARY_URL}
+      CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME}
+      CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY}
+      CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+      GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI}
+      GOOGLE_REFRESH_TOKEN: ${GOOGLE_REFRESH_TOKEN}
+    networks:
+      - traefik-public
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.antareja.rule=Host(`antareja.smktelkom-mlg.sch.id`)"
+      - "traefik.http.routers.antareja.entrypoints=websecure"
+      - "traefik.http.routers.antareja.tls.certresolver=letsencrypt"
+      - "traefik.http.services.antareja.loadbalancer.server.port=3000"
+
+networks:
+  traefik-public:
+    external: true
