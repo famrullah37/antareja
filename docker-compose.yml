@@ -17,6 +17,7 @@ services:
       GOOGLE_REFRESH_TOKEN: ${GOOGLE_REFRESH_TOKEN}
     networks:
       - traefik-public
+      - postgresql-wsnb_default
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.antareja.rule=Host(`antareja.smktelkom-mlg.sch.id`)"
@@ -26,4 +27,6 @@ services:
 
 networks:
   traefik-public:
+    external: true
+  postgresql-wsnb_default:
     external: true
