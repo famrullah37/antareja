@@ -1,6 +1,5 @@
 "use client";
 
-import { Pengumuman } from "@prisma/client";
 import TextField from "@/app/components/global/Input";
 import SubmitButton from "@/app/components/global/SubmitButton";
 import { toast } from "sonner";

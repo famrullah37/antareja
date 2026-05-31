@@ -6,17 +6,23 @@ import {
   findAnggota,
   updateAnggota,
 } from "@/queries/anggota.query";
-import { findTim } from "@/queries/tim.query";
-import { Kelas, Posisi, Tim } from "@prisma/client";
+import { findTimsByUser } from "@/queries/tim.query";
+import { Kelas, Posisi } from "@prisma/client";
 import { imageUploader } from "./fileUploader";
 import { revalidatePath } from "next/cache";
 
 export async function upsertAnggotaForm(
   data: FormData,
   posisi: Posisi,
-  id: string
+  id: string,
+  timId: string
 ) {
   const session = await getServerSession();
+  if (!session?.user?.id) return { success: false, message: "Unauthorized" };
+
+  const userTims = await findTimsByUser(session.user.id);
+  const owned = userTims.some((t) => t.id === timId);
+  if (!owned) return { success: false, message: "Forbidden" };
 
   const nama = data.get("nama") as string;
   const email = data.get("email") as string;
@@ -29,7 +35,6 @@ export async function upsertAnggotaForm(
   if (foto.size / 1024 / 1024 > 10)
     return { success: false, message: "Max. Ukuran foto adalah 10MB" };
 
-  const tim = (await findTim({ userId: session?.user?.id })) as Tim;
   const tryFindAnggota = await findAnggota({ id });
 
   try {
@@ -40,21 +45,12 @@ export async function upsertAnggotaForm(
       fotoUrl = uploadedFoto?.data?.url;
     }
 
-    const anggotaData = {
-      nama,
-      email,
-      telp,
-      nisn,
-      kelas,
-      posisi,
-      link_ig,
-    };
-
+    const anggotaData = { nama, email, telp, nisn, kelas, posisi, link_ig };
     const anggotaUpdate = { ...anggotaData, foto: fotoUrl ?? undefined };
     const anggotaCreate = {
       ...anggotaData,
       foto: fotoUrl!,
-      Tim: { connect: { id: tim.id } },
+      Tim: { connect: { id: timId } },
     };
 
     if (tryFindAnggota) await updateAnggota({ id }, anggotaUpdate);

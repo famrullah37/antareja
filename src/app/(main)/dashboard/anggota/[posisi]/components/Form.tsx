@@ -34,11 +34,11 @@ export default function EditAnggotaForm({
     const toastId = toast.loading(
       anggota.id === "" ? "Membuat anggota..." : "Memperbarui anggota..."
     );
-    const result = await upsertAnggotaForm(data, anggota.posisi, anggota.id);
+    const result = await upsertAnggotaForm(data, anggota.posisi, anggota.id, anggota.timId);
 
     if (result.success) {
       toast.success(result.message, { id: toastId });
-      router.push("/dashboard");
+      router.push(`/dashboard?timId=${anggota.timId}`);
     } else {
       toast.error(result.message, { id: toastId });
     }

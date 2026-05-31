@@ -52,7 +52,7 @@ export default function PembayaranForm({
             width={250}
             alt={data?.nama_tim!}
             unoptimized
-            className=" object-cover"
+            className="object-cover"
           />
         </div>
         <div>
@@ -99,7 +99,7 @@ export default function PembayaranForm({
             }}
           />
         </div>
-        
+
         <div className="flex flex-col gap-2">
           <label htmlFor={"isDP"} className="text-[16px]">
             Status Pembayaran

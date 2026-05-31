@@ -22,6 +22,14 @@ export async function findTim(
   return tim;
 }
 
+export async function findTimsByUser(userId: string, include?: Prisma.TimInclude) {
+  return prisma.tim.findMany({
+    where: { userId },
+    include,
+    orderBy: { updated_at: "desc" },
+  });
+}
+
 export async function updateTim(
   where: Prisma.TimWhereUniqueInput,
   data: Prisma.TimUncheckedUpdateInput

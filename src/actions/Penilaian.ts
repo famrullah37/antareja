@@ -6,6 +6,12 @@ import {
   deletePenilaian,
   updatePenilaian,
 } from "@/queries/penilaian.query";
+import { getServerSession } from "@/lib/next-auth";
+
+async function requireAdmin() {
+  const session = await getServerSession();
+  if (session?.user?.role !== "ADMIN") throw new Error("Forbidden");
+}
 
 export async function createPenilaianForm(data: FormData, userId: string) {
   const timId = data.get("tim") as string;
@@ -20,6 +26,7 @@ export async function createPenilaianForm(data: FormData, userId: string) {
   const isPublished = (data.get("isPublished") as string) ? true : false;
 
   try {
+    await requireAdmin();
     await createPenilaian({
       tim: { connect: { id: timId } },
       pbb: pbb,
@@ -35,13 +42,13 @@ export async function createPenilaianForm(data: FormData, userId: string) {
     });
     revalidatePath("/", "layout");
     return { success: true };
-  } catch (e) {
-    console.log(e);
+  } catch {
     return { success: false };
   }
 }
 
 export async function updatePenilaianForm(data: FormData, id: string) {
+  await requireAdmin();
   const pbb = parseInt(data.get("pbb") as string);
   const variasi = parseInt(data.get("variasi") as string);
   const formasi = parseInt(data.get("formasi") as string);
@@ -69,19 +76,18 @@ export async function updatePenilaianForm(data: FormData, id: string) {
     );
     revalidatePath("/", "layout");
     return { success: true };
-  } catch (e) {
-    console.log(e);
+  } catch {
     return { success: false };
   }
 }
 
 export async function deletePenilaianForm(id: string) {
   try {
+    await requireAdmin();
     await deletePenilaian({ id: id });
     revalidatePath("/", "layout");
     return { success: true };
-  } catch (e) {
-    console.log(e);
+  } catch {
     return { success: false };
   }
 }

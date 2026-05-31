@@ -15,7 +15,7 @@ export default function GlobalError({
     <html>
       <body>
         <Navbar />
-        <main className="mt-[58px] xl:mt-[88px] overflow-hidden h-[70vh] flex flex-col justify-center items-center">
+        <main className="mt-[58px] lg:mt-[88px] overflow-hidden h-[70vh] flex flex-col justify-center items-center">
           <Image
             src="/globalerror.svg"
             alt="Error"

@@ -2,8 +2,35 @@
 
 import { revalidatePath } from "next/cache";
 import { generateHash } from "@/lib/hash";
-import { createUser, deleteUser, updateUser } from "@/queries/user.query";
+import { createUser, updateUser } from "@/queries/user.query";
 import { Role } from "@prisma/client";
+import prisma from "@/lib/prisma";
+import { getServerSession } from "@/lib/next-auth";
+
+async function requireAdmin() {
+  const session = await getServerSession();
+  if (session?.user?.role !== "ADMIN") throw new Error("Forbidden");
+}
+
+export async function createStaffUser(data: FormData) {
+  await requireAdmin();
+  const nama = data.get("nama") as string;
+  const email = data.get("email") as string;
+  const password = data.get("password") as string;
+  const role = data.get("role") as Role;
+
+  try {
+    const hashedPass = generateHash(password);
+    await prisma.user.create({
+      data: { nama, email, password: hashedPass, role, verified: true },
+    });
+    revalidatePath("/admin/user");
+    return { success: true };
+  } catch (e) {
+    console.error(e);
+    return { success: false, message: "Email sudah terdaftar" };
+  }
+}
 
 export async function createUserForm(data: FormData) {
   const name = data.get("nama") as string;
@@ -18,17 +45,17 @@ export async function createUserForm(data: FormData) {
       email: email,
       password: hashedPass,
       role: role,
-      token: "tod",
+      verified: true,
     });
     revalidatePath("/", "layout");
     return { success: true };
-  } catch (e) {
-    console.log(e);
+  } catch {
     return { success: false };
   }
 }
 
 export async function updateUserForm(data: FormData, id: string) {
+  await requireAdmin();
   const name = data.get("nama") as string;
   const email = data.get("email") as string;
   const password = (data.get("password") as string) || undefined;
@@ -61,19 +88,57 @@ export async function updateUserForm(data: FormData, id: string) {
     );
     revalidatePath("/", "layout");
     return { success: true };
-  } catch (e) {
-    console.log(e);
+  } catch {
+    return { success: false };
+  }
+}
+
+export async function updateProfileUser(data: FormData, userId: string) {
+  const nama = data.get("nama") as string;
+  const password = (data.get("password") as string) || undefined;
+
+  try {
+    if (password) {
+      await updateUser({ id: userId }, { nama, password: generateHash(password) });
+    } else {
+      await updateUser({ id: userId }, { nama });
+    }
+    revalidatePath("/dashboard/profile");
+    return { success: true };
+  } catch {
+    return { success: false };
+  }
+}
+
+export async function updateRoleUser(userId: string, role: Role) {
+  try {
+    await requireAdmin();
+    await updateUser({ id: userId }, { role });
+    revalidatePath("/admin/user");
+    return { success: true };
+  } catch {
     return { success: false };
   }
 }
 
 export async function deleteUserForm(id: string) {
   try {
-    await deleteUser({ id: id });
+    await requireAdmin();
+    await prisma.$transaction(async (tx) => {
+      const tims = await tx.tim.findMany({ where: { userId: id } });
+      for (const tim of tims) {
+        await tx.penilaianBaru.deleteMany({ where: { timId: tim.id } });
+        await tx.penilaian.deleteMany({ where: { tim_id: tim.id } });
+        await tx.tim.delete({ where: { id: tim.id } });
+      }
+      await tx.juri.updateMany({ where: { userId: id }, data: { userId: null } });
+      await tx.transaksiTiket.updateMany({ where: { userId: id }, data: { userId: null } });
+      await tx.transaksiFoto.updateMany({ where: { userId: id }, data: { userId: null } });
+      await tx.user.delete({ where: { id } });
+    });
     revalidatePath("/", "layout");
     return { success: true };
-  } catch (e) {
-    console.log(e);
+  } catch {
     return { success: false };
   }
 }

@@ -9,7 +9,7 @@
 Clone this repository:
 
 ```bash
-git clone https://github.com/mokletdev/antareja.git
+git clone https://github.com/famrullah37/antareja.git
 ```
 
 Install dependencies
@@ -45,8 +45,4 @@ This project is a closed-source project, therefore nobody should/can use this pr
 
 <h2>🤵🏻 Authors:</h2>
 
-- Ahsan Azizan (Team Lead)
-- Teguh Bayu (Team Co-lead)
-- Ibani Hillabi (Developer)
-- Pradita Cleine (Developer)
-- Fadhil Kholaf (Developer)
+- Paskatema DEV

@@ -1,6 +1,4 @@
-import { findAnggotas } from "@/queries/anggota.query";
 import { findTim } from "@/queries/tim.query";
-import { Anggota, Tim } from "@prisma/client";
 import { notFound } from "next/navigation";
 import PembayaranForm from "./components/Form";
 import { TimWithPembayaran } from "@/types/entityRelations";

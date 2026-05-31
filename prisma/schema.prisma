@@ -7,70 +7,62 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ─── Core Auth ───────────────────────────────────────────────────────────────
+
 model User {
-  id        String      @id @default(uuid())
-  nama      String
-  email     String      @unique
-  password  String
-  role      Role
-  verified  Boolean     @default(false)
-  token     String?     @unique
-  penilaian Penilaian[]
-  tim       Tim?
+  id               String           @id @default(uuid())
+  nama             String
+  email            String           @unique
+  password         String
+  role             Role
+  verified         Boolean          @default(false)
+  token            String?          @unique
+  penilaian        Penilaian[]
+  tims             Tim[]
+  juri             Juri?
+  transaksiTiket   TransaksiTiket[]
+  transaksiFoto    TransaksiFoto[]
+}
+
+// ─── Tim & Anggota ───────────────────────────────────────────────────────────
+
+model Tim {
+  id            String         @id @default(uuid())
+  nama_tim      String
+  updated_at    DateTime       @updatedAt
+  pelatih       String
+  jenjang       Jenjang
+  confirmed     Boolean        @default(false)
+  userId        String
+  asal_sekolah  String
+  tipe_tim      Tipe
+  no_pelatih    String
+  link_berkas   String?
+  link_video    String?
+  has_cc        Boolean        @default(false)
+  has_maskot    Boolean        @default(false)
+  anggotas      Anggota[]
+  pembayaran    Pembayaran?
+  penilaian     Penilaian?
+  penilaianBaru PenilaianBaru?
+  sertifikat    Sertifikat[]
+  user          User           @relation(fields: [userId], references: [id])
 }
 
 model Anggota {
-  id     String  @id @default(uuid())
-  nama   String
-  email  String  @unique
-  telp   String
-  foto   String
-  posisi Posisi
-  nisn   String?
-  link_ig     String?
-  kelas  Kelas?
-  timId  String
-  Tim    Tim     @relation(fields: [timId], references: [id], onDelete: Cascade)
+  id      String  @id @default(uuid())
+  nama    String
+  email   String  @unique
+  telp    String
+  foto    String
+  posisi  Posisi
+  nisn    String?
+  link_ig String?
+  kelas   Kelas?
+  timId   String
+  Tim     Tim     @relation(fields: [timId], references: [id], onDelete: Cascade)
 
   @@unique([posisi, timId])
-}
-
-model Penilaian {
-  id            String    @id @default(uuid())
-  created_at    DateTime? @default(now())
-  updated_at    DateTime  @updatedAt
-  user_id       String
-  tim_id        String    @unique
-  danpas        Int
-  detail_url    String
-  formasi       Int
-  note          String
-  pasukan       Int
-  pbb           Int
-  pbb_tambahan  Int
-  published     Boolean   @default(false)
-  variasi       Int
-  tim           Tim       @relation(fields: [tim_id], references: [id])
-  user          User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
-}
-
-model Tim {
-  id           String      @id @default(uuid())
-  nama_tim     String
-  updated_at   DateTime    @updatedAt
-  pelatih      String
-  jenjang      Jenjang
-  confirmed    Boolean     @default(false)
-  userId       String      @unique
-  asal_sekolah String
-  tipe_tim     Tipe
-  no_pelatih   String
-  anggotas     Anggota[]
-  pembayaran   Pembayaran?
-  penilaian    Penilaian?
-  user         User        @relation(fields: [userId], references: [id])
-  link_berkas  String?
-  link_video   String?
 }
 
 model Pembayaran {
@@ -83,11 +75,307 @@ model Pembayaran {
   tim      Tim     @relation(fields: [tim_id], references: [id], onDelete: Cascade)
 }
 
+// ─── Juri ────────────────────────────────────────────────────────────────────
+
+model Juri {
+  id           String         @id @default(uuid())
+  nama         String
+  email        String         @unique
+  no_hp        String
+  foto         String
+  kategori     String
+  userId       String?        @unique
+  user         User?          @relation(fields: [userId], references: [id])
+  juriKategori JuriKategori[]
+  nilaiJuri    NilaiJuri[]
+}
+
+// ─── Penilaian (legacy — single-admin input) ─────────────────────────────────
+
+model Penilaian {
+  id           String    @id @default(uuid())
+  created_at   DateTime? @default(now())
+  updated_at   DateTime  @updatedAt
+  user_id      String
+  tim_id       String    @unique
+  danpas       Int
+  detail_url   String
+  formasi      Int
+  note         String
+  pasukan      Int
+  pbb          Int
+  pbb_tambahan Int
+  published    Boolean   @default(false)
+  variasi      Int
+  tim          Tim       @relation(fields: [tim_id], references: [id])
+  user         User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+}
+
+// ─── Penilaian Baru (Multi-Juri + Nilai Diskrit) ─────────────────────────────
+
+model NilaiDiskritMaster {
+  id       String  @id @default(uuid())
+  kategori String
+  predikat String
+  warna    String
+  nilai    Json
+  urutan   Int
+  dikunci  Boolean @default(false)
+
+  @@unique([kategori, predikat])
+}
+
+model SubKategoriMaster {
+  id        String      @id @default(uuid())
+  kode      String      @unique
+  nama      String
+  kategori  String
+  maxNilai  Int         @default(100)
+  urutan    Int
+  aktif     Boolean     @default(true)
+  nilaiJuri NilaiJuri[]
+}
+
+model JuriKategori {
+  id       String @id @default(uuid())
+  juriId   String
+  kategori String
+  juri     Juri   @relation(fields: [juriId], references: [id], onDelete: Cascade)
+
+  @@unique([juriId, kategori])
+}
+
+model PenilaianBaru {
+  id             String           @id @default(uuid())
+  timId          String           @unique
+  nilaiKotor     Int              @default(0)
+  totalPengurang Int              @default(0)
+  nilaiAkhir     Int              @default(0)
+  status         String           @default("DRAFT")
+  published      Boolean          @default(false)
+  publishedAt    DateTime?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  tim            Tim              @relation(fields: [timId], references: [id])
+  nilaiJuri      NilaiJuri[]
+  pelanggaranTim PelanggaranTim[]
+}
+
+model NilaiJuri {
+  id            String            @id @default(uuid())
+  penilaianId   String
+  juriId        String
+  subKategoriId String
+  nilaiDipilih  Int
+  predikat      String
+  catatan       String?
+  penilaian     PenilaianBaru     @relation(fields: [penilaianId], references: [id], onDelete: Cascade)
+  juri          Juri              @relation(fields: [juriId], references: [id])
+  subKategori   SubKategoriMaster @relation(fields: [subKategoriId], references: [id])
+
+  @@unique([penilaianId, juriId, subKategoriId])
+}
+
+model Pelanggaran {
+  id              String           @id @default(uuid())
+  kode            String           @unique
+  nama            String
+  kategori        String
+  poinPengurangan Int
+  dikunci         Boolean          @default(false)
+  pelanggaranTim  PelanggaranTim[]
+}
+
+model PelanggaranTim {
+  id             String        @id @default(uuid())
+  penilaianId    String
+  pelanggaranId  String
+  jumlahKejadian Int           @default(1)
+  totalPengurang Int
+  penilaian      PenilaianBaru @relation(fields: [penilaianId], references: [id], onDelete: Cascade)
+  pelanggaran    Pelanggaran   @relation(fields: [pelanggaranId], references: [id])
+}
+
+// ─── Sistem Penghargaan ───────────────────────────────────────────────────────
+
+model KonfigJuara {
+  id           String  @id @default(uuid())
+  jenisJuara   String
+  kode         String  @unique
+  namaJuara    String
+  jenjang      String
+  urutan       Int?
+  kategoriList Json
+  penghargaan  String?
+  dikunci      Boolean @default(false)
+}
+
+// ─── Sistem Tiket ─────────────────────────────────────────────────────────────
+
+model Tiket {
+  id        String           @id @default(uuid())
+  jenis     String
+  harga     Int
+  kuota     Int              @default(0)
+  sisa      Int              @default(0)
+  transaksi TransaksiTiket[]
+}
+
+model TransaksiTiket {
+  id               String    @id @default(uuid())
+  userId           String?
+  tiketId          String
+  nama             String
+  email            String
+  noHp             String
+  jumlah           Int       @default(1)
+  status           String    @default("PENDING")
+  bukti            String?
+  jenisJual        String    @default("ONLINE")
+  metodePembayaran String    @default("TRANSFER")
+  kodeUnik         String?
+  catatanAdmin     String?
+  createdAt        DateTime  @default(now())
+  user             User?     @relation(fields: [userId], references: [id])
+  tiket            Tiket     @relation(fields: [tiketId], references: [id])
+  qrTikets         QRTiket[]
+}
+
+model QRTiket {
+  id          String         @id @default(uuid())
+  transaksiId String
+  token       String         @unique @default(uuid())
+  statusScan  Boolean        @default(false)
+  waktuScan   DateTime?
+  transaksi   TransaksiTiket @relation(fields: [transaksiId], references: [id], onDelete: Cascade)
+}
+
+model KonfigTiket {
+  id           String  @id @default("singleton")
+  qrisUrl      String?
+  bankNama     String?
+  bankNoRek    String?
+  bankAtasNama String?
+}
+
+// ─── Galeri Foto Premium ──────────────────────────────────────────────────────
+
+model Album {
+  id            String   @id @default(uuid())
+  nama          String
+  deskripsi     String?
+  tipe          String   @default("BERBAYAR")
+  harga         Int      @default(0)
+  statusPublish Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  fotos         Foto[]
+}
+
+model Foto {
+  id            String  @id @default(uuid())
+  albumId       String
+  pathAsli      String
+  pathWatermark String
+  tagTim        String?
+  statusPublish Boolean @default(false)
+  createdAt     DateTime @default(now())
+  album         Album   @relation(fields: [albumId], references: [id])
+}
+
+model TransaksiFoto {
+  id               String    @id @default(uuid())
+  userId           String?
+  namaPembeli      String?
+  email            String?
+  fotoList         Json
+  paket            String?
+  harga            Int
+  status           String    @default("PENDING")
+  bukti            String
+  kodeUnik         String?
+  metodePembayaran String    @default("TRANSFER")
+  expiredAt        DateTime?
+  createdAt        DateTime  @default(now())
+  user             User?     @relation(fields: [userId], references: [id])
+}
+
+model KonfigPaketFoto {
+  id     String  @id @default(uuid())
+  kode   String  @unique
+  nama   String
+  harga  Int
+  aktif  Boolean @default(true)
+  urutan Int     @default(0)
+}
+
+// ─── Kas ─────────────────────────────────────────────────────────────────────
+
+model KasTransaksi {
+  id          String   @id @default(uuid())
+  tipe        String   // PEMASUKAN | PENGELUARAN
+  keterangan  String
+  vendor      String?
+  jumlah      Int
+  kategori    String   @default("LAINNYA")
+  nota        String?
+  sumber      String   @default("MANUAL")
+  referensiId String?
+  createdAt   DateTime @default(now())
+}
+
+// ─── Kategori Lomba ──────────────────────────────────────────────────────────
+
+model KategoriLomba {
+  id   String @id @default(uuid())
+  nama String @unique
+}
+
+// ─── Pengumuman ───────────────────────────────────────────────────────────────
+
 model Pengumuman {
   id        String   @id @default(uuid())
   createdAt DateTime @default(now())
   content   String
 }
+
+// ─── Konfigurasi Umum (singleton) ────────────────────────────────────────────
+
+model KonfigUmum {
+  id              String   @id @default("singleton")
+  countdownTarget DateTime @default("2025-11-08T00:00:00.000Z")
+  biayaSD         Int      @default(375000)
+  biayaSDDP       Int      @default(187500)
+  biayaSMP        Int      @default(400000)
+  biayaSMPDP      Int      @default(200000)
+  biayaSMA        Int      @default(400000)
+  biayaSMADP      Int      @default(200000)
+}
+
+// ─── Sponsor ─────────────────────────────────────────────────────────────────
+
+model Sponsor {
+  id      String  @id @default(uuid())
+  nama    String
+  logoUrl String
+  linkUrl String?
+  tipe    String  @default("SPONSOR")
+  urutan  Int     @default(0)
+  aktif   Boolean @default(true)
+}
+
+// ─── Sertifikat ───────────────────────────────────────────────────────────────
+
+model Sertifikat {
+  id           String   @id @default(uuid())
+  timId        String
+  namaAnggota  String?
+  namaJuara    String?
+  fileUrl      String
+  createdAt    DateTime @default(now())
+  tim          Tim      @relation(fields: [timId], references: [id], onDelete: Cascade)
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
 
 enum Jenjang {
   SD
@@ -113,6 +401,10 @@ enum Kelas {
 enum Role {
   USER
   ADMIN
+  JURI
+  FOTOGRAFER
+  TIKET
+  BENDAHARA
 }
 
 enum Tipe {

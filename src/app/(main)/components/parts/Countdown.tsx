@@ -1,41 +1,43 @@
 "use client";
 
-import { H2, H5 } from "@/app/components/global/Text";
 import { useCountdown } from "@/app/hooks/useCountdown";
 
-const endDate = new Date("11/8/2025");
-
-function TimeFigure({
-  time,
-  title,
-}: Readonly<{ time: number; title: string }>) {
+function TimeFigure({ time, title }: { time: number; title: string }) {
+  const display = time.toString().padStart(2, "0");
   return (
-    <figure className="flex flex-col items-center gap-3">
-      <div className="p-[30px] rounded-[18px] w-[76px] h-[72px] sm:w-[108px] sm:h-[110px] bg-white bg-opacity-60 flex flex-col justify-center items-center">
-        <span className="text-[30px] sm:text-[50px] text-white font-bold leading-[1]">
-          {time.toString().length >= 2 ? time : "0" + time.toString()}
+    <div className="flex flex-col items-center gap-2">
+      <div className="relative w-[72px] h-[72px] sm:w-[90px] sm:h-[90px] rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center shadow-lg">
+        <span className="text-[32px] sm:text-[42px] font-extrabold text-white leading-none tabular-nums">
+          {display}
         </span>
       </div>
-      <H5 className="text-white sm">{title}</H5>
-    </figure>
+      <span className="text-white/70 text-xs sm:text-sm font-medium tracking-widest uppercase">
+        {title}
+      </span>
+    </div>
   );
 }
 
-export default function Countdown() {
+export default function Countdown({ endDate }: { endDate: Date }) {
   const [days, hours, minutes, seconds] = useCountdown(endDate);
 
   return (
-    <figure
-      suppressHydrationWarning
-      className="absolute w-[510px] h-[210px] flex flex-col justify-center items-center gap-4 left-1/2 -translate-x-1/2 top-[13%] sm:top-[20%]"
-    >
-      <H2 className="text-white">Close Registrasi</H2>
-      <div className="flex gap-[17px] flex-wrap max-w-[233px] md:max-w-none w-full justify-center">
+    <div suppressHydrationWarning className="flex flex-col items-center gap-5">
+      <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm border border-white/20 rounded-full px-4 py-1.5">
+        <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+        <span className="text-white text-xs sm:text-sm font-semibold tracking-wide">
+          Penutupan Pendaftaran
+        </span>
+      </div>
+      <div className="flex gap-3 sm:gap-5">
         <TimeFigure time={days} title="Hari" />
+        <div className="text-white/50 text-3xl font-bold self-start mt-4">:</div>
         <TimeFigure time={hours} title="Jam" />
+        <div className="text-white/50 text-3xl font-bold self-start mt-4">:</div>
         <TimeFigure time={minutes} title="Menit" />
+        <div className="text-white/50 text-3xl font-bold self-start mt-4">:</div>
         <TimeFigure time={seconds} title="Detik" />
       </div>
-    </figure>
+    </div>
   );
 }

@@ -36,3 +36,10 @@ getRefreshToken.js
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# docs internal (tidak perlu masuk repository)
+akun.txt
+prdantareja.md
+prd*.md
+PRD*.md
+PRD_LKBB_Antareja.md

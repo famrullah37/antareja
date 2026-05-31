@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { signIn, useSession, signOut } from "next-auth/react";
 import Image from "next/image";
@@ -7,7 +7,6 @@ import { useEffect, useState } from "react";
 import { SecondaryButton } from "./Button";
 import { TertiaryLinkButton } from "./LinkButton";
 import { usePathname } from "next/navigation";
-import { P } from "./Text";
 import { HamburgerIcon } from "./Icons";
 
 interface NavOption {
@@ -18,10 +17,17 @@ interface NavOption {
 const NavOptions: NavOption[] = [
   { label: "Beranda", href: "/#hero" },
   { label: "Antareja", href: "/#antareja" },
-  { label: "Video", href: "/#video" },
+  { label: "Alur Daftar", href: "/#video" },
   { label: "Timeline", href: "/#timeline" },
   { label: "Juri", href: "/#juri" },
-  { label: "Throwback", href: "/#throwback" },
+  { label: "Tiket", href: "/#tiket" },
+  { label: "Galeri", href: "/galeri" },
+];
+
+const OrgLogos = [
+  { src: "/image/logo-osis.png",          alt: "OSIS SMK Telkom Malang" },
+  { src: "/image/logo-paskatema.jpg",     alt: "Paskatema" },
+  { src: "/image/logo-telkom-school.png", alt: "Telkom School" },
 ];
 
 export default function Navbar() {
@@ -35,155 +41,179 @@ export default function Navbar() {
     setIsExpanded(false);
   }, [pathname]);
 
+  const navText = "text-gray-600 hover:text-primary-500";
+
   return (
-    <nav className="-mt-[58px] xl:-mt-[88px] w-full h-[58px] xl:h-[88px] bg-neutral-500 fixed z-[999]">
-      <div className="flex items-center justify-between px-[30px] xl:px-[50px] py-[22px] h-full">
-        <Link href={"/"}>
-          <Image
-            src={"/icon-colored.svg"}
-            alt="logo"
-            width={64}
-            height={64}
-            className="w-8 h-8 xl:w-16 xl:h-16"
-          />
-        </Link>
-        <div className="gap-8 hidden xl:flex">
-          <div className="flex gap-[30px] items-center">
+    <nav className="fixed top-0 left-0 right-0 z-[999]">
+      <div className="w-full bg-white border-b border-gray-100 shadow-sm">
+        <div className="flex items-center justify-between px-6 lg:px-[50px] py-3 lg:py-4 gap-4">
+
+          {/* ── Kiri: Antareja logo + divider + logo organisasi ── */}
+          <div className="flex items-center gap-2 shrink-0">
+            <Link href="/">
+              <Image
+                src="/icon-colored.svg"
+                alt="Antareja"
+                width={44}
+                height={44}
+                className="w-9 h-9 lg:w-11 lg:h-11"
+              />
+            </Link>
+
+            {/* Divider */}
+            <div className="w-px h-7 mx-1 bg-gray-200" />
+
+            {/* Logo organisasi — tersembunyi otomatis jika file belum ada */}
+            <div className="flex items-center gap-1.5">
+              {OrgLogos.map((org) => (
+                <img
+                  key={org.alt}
+                  src={org.src}
+                  alt={org.alt}
+                  className="w-8 h-8 lg:w-9 lg:h-9 object-contain mix-blend-multiply"
+                  onError={(e) => {
+                    (e.currentTarget as HTMLImageElement).style.display = "none";
+                  }}
+                />
+              ))}
+            </div>
+          </div>
+
+          {/* ── Tengah: Nav links ── */}
+          <div className="hidden lg:flex items-center gap-6 flex-1 justify-center">
             {NavOptions.map((nav) => (
-              <Link href={nav.href} key={nav.label}>
-                <p className="text-[#858585] text-sm hover:opacity-75 transition-all duration-300">
-                  {nav.label}
-                </p>
+              <Link
+                href={nav.href}
+                key={nav.label}
+                className={`text-sm font-medium transition-all duration-200 ${navText}`}
+              >
+                {nav.label}
               </Link>
             ))}
           </div>
-          <div className="flex gap-3">
+
+          {/* ── Kanan: Auth ── */}
+          <div className="hidden lg:flex items-center gap-3 shrink-0">
             {status === "authenticated" ? (
               <div className="relative">
                 <button
                   type="button"
-                  aria-label="User"
-                  className="w-[40px] h-[40px] rounded-full overflow-hidden"
+                  aria-label="User menu"
                   onClick={() => setIsOpened(!isOpened)}
+                  className="flex items-center gap-2 group"
                 >
-                  <Image
-                    alt="User"
-                    src={
-                      "https://st3.depositphotos.com/6672868/13701/v/450/depositphotos_137014128-stock-illustration-user-profile-icon.jpg"
-                    }
-                    unoptimized
-                    width={40}
-                    height={40}
-                    className="object-cover w-full h-full"
-                  />
-                </button>
-                <div
-                  className={`absolute w-[275px] bg-white right-0 flex flex-col rounded-2xl drop-shadow-md shadow-black py-5 px-3 gap-2 ${
-                    isOpened ? "" : "hidden"
-                  }`}
-                >
-                  <div className="flw=ex flex-col gap-2 px-2 text-wrap">
-                    <P className="text-sm font-bold text-wrap line-clamp-1">
-                      {session.user?.nama}
-                    </P>
-                    <P className="text-sm text-wrap line-clamp-1">
-                      {session.user?.email}
-                    </P>
+                  <div className="w-9 h-9 rounded-full overflow-hidden ring-2 ring-primary-500/50 group-hover:ring-primary-500 transition-all">
+                    <Image
+                      alt="User"
+                      src="https://st3.depositphotos.com/6672868/13701/v/450/depositphotos_137014128-stock-illustration-user-profile-icon.jpg"
+                      unoptimized
+                      width={36}
+                      height={36}
+                      className="object-cover w-full h-full"
+                    />
                   </div>
-                  <Link
-                    href={
-                      session.user?.role === "ADMIN" ? "/admin" : "/dashboard"
-                    }
-                    className="w-full text-black bg-white hover:bg-neutral-300 px-2 rounded-lg transition-all duration-300 py-3"
-                  >
-                    {session.user?.role === "ADMIN" ? "Admin" : "Dashboard"}
-                  </Link>
-                  <button
-                    onClick={() => signOut()}
-                    className="w-full text-primary-500 bg-white text-start flex justify-start hover:bg-neutral-300 px-2 rounded-lg transition-all duration-300 py-3"
-                  >
-                    Sign Out
-                  </button>
-                </div>
+                  <span className="text-sm font-medium max-w-[100px] truncate text-gray-800">
+                    {session.user?.nama}
+                  </span>
+                </button>
+                {isOpened && (
+                  <div className="absolute right-0 top-12 w-60 bg-white rounded-2xl shadow-xl border border-neutral-100 py-2 overflow-hidden">
+                    <div className="px-4 py-3 border-b border-neutral-100">
+                      <p className="font-semibold text-sm text-neutral-900 truncate">{session.user?.nama}</p>
+                      <p className="text-xs text-gray-400 truncate">{session.user?.email}</p>
+                    </div>
+                    <Link
+                      href={session.user?.role === "ADMIN" ? "/admin" : "/dashboard"}
+                      className="flex items-center px-4 py-3 text-sm text-neutral-700 hover:bg-neutral-50 transition-colors"
+                      onClick={() => setIsOpened(false)}
+                    >
+                      {session.user?.role === "ADMIN" ? "Admin Panel" : "Dashboard"}
+                    </Link>
+                    <button
+                      onClick={() => signOut()}
+                      className="w-full flex items-center px-4 py-3 text-sm text-primary-500 hover:bg-primary-50 transition-colors"
+                    >
+                      Sign Out
+                    </button>
+                  </div>
+                )}
               </div>
-            ) : status === "loading" ? (
-              <></>
-            ) : (
+            ) : status === "loading" ? null : (
               <>
                 <SecondaryButton
                   onClick={() => signIn()}
                   type="button"
-                  className="font-bold drop-shadow-glow"
+                  className="font-bold text-sm px-5 py-2"
                 >
                   Masuk
                 </SecondaryButton>
-                <TertiaryLinkButton href="/auth/register" className="font-bold">
+                <TertiaryLinkButton href="/auth/register" className="font-bold text-sm px-5 py-2">
                   Daftar
                 </TertiaryLinkButton>
               </>
             )}
           </div>
+
+          {/* ── Hamburger mobile ── */}
+          <button
+            type="button"
+            aria-label="Toggle menu"
+            onClick={() => setIsExpanded(!isExpanded)}
+            className="block lg:hidden text-gray-700"
+          >
+            {isExpanded ? (
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            ) : (
+              <HamburgerIcon />
+            )}
+          </button>
         </div>
-        <button
-          type="button"
-          aria-label="Toggle Navigation"
-          className="block xl:hidden"
-          onClick={() => setIsExpanded(!isExpanded)}
-        >
-          <HamburgerIcon />
-        </button>
-      </div>
-      <div
-        className={`block xl:hidden w-full z-[800] bg-neutral-500 transition-all duration-500 py-6 px-6 ${
-          isExpanded ? "mt-0" : " -mt-[570px]"
-        }`}
-      >
-        <div className="flex flex-col gap-8 justify-center items-center w-full text-center">
-          {NavOptions.map((navOption) => (
-            <Link
-              key={navOption.label}
-              href={navOption.href}
-              className={`rounded-full text-center text-[16px] transition-all duration-300 hover:text-primary-400`}
-              onClick={() => setIsExpanded(false)}
-            >
-              {navOption.label}
-            </Link>
-          ))}
-          {status === "authenticated" ? (
-            <>
+
+        {/* ── Mobile menu ── */}
+        {isExpanded && (
+          <div className="lg:hidden border-t border-white/10 px-6 py-5 flex flex-col gap-4 bg-neutral-950/95 backdrop-blur-md">
+            {NavOptions.map((nav) => (
               <Link
-                href={session?.user?.role === "ADMIN" ? "/admin" : "/dashboard"}
-                className={`rounded-full text-center text-[16px] transition-all duration-300 hover:text-primary-400`}
-                onClick={() => setIsExpanded(!isExpanded)}
+                key={nav.label}
+                href={nav.href}
+                onClick={() => setIsExpanded(false)}
+                className="text-white/80 text-base font-medium hover:text-primary-400 transition-colors"
               >
-                {session?.user?.role === "ADMIN" ? "Admin" : "Dashboard"}
+                {nav.label}
               </Link>
-              <button
-                onClick={() => signOut()}
-                className="rounded-full text-center text-[16px] transition-all duration-300 text-primary-500 hover:text-primary-400"
-              >
-                Sign Out
-              </button>
-            </>
-          ) : status === "loading" ? (
-            <></>
-          ) : (
-            <>
-              <Link
-                href="/auth/login"
-                className={`rounded-full text-center text-[16px] transition-all duration-300 text-primary-500 hover:text-primary-400`}
-              >
-                Masuk
-              </Link>
-              <Link
-                href="/auth/register"
-                className={`rounded-full text-center text-[16px] transition-all duration-300 hover:text-primary-400`}
-              >
-                Daftar
-              </Link>
-            </>
-          )}
-        </div>
+            ))}
+            <div className="h-px bg-white/10 my-1" />
+            {status === "authenticated" ? (
+              <>
+                <Link
+                  href={session?.user?.role === "ADMIN" ? "/admin" : "/dashboard"}
+                  onClick={() => setIsExpanded(false)}
+                  className="text-white/80 text-base font-medium hover:text-primary-400 transition-colors"
+                >
+                  {session?.user?.role === "ADMIN" ? "Admin Panel" : "Dashboard"}
+                </Link>
+                <button
+                  onClick={() => signOut()}
+                  className="text-primary-400 text-base font-medium text-left hover:text-primary-300 transition-colors"
+                >
+                  Sign Out
+                </button>
+              </>
+            ) : status === "loading" ? null : (
+              <>
+                <Link href="/auth/login" onClick={() => setIsExpanded(false)} className="text-primary-400 text-base font-medium">
+                  Masuk
+                </Link>
+                <Link href="/auth/register" onClick={() => setIsExpanded(false)} className="text-white/80 text-base font-medium">
+                  Daftar
+                </Link>
+              </>
+            )}
+          </div>
+        )}
       </div>
     </nav>
   );

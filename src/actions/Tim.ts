@@ -1,72 +1,75 @@
 "use server";
 
+import { getServerSession } from "@/lib/next-auth";
 import { revalidatePath } from "next/cache";
-import { updateTim, deleteTim } from "@/queries/tim.query";
-import { Tipe } from "@prisma/client"
+import { updateTim } from "@/queries/tim.query";
+import { Tipe } from "@prisma/client";
+import prisma from "@/lib/prisma";
+
+async function requireAdmin() {
+  const session = await getServerSession();
+  if (session?.user?.role !== "ADMIN") throw new Error("Forbidden");
+}
 
 export async function getTimById(timId: string) {
   try {
     const tim = await prisma.tim.findUnique({
       where: { id: timId },
-      include: {
-        anggotas: true,
-        pembayaran: true,
-      },
+      include: { anggotas: true, pembayaran: true },
     });
-
     if (!tim) return { success: false, message: "Tim tidak ditemukan" };
-    console.log(tim);
     return { success: true, data: tim };
-  } catch (error) {
-    console.error(error);
+  } catch {
     return { success: false, message: "Gagal mengambil data tim" };
   }
 }
 
 export async function updateTimForm(id: string, formData: FormData) {
+  const session = await getServerSession();
+  if (!session?.user?.id) return { success: false, message: "Unauthorized" };
+
+  // Hanya user pemilik tim yang boleh update link
+  const tim = await prisma.tim.findUnique({ where: { id } });
+  if (!tim || tim.userId !== session.user.id)
+    return { success: false, message: "Forbidden" };
+
   const link_berkas = formData.get("link_berkas") as string;
   const link_video = formData.get("link_video") as string;
 
   try {
-    await updateTim(
-      { id },
-      { link_berkas, link_video }
-    );
+    await updateTim({ id }, { link_berkas, link_video });
     revalidatePath("/", "layout");
     return { success: true, message: "Berhasil memperbarui Link" };
-  } catch (e) {
-    console.log(e);
+  } catch {
     return { success: false, message: "Gagal memperbarui Link" };
   }
 }
 
 export async function updateTimFormAdmin(data: FormData, id: string) {
+  await requireAdmin();
   const asal_sekolah = data.get("asal_sekolah") as string;
   const tipe_tim = data.get("tipe_tim") as Tipe;
 
   try {
-    await updateTim(
-      { id },
-      {
-        asal_sekolah: asal_sekolah,
-        tipe_tim: tipe_tim
-      }
-    );
+    await updateTim({ id }, { asal_sekolah, tipe_tim });
     revalidatePath("/", "layout");
     return { success: true };
-  } catch (e) {
-    console.log(e);
+  } catch {
     return { success: false };
   }
 }
 
 export async function deleteTimForm(id: string) {
+  await requireAdmin();
   try {
-    await deleteTim({ id });
+    await prisma.$transaction(async (tx) => {
+      await tx.penilaianBaru.deleteMany({ where: { timId: id } });
+      await tx.penilaian.deleteMany({ where: { tim_id: id } });
+      await tx.tim.delete({ where: { id } });
+    });
     revalidatePath("/", "layout");
     return { success: true };
-  } catch (e) {
-    console.log(e);
+  } catch {
     return { success: false };
   }
 }

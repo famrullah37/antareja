@@ -1,24 +1,37 @@
 import { getServerSession } from "@/lib/next-auth";
 import { findAnggota } from "@/queries/anggota.query";
-import { findTim } from "@/queries/tim.query";
+import { findTim, findTimsByUser } from "@/queries/tim.query";
 import { Anggota, Posisi, Tim } from "@prisma/client";
 import { redirect } from "next/navigation";
 import EditAnggotaForm from "./components/Form";
 
 export default async function EditAnggota({
   params,
-}: Readonly<{ params: { posisi: string } }>) {
+  searchParams,
+}: Readonly<{ params: { posisi: string }; searchParams?: { timId?: string } }>) {
   if (Object.keys(Posisi).indexOf(params.posisi.toUpperCase()) === -1)
     return redirect("/dashboard");
 
   const session = await getServerSession();
-  const tim = (await findTim({ userId: session?.user?.id })) as Tim;
+
+  let tim: Tim | null = null;
+  if (searchParams?.timId) {
+    const found = await findTim({ id: searchParams.timId });
+    if (found?.userId === session?.user?.id) tim = found as Tim;
+  }
+  if (!tim) {
+    const tims = await findTimsByUser(session?.user?.id ?? "");
+    tim = (tims[0] ?? null) as Tim | null;
+  }
+  if (!tim) return redirect("/dashboard");
+
+  const timId = tim.id;
 
   const anggota =
     (await findAnggota({
       posisi_timId: {
         posisi: params.posisi.toUpperCase() as Posisi,
-        timId: tim?.id,
+        timId,
       },
     })) ??
     ({
@@ -30,7 +43,7 @@ export default async function EditAnggota({
       nisn: "",
       posisi: params.posisi.toUpperCase(),
       telp: "",
-      timId: tim?.id,
+      timId,
     } as unknown as Anggota);
 
   return (

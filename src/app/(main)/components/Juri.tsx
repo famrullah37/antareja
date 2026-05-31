@@ -1,30 +1,6 @@
-import { Person } from "@/app/components/global/Icons";
-import { H3, P } from "@/app/components/global/Text";
-import SectionWrapper from "@/app/components/global/Wrapper";
+﻿import SectionWrapper from "@/app/components/global/Wrapper";
+import { findJuris } from "@/queries/juri.query";
 import Image from "next/image";
-
-const juris = [
-  {
-    image: "/image/man.png",
-    name: "-",
-    title: "Juri",
-  },
-  {
-    image: "/image/man.png",
-    name: "-",
-    title: "Juri",
-  },
-  {
-    image: "/image/man.png",
-    name: "-",
-    title: "Juri",
-  },
-  {
-    image: "/image/man.png",
-    name: "-",
-    title: "Juri",
-  },
-];
 
 interface JuriCardProps {
   image: string;
@@ -32,65 +8,63 @@ interface JuriCardProps {
   title: string;
 }
 
-export function JuriCard({ image, name, title }: Readonly<JuriCardProps>) {
+function JuriCard({ image, name, title }: JuriCardProps) {
   return (
-    <figure className="relative w-full lg:w-[294px] flex items-center justify-center bg-white rounded-[20px] lg:bg-transparent lg:rounded-none py-6 lg:py-0">
-      <div className="relative bg-primary-500 w-[191px] h-[258px] rounded-[24px]">
+    <div className="group flex flex-col items-center gap-4 bg-white rounded-3xl p-6 border border-neutral-100 shadow-sm hover:shadow-xl hover:-translate-y-2 transition-all duration-300 w-full sm:w-[220px] shrink-0">
+      <div className="relative w-28 h-28 rounded-2xl overflow-hidden bg-primary-50 ring-4 ring-primary-100 group-hover:ring-primary-300 transition-all duration-300">
         <Image
           src={image}
-          alt={`${name}'s Photo`}
-          width={274.68}
-          height={416.7}
-          className="absolute -bottom-[1px] left-1/2 -translate-x-1/2 w-[160%] h-[140%] object-cover"
+          alt={`Foto ${name}`}
+          fill
+          className="object-cover"
+          unoptimized
         />
       </div>
-      <div className="absolute rounded-3xl p-5 bg-white drop-shadow-md flex items-center justify-between gap-6 -bottom-4">
-        <div className="p-[14px] rounded-2xl bg-primary-500 drop-shadow-glow">
-          <Person />
-        </div>
-        <div className="block text-start">
-          <P className="font-bold text-black mb-1">{name}</P>
-          <P>{title}</P>
-        </div>
+      <div className="text-center flex flex-col gap-1">
+        <p className="font-bold text-neutral-900 text-sm leading-snug">{name}</p>
+        <span className="inline-flex px-3 py-1 bg-primary-50 text-primary-600 text-xs font-semibold rounded-full border border-primary-100">
+          {title}
+        </span>
       </div>
-    </figure>
+    </div>
   );
 }
 
-export default function Juri() {
+export default async function Juri() {
+  const juris = await findJuris();
+
+  const displayJuris = juris.length > 0
+    ? juris
+    : [{ foto: "/image/man.png", nama: "–", kategori: "Juri" }];
+
   return (
     <SectionWrapper id="juri">
-      <div className="w-full flex flex-col gap-[40px] text-end">
-        <div className="mb-24 w-full flex flex-col items-end">
-          <H3 className="text-[#272727] font-bold">
-            Juri LPKBB <span className="text-primary-500">Antareja 2025</span>
-          </H3>
-          <P className="text-wrap text-neutral-200 max-w-[300px] lg:max-w-none">
-            Yuk kenalan dulu dengan tim juri LPKBB Antareja tahun 2025
-          </P>
+      {/* Dark background section */}
+      <div className="relative bg-neutral-950 rounded-3xl overflow-hidden px-8 py-14 flex flex-col gap-12">
+        {/* Decorative blob */}
+        <div className="absolute -top-20 -right-20 w-80 h-80 rounded-full bg-primary-500/10 blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-20 -left-10 w-60 h-60 rounded-full bg-primary-700/10 blur-3xl pointer-events-none" />
+
+        {/* Header */}
+        <div className="flex flex-col gap-3 relative z-10">
+          <span className="inline-flex items-center gap-2 text-primary-400 font-semibold text-sm uppercase tracking-widest">
+            <span className="w-8 h-px bg-primary-400" />
+            Dewan Juri
+          </span>
+          <h2 className="text-3xl sm:text-4xl font-extrabold text-white leading-tight">
+            Juri LKBB{" "}
+            <span className="text-primary-400">Antareja 2026</span>
+          </h2>
+          <p className="text-gray-400 max-w-md">
+            Kenali para profesional yang akan menilai penampilan terbaik tim Anda.
+          </p>
         </div>
-        <div className="relative flex justify-center items-center gap-28 lg:gap-4 flex-col lg:flex-row">
-          <div className="absolute w-full rounded-[30px] bg-white min-h-[293px] -top-14 hidden lg:block"></div>
-          <JuriCard
-            image={juris[0].image}
-            name={juris[0].name}
-            title={juris[0].title}
-          />
-          <JuriCard
-            image={juris[1].image}
-            name={juris[1].name}
-            title={juris[1].title}
-          />
-          <JuriCard
-            image={juris[2].image}
-            name={juris[2].name}
-            title={juris[2].title}
-          />
-          <JuriCard
-            image={juris[3].image}
-            name={juris[3].name}
-            title={juris[3].title}
-          />
+
+        {/* Cards */}
+        <div className="relative z-10 flex flex-wrap gap-5 justify-center sm:justify-start">
+          {displayJuris.map((j) => (
+            <JuriCard key={j.nama} image={j.foto} name={j.nama} title={j.kategori} />
+          ))}
         </div>
       </div>
     </SectionWrapper>

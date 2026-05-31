@@ -8,7 +8,6 @@ import { signOut } from "next-auth/react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { FaArrowRight } from "react-icons/fa";
-import { DashboardIcon } from "./Icons";
 
 interface Sidenavprops {
   active: boolean;

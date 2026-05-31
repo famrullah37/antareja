@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 import { findPenilaians } from "@/queries/penilaian.query";
 import { PrimaryLinkButton } from "@/app/components/global/LinkButton";
 import { H1 } from "@/app/components/global/Text";

@@ -1,13 +1,20 @@
 'use server';
 
-import cloudinary from '@/lib/cloudinary';
+import { v2 as cloudinary } from 'cloudinary';
 import { UploadApiResponse } from 'cloudinary';
 
 export async function imageUploader(file: Buffer) {
+  cloudinary.config({
+    secure: true,
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET,
+  });
+
   try {
     const upload: UploadApiResponse = await new Promise((resolve, reject) => {
       const stream = cloudinary.uploader.upload_stream(
-        {}, 
+        { folder: 'antareja' },
         (error, result) => {
           if (error || !result) {
             return reject(error || new Error('Cloudinary upload failed.'));
@@ -18,20 +25,17 @@ export async function imageUploader(file: Buffer) {
       stream.end(file);
     });
 
-    if (!upload) return { error: true, message: 'Terjadi kesalahan' };
-
-    let data = {
-      format: upload.format,
-      url: upload.secure_url,
+    return {
+      error: false,
+      message: 'Upload sukses',
+      data: { format: upload.format, url: upload.secure_url },
     };
-
-    return { error: false, message: 'Upload sukses', data };
-  } catch (e) {
-    console.error(e);
-    const error = e as Error;
+  } catch (e: any) {
+    const msg = e?.message || e?.error?.message || 'Terjadi kesalahan';
+    console.error('Upload error:', msg);
     return {
       error: true,
-      message: error.message.includes('not allowed') ? error.message : 'Terjadi kesalahan',
+      message: msg.includes('not allowed') ? msg : 'Terjadi kesalahan',
     };
   }
 }

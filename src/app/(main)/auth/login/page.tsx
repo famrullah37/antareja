@@ -4,7 +4,7 @@ import { Eye } from "@/app/components/global/Icons";
 import TextField from "@/app/components/global/Input";
 import { LoginButton } from "@/app/components/global/SubmitButton";
 import { H1, H3, P } from "@/app/components/global/Text";
-import { signIn, useSession } from "next-auth/react";
+import { getSession, signIn, useSession } from "next-auth/react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -42,8 +42,9 @@ export default function Login() {
 
     if (result.success) {
       toast.success("Berhasil Login!", { id: toastId });
-      return router.push("/confirmation");
-    } else return toast.error("Email atau Password salah!", { id: toastId });
+      const session = await getSession();
+      return router.push(session?.user?.role === "ADMIN" ? "/admin" : "/dashboard");
+    } else return toast.error("Email/password salah, atau akun belum diverifikasi. Cek email Anda.", { id: toastId, duration: 5000 });
   };
 
   return (

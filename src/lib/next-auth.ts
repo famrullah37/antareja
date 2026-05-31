@@ -53,7 +53,6 @@ export const authOptions: AuthOptions = {
         password: { label: "Password", type: "password", placeholder: "********" },
       },
       async authorize(credentials) {
-        try {
           if (!credentials?.email || !credentials.password) return null;
 
           const user = await findUser({ email: credentials.email });
@@ -68,10 +67,6 @@ export const authOptions: AuthOptions = {
             nama: user.nama,
             email: user.email,
           };
-        } catch (e) {
-          console.error("❌ Authorize Error:", e);
-          return null;
-        }
       },
     }),
   ],
@@ -82,9 +77,8 @@ export const authOptions: AuthOptions = {
     async redirect({ url, baseUrl }) {
       return url.startsWith("/") ? `${baseUrl}${url}` : url;
     },
-    async signIn({ user }) {
-      const userInDb = await findUser({ email: user.email! });
-      return !!userInDb;
+    async signIn() {
+      return true;
     },
     async jwt({ token, user }) {
       // inject data saat login pertama kali

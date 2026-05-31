@@ -18,8 +18,12 @@ export default function UserForm({
   id?: string;
 }) {
   const options = [
-    { label: "USER", value: "USER" },
-    { label: "ADMIN", value: "ADMIN" },
+    { label: "USER — Peserta", value: "USER" },
+    { label: "ADMIN — Administrator", value: "ADMIN" },
+    { label: "JURI — Juri Penilaian", value: "JURI" },
+    { label: "TIKET — Petugas Tiket", value: "TIKET" },
+    { label: "BENDAHARA — Bendahara", value: "BENDAHARA" },
+    { label: "FOTOGRAFER — Fotografer", value: "FOTOGRAFER" },
   ];
 
   const optionsVerified = [

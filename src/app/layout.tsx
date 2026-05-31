@@ -9,15 +9,9 @@ import basierFont from "./font";
 export const metadata: Metadata = {
   title: "LPKBB Antareja",
   description: "Official Website of LKBB Antareja",
-  authors: [
-    { name: "Ahsan Azizan", url: "https://ahsanzizan.xyz" },
-    { name: "Teguh Bayu Pratama", url: "https://bayu.xtero.live" },
-    { name: "Ibani Muhamad Hillabi", url: "" },
-    { name: "Muhammad Fadhil Kholaf", url: "https://fadhilkholaf.my.id" },
-    { name: "Pradita Cleine Abadi", url: "" },
-  ],
+  authors: [{ name: "Paskatema DEV" }],
   keywords: "antareja, lkbb, moklet, SMK, malang, telkom, paskibra",
-  creator: "MokletDev Team",
+  creator: "Paskatema DEV",
   publisher: "SMK Telkom Malang",
   verification: { google: "5b4dyR8sHph6P_xwuaaNfnN4FMAlL4G_GsWznRP5tuA" },
 };

@@ -3,11 +3,65 @@
 @tailwind utilities;
 
 :root {
-  @apply bg-neutral-300;
+  @apply bg-white;
 }
 
 p,
 span,
 a {
   @apply tracking-normal;
+}
+
+/* ─── Scroll-reveal animation ───────────────────────────────────────────── */
+
+@layer utilities {
+  .animate-fade-up {
+    animation: fadeUp 0.6s ease both;
+  }
+
+  .animate-fade-in {
+    animation: fadeIn 0.5s ease both;
+  }
+
+  .delay-100 { animation-delay: 100ms; }
+  .delay-200 { animation-delay: 200ms; }
+  .delay-300 { animation-delay: 300ms; }
+  .delay-400 { animation-delay: 400ms; }
+  .delay-500 { animation-delay: 500ms; }
+}
+
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(28px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* ─── Smooth scroll ─────────────────────────────────────────────────────── */
+html {
+  scroll-behavior: smooth;
+}
+
+/* ─── Scrollbar ─────────────────────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #f5f5f5;
+}
+::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 99px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #F70048;
 }

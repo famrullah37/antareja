@@ -47,6 +47,12 @@ export default function HeadingClient({ session, pengumumans }: HeadingClientPro
           Selamat Datang, {session?.user?.nama ?? "Tamu"} 👋
         </H2>
         <div className="flex flex-col sm:flex-row gap-3">
+          <PrimaryLinkButton
+            href="/dashboard/profile"
+            className="inline-flex gap-2 items-center"
+          >
+            Profil Saya
+          </PrimaryLinkButton>
           <PrimaryButton
             type="button"
             onClick={handleDownloadFormClick}

@@ -25,7 +25,7 @@ export function LargeP({ children, className }: Readonly<TextProps>) {
 
 export function P({ children, className }: Readonly<TextProps>) {
   return (
-    <p className={cn("text-xs sm:text-base text-neutral-200", className)}>
+    <p className={cn("text-xs sm:text-base text-neutral-600", className)}>
       {children}
     </p>
   );

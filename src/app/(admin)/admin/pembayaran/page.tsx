@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 import { findTims } from "@/queries/tim.query";
 import { H1 } from "@/app/components/global/Text";
 import TimTable from "./components/Table";

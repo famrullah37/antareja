@@ -1,9 +1,10 @@
+export const dynamic = "force-dynamic";
 import prisma from "@/lib/prisma";
 import { FaPeopleLine, FaPerson } from "react-icons/fa6";
 import { H1, H4, P } from "@/app/components/global/Text";
 
 async function getCounts() {
-  const usersCount = await prisma.user.count();
+  const usersCount = await prisma.user.count({ where: { role: "USER" } });
   const timsCount = await prisma.tim.count();
   const anggotasCount = await prisma.anggota.count();
 

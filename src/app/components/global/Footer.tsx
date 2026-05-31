@@ -1,4 +1,4 @@
-import Image from "next/image";
+﻿import Image from "next/image";
 import { P } from "./Text";
 import Link from "next/link";
 import { FaTiktok, FaInstagram, FaYoutube } from "react-icons/fa";
@@ -57,7 +57,7 @@ export default function Footer() {
             <div className="flex gap-[17px] sm:gap-10">
               {FootOptions.map((nav) => (
                 <Link href={nav.href} key={nav.label}>
-                  <p className="text-neutral-600 text-sm hover:text-neutral-400 transition-all duration-300 font-semibold">
+                  <p className="text-neutral-600 text-sm hover:text-gray-400 transition-all duration-300 font-semibold">
                     {nav.label}
                   </p>
                 </Link>
@@ -80,7 +80,7 @@ export default function Footer() {
         <div className="w-full">
           <div className="w-full h-[1px] bg-[#D9E1EE]"></div>
           <P className="text-sm text-neutral-600 mt-[10px]">
-            Copyright&copy; Antareja 2025
+            Copyright&copy; Antareja 2026
           </P>
         </div>
       </div>

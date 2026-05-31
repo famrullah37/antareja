@@ -1,7 +1,6 @@
 "use client";
 
 import submitFormRegistrasi from "@/actions/registrationForm";
-import {upsertAnggotaForm} from "@/actions/Anggota";
 import TextField from "@/app/components/global/Input";
 import SubmitButton from "@/app/components/global/SubmitButton";
 import { H2, H3, P } from "@/app/components/global/Text";
@@ -42,6 +41,20 @@ export default function FormComponent({ id }: { id: string }) {
       toast.error(result.message, { id: toastId });
     }
   }
+
+  const selectClassNames = {
+    placeholder: () => "text-[#C8C8C8]",
+    control: () =>
+      "rounded-[14px] border focus:bg-[#F1F6F9] border-neutral-400 px-[18px] active:border-black hover:border-black py-[14px] text-black placeholder-neutral-500 bg-white focus:outline-none transition-all duration-500 placeholder:text-[#C8C8C8]",
+    menu: () =>
+      "bg-white rounded-lg px-[18px] py-[14px] border border-neutral-400",
+    multiValue: () => "bg-primary-400 px-4 py-2 text-white rounded-2xl",
+    valueContainer: () => "flex gap-2",
+    menuList: () => "text-base flex flex-col gap-1",
+    option: () =>
+      "hover:bg-neutral-300 hover:cursor-pointer transition-all duration-500 rounded-lg p-2",
+    input: () => "focus:bg-[#F1F6F9]",
+  };
 
   return (
     <form className="mx-6 sm:mx-[100px] my-[24px]" action={submitForm}>
@@ -94,21 +107,8 @@ export default function FormComponent({ id }: { id: string }) {
             options={jenjang}
             id="jenjang"
             placeholder="Pilih Jenjang"
-            onChange={(e) => (e?.value === "SD" ? setIsSD(true) : setIsSD(false))}  
-            classNames={{
-              placeholder: () => "text-[#C8C8C8]",
-              control: () =>
-                "rounded-[14px] border focus:bg-[#F1F6F9] border-neutral-400 px-[18px] active:border-black hover:border-black py-[14px] text-black placeholder-neutral-500 bg-white focus:outline-none transition-all duration-500 placeholder:text-[#C8C8C8]",
-              menu: () =>
-                "bg-white rounded-lg px-[18px] py-[14px] border border-neutral-400",
-              multiValue: () =>
-                "bg-primary-400 px-4 py-2 text-white rounded-2xl",
-              valueContainer: () => "flex gap-2",
-              menuList: () => "text-base flex flex-col gap-1",
-              option: () =>
-                "hover:bg-neutral-300 hover:cursor-pointer transition-all duration-500 rounded-lg p-2",
-              input: () => "focus:bg-[#F1F6F9]",
-            }}
+            onChange={(e) => (e?.value === "SD" ? setIsSD(true) : setIsSD(false))}
+            classNames={selectClassNames}
           />
         </div>
         <div className="flex flex-col gap-2">
@@ -122,20 +122,7 @@ export default function FormComponent({ id }: { id: string }) {
             options={size}
             id="size"
             placeholder="Pilih Jumlah Pasukan"
-            classNames={{
-              placeholder: () => "text-[#C8C8C8]",
-              control: () =>
-                "rounded-[14px] border focus:bg-[#F1F6F9] border-neutral-400 px-[18px] active:border-black hover:border-black py-[14px] text-black placeholder-neutral-500 bg-white focus:outline-none transition-all duration-500 placeholder:text-[#C8C8C8]",
-              menu: () =>
-                "bg-white rounded-lg px-[18px] py-[14px] border border-neutral-400",
-              multiValue: () =>
-                "bg-primary-400 px-4 py-2 text-white rounded-2xl",
-              valueContainer: () => "flex gap-2",
-              menuList: () => "text-base flex flex-col gap-1",
-              option: () =>
-                "hover:bg-neutral-300 hover:cursor-pointer transition-all duration-500 rounded-lg p-2",
-              input: () => "focus:bg-[#F1F6F9]",
-            }}
+            classNames={selectClassNames}
           />
         </div>
         <div className="flex flex-col gap-2">
@@ -152,20 +139,7 @@ export default function FormComponent({ id }: { id: string }) {
             options={paymentType}
             id="tipe"
             placeholder="Pilih Tipe Pembayaran"
-            classNames={{
-              placeholder: () => "text-[#C8C8C8]",
-              control: () =>
-                "rounded-[14px] border focus:bg-[#F1F6F9] border-neutral-400 px-[18px] active:border-black hover:border-black py-[14px] text-black placeholder-neutral-500 bg-white focus:outline-none transition-all duration-500 placeholder:text-[#C8C8C8]",
-              menu: () =>
-                "bg-white rounded-lg px-[18px] py-[14px] border border-neutral-400",
-              multiValue: () =>
-                "bg-primary-400 px-4 py-2 text-white rounded-2xl",
-              valueContainer: () => "flex gap-2",
-              menuList: () => "text-base flex flex-col gap-1",
-              option: () =>
-                "hover:bg-neutral-300 hover:cursor-pointer transition-all duration-500 rounded-lg p-2",
-              input: () => "focus:bg-[#F1F6F9]",
-            }}
+            classNames={selectClassNames}
           />
         </div>
         <div>

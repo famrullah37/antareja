@@ -1,9 +1,9 @@
 "use client";
 
+import { ReactNode, useState } from "react";
 import { H2, H3, P } from "@/app/components/global/Text";
 import SectionWrapper from "@/app/components/global/Wrapper";
 import { TimWithRelations } from "@/types/entityRelations";
-import { ReactNode, useState,useEffect } from "react";
 import { AnggotaCard } from "./parts/AnggotaCard";
 import cn from "@/lib/clsx";
 import { updateTimForm } from "@/actions/Tim";
@@ -12,7 +12,6 @@ import Field from "../components/parts/input";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import SubmitButton from "@/app/components/global/SubmitButton";
-import { findPenilaian } from "@/queries/penilaian.query";
 
 const rowsMapNormal = [
   ["b1s1", "b1s2", "b1s3"],
@@ -70,21 +69,21 @@ function TimLayout({ tim }: Readonly<{ tim: TimWithRelations }>) {
       <div className="py-16 px-10 bg-neutral-300 rounded-lg flex flex-col gap-12">
         <AnggotaCardsWrapper className="flex flex-wrap gap-10">
           <AnggotaCard
-            href={`/dashboard/anggota/pelatih`}
+            href={`/dashboard/anggota/pelatih?timId=${tim.id}`}
             image={pelatih?.foto ?? "/placeholder-profile-picture.jpg"}
             name={tim.pelatih ?? "Belum diisi"}
             key={"pelatih"}
             posisi={pelatih?.posisi ?? "PELATIH"}
           />
           <AnggotaCard
-            href={`/dashboard/anggota/danton`}
+            href={`/dashboard/anggota/danton?timId=${tim.id}`}
             image={danton?.foto ?? "/placeholder-profile-picture.jpg"}
             name={danton?.nama ?? "Belum diisi"}
             key={"danton"}
             posisi={danton?.posisi ?? "DANTON"}
           />
           <AnggotaCard
-            href={`/dashboard/anggota/official`}
+            href={`/dashboard/anggota/official?timId=${tim.id}`}
             image={official?.foto ?? "/placeholder-profile-picture.jpg"}
             name={official?.nama ?? "Belum diisi"}
             key={"official"}
@@ -101,13 +100,10 @@ function TimLayout({ tim }: Readonly<{ tim: TimWithRelations }>) {
                 const anggotaInPos = anggotas.find(
                   (value) => value.posisi === pos.toUpperCase()
                 );
-
                 return (
                   <AnggotaCard
-                    href={`/dashboard/anggota/${pos}`}
-                    image={
-                      anggotaInPos?.foto ?? "/placeholder-profile-picture.jpg"
-                    }
+                    href={`/dashboard/anggota/${pos}?timId=${tim.id}`}
+                    image={anggotaInPos?.foto ?? "/placeholder-profile-picture.jpg"}
                     name={anggotaInPos?.nama ?? "Belum diisi"}
                     posisi={"Posisi " + (anggotaInPos?.posisi ?? pos)}
                     key={anggotaInPos?.id ?? i}
@@ -125,13 +121,10 @@ function TimLayout({ tim }: Readonly<{ tim: TimWithRelations }>) {
                 const anggotaInPos = anggotas.find(
                   (value) => value.posisi === pos.toUpperCase()
                 );
-
                 return (
                   <AnggotaCard
-                    href={`/dashboard/anggota/${pos}`}
-                    image={
-                      anggotaInPos?.foto ?? "/placeholder-profile-picture.jpg"
-                    }
+                    href={`/dashboard/anggota/${pos}?timId=${tim.id}`}
+                    image={anggotaInPos?.foto ?? "/placeholder-profile-picture.jpg"}
                     name={anggotaInPos?.nama ?? "Belum diisi"}
                     posisi={anggotaInPos?.posisi ?? pos}
                     key={anggotaInPos?.id ?? i}
@@ -145,18 +138,8 @@ function TimLayout({ tim }: Readonly<{ tim: TimWithRelations }>) {
   );
 }
 
-export default function ProfileTim({ tim }: { tim: TimWithRelations }) {
+export default function ProfileTim({ tim, penilaian }: { tim: TimWithRelations; penilaian?: any }) {
   const router = useRouter();
-  const [penilaian, setPenilaian] = useState<any>(null);
-
-  // ambil data penilaian setelah render
-  useEffect(() => {
-    async function fetchPenilaian() {
-      const data = await findPenilaian({ tim_id: tim.id });
-      setPenilaian(data);
-    }
-    fetchPenilaian();
-  }, [tim.id]);
 
   async function submitForm(formData: FormData) {
     const toastId = toast.loading(
@@ -185,7 +168,6 @@ export default function ProfileTim({ tim }: { tim: TimWithRelations }) {
           <H3>Nama Tim</H3>
           <P>{tim.nama_tim}</P>
         </div>
-        {/* ... (bagian info tim lainnya tetap sama) ... */}
 
         {tim.confirmed ? (
           <form action={submitForm} className="mb-4">
@@ -213,7 +195,7 @@ export default function ProfileTim({ tim }: { tim: TimWithRelations }) {
           </form>
         ) : null}
 
-        {/* hasil penilaian */}
+        {/* hasil penilaian (legacy) */}
         {penilaian?.published === true && (
           <>
             <div className="flex flex-col gap-1 mb-4">

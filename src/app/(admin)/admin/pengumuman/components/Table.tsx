@@ -2,7 +2,6 @@
 import { deletePengumumanForm } from "@/actions/Pengumuman";
 import { Pengumuman } from "@prisma/client";
 import { useRouter } from "next-nprogress-bar";
-import { redirect } from "next/navigation";
 import { useEffect, useState } from "react";
 import DataTable, { TableColumn } from "react-data-table-component";
 import { FaRegTrashCan } from "react-icons/fa6";

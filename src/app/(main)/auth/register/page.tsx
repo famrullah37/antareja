@@ -17,8 +17,7 @@ async function submit(data: FormData) {
   const toastId = toast.loading("Membuat akun...");
   const result = await signUp(data);
   if (result.success) {
-    toast.success("Berhasil membuat akun!", { id: toastId });
-    toast.warning("Silahkan masuk ke akun yang telah dibuat!", { id: toastId });
+    toast.success("Akun berhasil dibuat! Cek email Anda untuk verifikasi.", { id: toastId, duration: 6000 });
     redirect("/auth/login");
   } else {
     toast.error(result.message, { id: toastId });

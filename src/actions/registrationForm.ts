@@ -20,9 +20,12 @@ export default async function submitFormRegistrasi(
   const no_pelatih = data.get("no-pelatih") as string;
 
   const timCount = (await findTims({ jenjang: jenjang, confirmed: true })).length;
-
   if (timCount >= 30)
     return { success: false, message: `Kuota jenjang ${jenjang} telah penuh!` };
+
+  const existingTim = await findTims({ userId });
+  if (existingTim.length > 0)
+    return { success: false, message: "Akun Anda sudah memiliki tim terdaftar." };
 
   try {
     const tryUploadImage = await imageUploader(
@@ -47,8 +50,7 @@ export default async function submitFormRegistrasi(
     });
     revalidatePath("/", "layout");
     return { success: true, message: "Berhasil membuat Tim!" };
-  } catch (e) {
-    console.log(e);
+  } catch {
     return { success: false, message: "Gagal membuat Tim" };
   }
 }
