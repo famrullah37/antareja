@@ -61,6 +61,8 @@ export const authOptions: AuthOptions = {
           const isValidPassword = validateHash(credentials.password, user.password);
           if (!isValidPassword) return null;
 
+          if (!user.verified) return null;
+
           return {
             id: user.id,
             role: user.role,
