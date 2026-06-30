@@ -101,36 +101,47 @@ export async function beliTiket(data: FormData, userId?: string) {
   const metodePembayaran = (data.get("metodePembayaran") as string) || "TRANSFER";
   const kodeUnik = data.get("kodeUnik") as string | null;
 
-  try {
-    const tiket = await prisma.tiket.findUnique({ where: { id: tiketId } });
-    if (!tiket) return { success: false, message: "Tiket tidak ditemukan" };
-    if (tiket.sisa < jumlah) return { success: false, message: "Stok tiket tidak mencukupi" };
-
-    let buktiUrl: string | undefined;
-    if (bukti && bukti.size > 0) {
-      const upload = await imageUploader(Buffer.from(await bukti.arrayBuffer()));
-      if (upload.error) {
-        console.error("Upload bukti gagal:", upload.message);
-        return { success: false, message: upload.message };
-      }
-      buktiUrl = upload.data?.url;
+  // Upload bukti dulu sebelum transaksi DB
+  let buktiUrl: string | undefined;
+  if (bukti && bukti.size > 0) {
+    const upload = await imageUploader(Buffer.from(await bukti.arrayBuffer()));
+    if (upload.error) {
+      console.error("Upload bukti gagal:", upload.message);
+      return { success: false, message: upload.message };
     }
+    buktiUrl = upload.data?.url;
+  }
 
-    await createTransaksiTiket({
-      tiket: { connect: { id: tiketId } },
-      jumlah,
-      nama,
-      email,
-      noHp,
-      ...(buktiUrl ? { bukti: buktiUrl } : {}),
-      status: "PENDING",
-      metodePembayaran,
-      ...(kodeUnik ? { kodeUnik } : {}),
-      ...(userId ? { user: { connect: { id: userId } } } : {}),
+  try {
+    // Atomic: decrement sisa hanya jika cukup, lalu buat transaksi
+    await prisma.$transaction(async (tx) => {
+      const tiket = await tx.tiket.findUnique({ where: { id: tiketId } });
+      if (!tiket) throw new Error("TIKET_TIDAK_DITEMUKAN");
+      if (jumlah < 1) throw new Error("JUMLAH_INVALID");
+      if (tiket.sisa < jumlah) throw new Error("STOK_KURANG");
+
+      await tx.transaksiTiket.create({
+        data: {
+          tiket: { connect: { id: tiketId } },
+          jumlah,
+          nama,
+          email,
+          noHp,
+          ...(buktiUrl ? { bukti: buktiUrl } : {}),
+          status: "PENDING",
+          metodePembayaran,
+          ...(kodeUnik ? { kodeUnik } : {}),
+          ...(userId ? { user: { connect: { id: userId } } } : {}),
+        },
+      });
     });
     revalidatePath("/tiket");
     return { success: true };
-  } catch (e) {
+  } catch (e: any) {
+    const msg = e?.message ?? "";
+    if (msg === "TIKET_TIDAK_DITEMUKAN") return { success: false, message: "Tiket tidak ditemukan" };
+    if (msg === "JUMLAH_INVALID") return { success: false, message: "Jumlah tiket tidak valid" };
+    if (msg === "STOK_KURANG") return { success: false, message: "Stok tiket tidak mencukupi" };
     console.error("beliTiket error:", e);
     return { success: false };
   }
@@ -201,6 +212,7 @@ export async function verifikasiTiket(transaksiId: string) {
   try {
     const transaksi = await findTransaksiTiket({ id: transaksiId });
     if (!transaksi) return { success: false };
+    if (transaksi.status === "VERIFIED") return { success: false, message: "Tiket sudah diverifikasi sebelumnya" };
 
     await updateTransaksiTiket({ id: transaksiId }, { status: "VERIFIED" });
 
@@ -211,7 +223,7 @@ export async function verifikasiTiket(transaksiId: string) {
     });
 
     await prisma.tiket.update({
-      where: { id: transaksi.tiketId },
+      where: { id: transaksi.tiketId, sisa: { gte: transaksi.jumlah } },
       data: { sisa: { decrement: transaksi.jumlah } },
     });
 
@@ -286,6 +298,7 @@ export async function rejectTiket(transaksiId: string) {
 }
 
 export async function scanQRTiket(token: string) {
+  await requireAdminOrTiket();
   try {
     const qr = await prisma.qRTiket.findUnique({
       where: { token },

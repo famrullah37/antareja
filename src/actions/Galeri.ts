@@ -113,7 +113,7 @@ export async function beliFoto(data: FormData, userId?: string) {
     const uniqueAlbumPrices = Array.from(new Map(fotos.map((f) => [f.albumId, f.album.harga])).values());
     const harga = uniqueAlbumPrices.reduce((sum, h) => sum + h, 0);
     const expiredAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-    const kodeUnik = String(Math.floor(Math.random() * 900) + 100);
+    const kodeUnik = crypto.randomUUID().replace(/-/g, "").substring(0, 8).toUpperCase();
     const upload = await imageUploader(Buffer.from(await bukti.arrayBuffer()));
     if (!upload.data?.url) return { success: false, message: "Upload bukti gagal" };
     const transaksi = await createTransaksiFoto({

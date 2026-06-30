@@ -57,7 +57,7 @@ export default function GaleriClient({
   const [showCheckout, setShowCheckout] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [transaksiId, setTransaksiId] = useState<string | null>(null);
-  const [kodeUnik] = useState(() => String(Math.floor(Math.random() * 900) + 100));
+  const [kodeUnik] = useState(() => crypto.randomUUID().replace(/-/g, "").substring(0, 8).toUpperCase());
 
   const filtered =
     selectedAlbum === "all"

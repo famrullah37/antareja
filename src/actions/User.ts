@@ -33,6 +33,7 @@ export async function createStaffUser(data: FormData) {
 }
 
 export async function createUserForm(data: FormData) {
+  await requireAdmin();
   const name = data.get("nama") as string;
   const email = data.get("email") as string;
   const password = data.get("password") as string;
@@ -93,7 +94,11 @@ export async function updateUserForm(data: FormData, id: string) {
   }
 }
 
-export async function updateProfileUser(data: FormData, userId: string) {
+export async function updateProfileUser(data: FormData) {
+  const session = await getServerSession();
+  if (!session?.user?.id) return { success: false };
+  const userId = session.user.id;
+
   const nama = data.get("nama") as string;
   const password = (data.get("password") as string) || undefined;
 

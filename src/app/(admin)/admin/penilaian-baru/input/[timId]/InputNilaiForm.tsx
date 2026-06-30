@@ -124,7 +124,7 @@ export default function InputNilaiForm({
     }
     setLoading(true);
     const toastId = toast.loading("Menyimpan nilai...");
-    const result = await inputNilaiJuri(tim.id, selectedJuriId, entries);
+    const result = await inputNilaiJuri(tim.id, entries);
     setLoading(false);
     if (result.success) {
       toast.success("Nilai berhasil disimpan & dihitung ulang!", { id: toastId });

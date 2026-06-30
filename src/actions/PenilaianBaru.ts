@@ -106,10 +106,16 @@ export async function tugaskanJuriKategori(juriId: string, kategori: string) {
 
 export async function inputNilaiJuri(
   timId: string,
-  juriId: string,
   scores: { subKategoriId: string; nilai: number; predikat: string; catatan?: string }[]
 ) {
-  await requireAdminOrJuri();
+  const session = await getServerSession();
+  if (!["ADMIN", "JURI"].includes(session?.user?.role ?? "")) throw new Error("Forbidden");
+
+  // Juri hanya bisa submit atas namanya sendiri; admin bisa submit tapi tetap pakai userId-nya
+  const juri = await prisma.juri.findUnique({ where: { userId: session!.user!.id } });
+  if (!juri) return { success: false, message: "Akun tidak terhubung ke data Juri" };
+  const juriId = juri.id;
+
   try {
     const penilaian = await upsertPenilaianBaru(timId);
     await Promise.all(
@@ -127,7 +133,12 @@ export async function inputPelanggaranTim(
   jumlahKejadian: number,
   poinPerKejadian: number
 ) {
-  await requireAdminOrJuri();
+  const session = await getServerSession();
+  if (!["ADMIN", "JURI"].includes(session?.user?.role ?? "")) throw new Error("Forbidden");
+
+  const juri = await prisma.juri.findUnique({ where: { userId: session!.user!.id } });
+  if (!juri) return { success: false, message: "Akun tidak terhubung ke data Juri" };
+
   try {
     const penilaian = await upsertPenilaianBaru(timId);
     await createPelanggaranTim(penilaian.id, pelanggaranId, jumlahKejadian, poinPerKejadian);

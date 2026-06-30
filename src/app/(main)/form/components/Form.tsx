@@ -25,14 +25,14 @@ const paymentType = [
   { label: "Full", value: "FALSE" },
 ];
 
-export default function FormComponent({ id }: { id: string }) {
+export default function FormComponent() {
   const [isDP, setIsDP] = useState(false);
   const [isSD, setIsSD] = useState(false);
   const router = useRouter();
 
   async function submitForm(data: FormData) {
     const toastId = toast.loading("Membuat tim....");
-    const result = await submitFormRegistrasi(data, id);
+    const result = await submitFormRegistrasi(data);
 
     if (result.success) {
       toast.success(result.message, { id: toastId });

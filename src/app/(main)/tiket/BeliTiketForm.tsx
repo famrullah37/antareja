@@ -33,7 +33,7 @@ export default function BeliTiketForm({
   const [jumlah, setJumlah] = useState(1);
   const [metode, setMetode] = useState<"TRANSFER" | "QRIS">("TRANSFER");
   const [submitted, setSubmitted] = useState(false);
-  const [kodeUnik] = useState(() => String(Math.floor(Math.random() * 900) + 100));
+  const [kodeUnik] = useState(() => crypto.randomUUID().replace(/-/g, "").substring(0, 8).toUpperCase());
 
   async function handleSubmit(data: FormData) {
     const toastId = toast.loading("Memproses...");

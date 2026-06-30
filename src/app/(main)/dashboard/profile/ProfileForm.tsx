@@ -24,7 +24,7 @@ export default function ProfileForm({
 }) {
   async function handleSubmit(data: FormData) {
     const toastId = toast.loading("Menyimpan...");
-    const result = await updateProfileUser(data, user.id);
+    const result = await updateProfileUser(data);
     if (result.success) toast.success("Profil berhasil diperbarui!", { id: toastId });
     else toast.error("Gagal menyimpan perubahan", { id: toastId });
   }

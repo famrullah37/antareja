@@ -16,7 +16,7 @@ export default async function Form() {
 
   return (
     <div className="my-16">
-      <FormComponent id={session.user?.id!} />
+      <FormComponent />
     </div>
   );
 }
