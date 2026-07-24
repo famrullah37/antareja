@@ -22,6 +22,7 @@ const NavOptions: NavOption[] = [
   { label: "Juri", href: "/#juri" },
   { label: "Tiket", href: "/#tiket" },
   { label: "Galeri", href: "/galeri" },
+  { label: "Vote", href: "/vote" },
 ];
 
 const OrgLogos = [

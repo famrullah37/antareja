@@ -22,6 +22,7 @@ model User {
   juri             Juri?
   transaksiTiket   TransaksiTiket[]
   transaksiFoto    TransaksiFoto[]
+  transaksiVoting  TransaksiVoting[]
 }
 
 // ─── Tim & Anggota ───────────────────────────────────────────────────────────
@@ -41,11 +42,13 @@ model Tim {
   link_video    String?
   has_cc        Boolean        @default(false)
   has_maskot    Boolean        @default(false)
+  totalVote     Int            @default(0)
   anggotas      Anggota[]
   pembayaran    Pembayaran?
   penilaian     Penilaian?
   penilaianBaru PenilaianBaru?
   sertifikat    Sertifikat[]
+  transaksiVoting TransaksiVoting[]
   user          User           @relation(fields: [userId], references: [id])
 }
 
@@ -256,6 +259,38 @@ model KonfigTiket {
   bankNama     String?
   bankNoRek    String?
   bankAtasNama String?
+}
+
+// ─── Sistem Voting (Dukungan Berbayar) ────────────────────────────────────────
+
+model KonfigVoting {
+  id           String  @id @default("singleton")
+  aktif        Boolean @default(true)
+  nominalVote  Int     @default(5000)
+  counterUrut  Int     @default(0)
+  qrisUrl      String?
+  bankNama     String?
+  bankNoRek    String?
+  bankAtasNama String?
+}
+
+model TransaksiVoting {
+  id           String   @id @default(uuid())
+  userId       String?
+  timId        String
+  nama         String
+  email        String
+  noHp         String
+  jumlahVote   Int      @default(1)
+  hargaSatuan  Int
+  kodeUnik     String
+  totalBayar   Int
+  status       String   @default("PENDING")
+  bukti        String
+  catatanAdmin String?
+  createdAt    DateTime @default(now())
+  user         User?    @relation(fields: [userId], references: [id])
+  tim          Tim      @relation(fields: [timId], references: [id])
 }
 
 // ─── Galeri Foto Premium ──────────────────────────────────────────────────────

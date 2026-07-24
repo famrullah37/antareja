@@ -31,6 +31,7 @@ export default async function TimEdit({ params }: { params: { id: string } }) {
     link_video: "",
     has_cc: false,
     has_maskot: false,
+    totalVote: 0,
   };
 
   const trygetTim = await findTim({ id: params.id });
