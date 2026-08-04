@@ -9,6 +9,7 @@ export async function upsertKonfigVoting(data: {
   aktif?: boolean;
   nominalVote?: number;
   qrisUrl?: string;
+  qrisPayload?: string | null;
   bankNama?: string;
   bankNoRek?: string;
   bankAtasNama?: string;

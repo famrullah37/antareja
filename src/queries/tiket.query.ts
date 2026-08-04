@@ -76,6 +76,7 @@ export async function findKonfigTiket() {
 
 export async function upsertKonfigTiket(data: {
   qrisUrl?: string;
+  qrisPayload?: string | null;
   bankNama?: string;
   bankNoRek?: string;
   bankAtasNama?: string;

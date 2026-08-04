@@ -4,7 +4,9 @@ import { getServerSession } from "@/lib/next-auth";
 import { revalidatePath } from "next/cache";
 import prisma from "@/lib/prisma";
 import { imageUploader } from "./fileUploader";
+import { buildDynamicQrisImage, decodeQrisFromImage } from "@/lib/qris";
 import {
+  findKonfigVoting,
   findTransaksiVoting,
   updateTransaksiVoting,
   upsertKonfigVoting,
@@ -39,15 +41,39 @@ export async function saveKonfigVoting(data: FormData) {
       bankNoRek,
       bankAtasNama,
     };
+    let qrisTerbaca = true;
     if (qrisFile && qrisFile.size > 0) {
-      const upload = await imageUploader(Buffer.from(await qrisFile.arrayBuffer()));
+      const buffer = Buffer.from(await qrisFile.arrayBuffer());
+      const upload = await imageUploader(buffer);
       if (upload.error) return { success: false, message: upload.message };
       update.qrisUrl = upload.data!.url;
+      const payload = await decodeQrisFromImage(buffer);
+      update.qrisPayload = payload;
+      qrisTerbaca = !!payload;
     }
     await upsertKonfigVoting(update);
     revalidatePath("/admin/voting");
     revalidatePath("/vote");
-    return { success: true };
+    return {
+      success: true,
+      message: qrisTerbaca ? undefined : "Konfigurasi disimpan, tapi kode QRIS pada gambar tidak terbaca — QRIS dinamis nonaktif, dukungan tetap memakai gambar QRIS statis.",
+    };
+  } catch {
+    return { success: false };
+  }
+}
+
+// ─── Publik: QRIS Dinamis ─────────────────────────────────────────────────────
+
+// Bangun QRIS dinamis (nominal sudah terisi) dari QRIS statis yang diupload admin,
+// dipanggil dari client setiap kali nominal yang harus dibayar berubah.
+export async function getDynamicQrisVoting(amount: number) {
+  if (!Number.isFinite(amount) || amount <= 0) return { success: false };
+  try {
+    const konfig = await findKonfigVoting();
+    const dataUrl = await buildDynamicQrisImage(konfig?.qrisPayload, amount);
+    if (!dataUrl) return { success: false };
+    return { success: true, dataUrl };
   } catch {
     return { success: false };
   }

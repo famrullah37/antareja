@@ -9,6 +9,7 @@ type Konfig = {
   aktif: boolean;
   nominalVote: number;
   qrisUrl?: string | null;
+  qrisPayload?: string | null;
   bankNama?: string | null;
   bankNoRek?: string | null;
   bankAtasNama?: string | null;
@@ -20,8 +21,12 @@ export default function KonfigVotingForm({ konfig }: { konfig: Konfig | null }) 
   async function handleSave(data: FormData) {
     const toastId = toast.loading("Menyimpan...");
     const result = await saveKonfigVoting(data);
-    if (result.success) toast.success("Konfigurasi disimpan!", { id: toastId });
-    else toast.error(result.message ?? "Gagal menyimpan", { id: toastId });
+    if (result.success) {
+      if (result.message) toast.warning(result.message, { id: toastId, duration: 6000 });
+      else toast.success("Konfigurasi disimpan!", { id: toastId });
+    } else {
+      toast.error(result.message ?? "Gagal menyimpan", { id: toastId });
+    }
   }
 
   return (
@@ -54,7 +59,18 @@ export default function KonfigVotingForm({ konfig }: { konfig: Konfig | null }) 
       </div>
 
       <div className="flex flex-col gap-1">
-        <label className="text-sm font-medium">Upload Gambar QRIS</label>
+        <div className="flex items-center gap-2">
+          <label className="text-sm font-medium">Upload Gambar QRIS</label>
+          {konfig?.qrisUrl && (
+            <span
+              className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                konfig.qrisPayload ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"
+              }`}
+            >
+              {konfig.qrisPayload ? "QRIS Dinamis Aktif" : "Kode QRIS Tidak Terbaca"}
+            </span>
+          )}
+        </div>
         {preview && (
           <Image
             src={preview}

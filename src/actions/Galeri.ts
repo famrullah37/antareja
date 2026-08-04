@@ -104,6 +104,8 @@ export async function beliFoto(data: FormData, userId?: string) {
   const bukti = data.get("bukti") as File;
   const email = (data.get("email") as string) || "";
   const namaPembeli = (data.get("namaPembeli") as string) || "";
+  const metodePembayaran = (data.get("metodePembayaran") as string) || "TRANSFER";
+  const kodeUnik = (data.get("kodeUnik") as string) || String(Math.floor(100 + Math.random() * 900));
   try {
     const fotoList = JSON.parse(fotoListRaw) as string[];
     const fotos = await prisma.foto.findMany({
@@ -113,7 +115,6 @@ export async function beliFoto(data: FormData, userId?: string) {
     const uniqueAlbumPrices = Array.from(new Map(fotos.map((f) => [f.albumId, f.album.harga])).values());
     const harga = uniqueAlbumPrices.reduce((sum, h) => sum + h, 0);
     const expiredAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-    const kodeUnik = crypto.randomUUID().replace(/-/g, "").substring(0, 8).toUpperCase();
     const upload = await imageUploader(Buffer.from(await bukti.arrayBuffer()));
     if (!upload.data?.url) return { success: false, message: "Upload bukti gagal" };
     const transaksi = await createTransaksiFoto({
@@ -123,6 +124,7 @@ export async function beliFoto(data: FormData, userId?: string) {
       status: "PENDING",
       expiredAt,
       kodeUnik,
+      metodePembayaran,
       namaPembeli: namaPembeli || null,
       email: email || null,
       ...(userId ? { user: { connect: { id: userId } } } : {}),

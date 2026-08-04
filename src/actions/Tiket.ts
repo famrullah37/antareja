@@ -4,6 +4,7 @@ import { getServerSession } from "@/lib/next-auth";
 import { revalidatePath } from "next/cache";
 import { sendMailTo } from "@/lib/mailer";
 import QRCode from "qrcode";
+import { buildDynamicQrisImage, decodeQrisFromImage } from "@/lib/qris";
 
 async function requireAdmin() {
   const session = await getServerSession();
@@ -18,6 +19,7 @@ import {
   createTiket,
   createTransaksiTiket,
   deleteTiket,
+  findKonfigTiket,
   findTransaksiTiket,
   updateQRTiket,
   updateTiket,
@@ -64,15 +66,38 @@ export async function saveKonfigTiket(data: FormData) {
     const update: Parameters<typeof upsertKonfigTiket>[0] = {
       bankNama, bankNoRek, bankAtasNama,
     };
+    let qrisTerbaca = true;
     if (qrisFile && qrisFile.size > 0) {
-      const upload = await imageUploader(Buffer.from(await qrisFile.arrayBuffer()));
+      const buffer = Buffer.from(await qrisFile.arrayBuffer());
+      const upload = await imageUploader(buffer);
       if (upload.error) return { success: false, message: upload.message };
       update.qrisUrl = upload.data!.url;
+      const payload = await decodeQrisFromImage(buffer);
+      update.qrisPayload = payload;
+      qrisTerbaca = !!payload;
     }
     await upsertKonfigTiket(update);
     revalidatePath("/admin/tiket");
     revalidatePath("/tiket");
-    return { success: true };
+    revalidatePath("/galeri");
+    return {
+      success: true,
+      message: qrisTerbaca ? undefined : "Konfigurasi disimpan, tapi kode QRIS pada gambar tidak terbaca — QRIS dinamis nonaktif, tetap memakai gambar QRIS statis.",
+    };
+  } catch {
+    return { success: false };
+  }
+}
+
+// ─── Publik: QRIS Dinamis (dipakai Tiket & Galeri Foto Premium) ──────────────
+
+export async function getDynamicQrisTiket(amount: number) {
+  if (!Number.isFinite(amount) || amount <= 0) return { success: false };
+  try {
+    const konfig = await findKonfigTiket();
+    const dataUrl = await buildDynamicQrisImage(konfig?.qrisPayload, amount);
+    if (!dataUrl) return { success: false };
+    return { success: true, dataUrl };
   } catch {
     return { success: false };
   }

@@ -256,6 +256,7 @@ model QRTiket {
 model KonfigTiket {
   id           String  @id @default("singleton")
   qrisUrl      String?
+  qrisPayload  String? @db.Text
   bankNama     String?
   bankNoRek    String?
   bankAtasNama String?
@@ -269,6 +270,7 @@ model KonfigVoting {
   nominalVote  Int     @default(5000)
   counterUrut  Int     @default(0)
   qrisUrl      String?
+  qrisPayload  String? @db.Text
   bankNama     String?
   bankNoRek    String?
   bankAtasNama String?

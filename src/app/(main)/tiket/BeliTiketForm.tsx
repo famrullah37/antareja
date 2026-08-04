@@ -1,8 +1,8 @@
 "use client";
 
-import { beliTiket } from "@/actions/Tiket";
+import { beliTiket, getDynamicQrisTiket } from "@/actions/Tiket";
 import { Tiket } from "@prisma/client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 function formatRupiah(n: number) {
@@ -33,7 +33,26 @@ export default function BeliTiketForm({
   const [jumlah, setJumlah] = useState(1);
   const [metode, setMetode] = useState<"TRANSFER" | "QRIS">("TRANSFER");
   const [submitted, setSubmitted] = useState(false);
-  const [kodeUnik] = useState(() => crypto.randomUUID().replace(/-/g, "").substring(0, 8).toUpperCase());
+  const [kodeUnik] = useState(() => String(Math.floor(100 + Math.random() * 900)));
+  const [qrisDinamis, setQrisDinamis] = useState<string | null>(null);
+
+  const totalQris = selected ? selected.harga * jumlah : 0;
+
+  useEffect(() => {
+    if (metode !== "QRIS" || totalQris <= 0) {
+      setQrisDinamis(null);
+      return;
+    }
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      const result = await getDynamicQrisTiket(totalQris);
+      if (!cancelled) setQrisDinamis(result.success ? result.dataUrl! : null);
+    }, 250);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [metode, totalQris]);
 
   async function handleSubmit(data: FormData) {
     const toastId = toast.loading("Memproses...");
@@ -211,7 +230,13 @@ export default function BeliTiketForm({
             ) : (
               <div className="bg-purple-50 border border-purple-200 rounded-xl p-4 text-sm text-purple-800 flex flex-col items-center gap-2">
                 <p className="font-semibold">Scan QRIS berikut:</p>
-                {konfig?.qrisUrl ? (
+                {qrisDinamis ? (
+                  <img
+                    src={qrisDinamis}
+                    alt="QRIS Dinamis"
+                    className="w-48 h-48 object-contain rounded-lg border border-purple-200 bg-white"
+                  />
+                ) : konfig?.qrisUrl ? (
                   <img
                     src={konfig.qrisUrl}
                     alt="QRIS"
@@ -222,12 +247,16 @@ export default function BeliTiketForm({
                     QRIS belum dikonfigurasi
                   </div>
                 )}
-                <p className="font-semibold">Nominal: {formatRupiah(selected.harga * jumlah)}</p>
-                <div className="bg-purple-100 rounded-lg px-4 py-2 text-center">
-                  <p className="text-xs text-purple-600">Kode unik</p>
-                  <p className="font-bold font-mono text-xl tracking-widest">{kodeUnik}</p>
-                  <p className="text-xs text-purple-500">Sertakan kode ini saat konfirmasi</p>
-                </div>
+                <p className="font-semibold">Nominal: {formatRupiah(totalQris)}</p>
+                {qrisDinamis ? (
+                  <p className="text-xs text-purple-500 text-center">Nominal sudah otomatis terisi di QRIS — tinggal scan & bayar.</p>
+                ) : (
+                  <div className="bg-purple-100 rounded-lg px-4 py-2 text-center">
+                    <p className="text-xs text-purple-600">Kode unik</p>
+                    <p className="font-bold font-mono text-xl tracking-widest">{kodeUnik}</p>
+                    <p className="text-xs text-purple-500">Sertakan kode ini saat konfirmasi</p>
+                  </div>
+                )}
               </div>
             )}
 

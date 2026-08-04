@@ -1,8 +1,9 @@
 ﻿"use client";
 
 import { beliFoto } from "@/actions/Galeri";
+import { getDynamicQrisTiket } from "@/actions/Tiket";
 import Image from "next/image";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 type FotoItem = {
@@ -24,6 +25,7 @@ type AlbumItem = {
 };
 
 type KonfigTiket = {
+  qrisUrl?: string | null;
   bankNama?: string | null;
   bankNoRek?: string | null;
   bankAtasNama?: string | null;
@@ -57,7 +59,9 @@ export default function GaleriClient({
   const [showCheckout, setShowCheckout] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [transaksiId, setTransaksiId] = useState<string | null>(null);
-  const [kodeUnik] = useState(() => crypto.randomUUID().replace(/-/g, "").substring(0, 8).toUpperCase());
+  const [kodeUnik] = useState(() => String(Math.floor(100 + Math.random() * 900)));
+  const [metode, setMetode] = useState<"TRANSFER" | "QRIS">("TRANSFER");
+  const [qrisDinamis, setQrisDinamis] = useState<string | null>(null);
 
   const filtered =
     selectedAlbum === "all"
@@ -77,6 +81,22 @@ export default function GaleriClient({
   const cartFotos = fotos.filter((f) => cart.has(f.id));
   const albumPriceMap = new Map(cartFotos.map((f) => [f.albumId, f.album.harga]));
   const totalHarga = Array.from(albumPriceMap.values()).reduce((s, h) => s + h, 0);
+
+  useEffect(() => {
+    if (metode !== "QRIS" || totalHarga <= 0) {
+      setQrisDinamis(null);
+      return;
+    }
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      const result = await getDynamicQrisTiket(totalHarga);
+      if (!cancelled) setQrisDinamis(result.success ? result.dataUrl! : null);
+    }, 250);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [metode, totalHarga]);
 
   async function handleCheckout(data: FormData) {
     data.set("fotoList", JSON.stringify(Array.from(cart)));
@@ -281,37 +301,92 @@ export default function GaleriClient({
 
               <form action={handleCheckout} className="flex flex-col gap-4">
                 <input type="hidden" name="kodeUnik" value={kodeUnik} />
+                <input type="hidden" name="metodePembayaran" value={metode} />
 
-                {/* Info Pembayaran */}
-                <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-blue-800 flex flex-col gap-1">
-                  <p className="font-semibold">Transfer ke:</p>
-                  {konfig?.bankNoRek ? (
-                    <>
-                      <p>
-                        <span className="font-bold">{konfig.bankNoRek}</span>
-                        {" — "}{konfig.bankNama ?? "Bank"}
-                      </p>
-                      {konfig.bankAtasNama && <p>a.n {konfig.bankAtasNama}</p>}
-                    </>
-                  ) : (
-                    <p className="italic text-blue-600">Info rekening belum dikonfigurasi admin.</p>
-                  )}
-                  <div className="border-t border-blue-200 mt-2 pt-2 flex flex-col gap-1">
-                    <div className="flex justify-between">
-                      <span>Nominal</span>
-                      <span className="font-bold">{formatRupiah(totalHarga)}</span>
-                    </div>
-                    <div className="flex justify-between text-blue-600">
-                      <span>Kode unik</span>
-                      <span className="font-bold font-mono tracking-widest">+{kodeUnik}</span>
-                    </div>
-                    <div className="flex justify-between font-bold text-primary-700 text-base border-t border-blue-200 pt-1 mt-1">
-                      <span>Transfer tepat</span>
-                      <span>{formatRupiah(totalHarga + parseInt(kodeUnik))}</span>
-                    </div>
-                    <p className="text-xs text-blue-400 mt-0.5">Transfer nominal tepat agar mudah diverifikasi admin.</p>
+                {/* Metode Pembayaran */}
+                <div className="flex flex-col gap-1">
+                  <label className="text-sm font-medium">Metode Pembayaran</label>
+                  <div className="flex gap-3">
+                    {(["TRANSFER", "QRIS"] as const).map((m) => (
+                      <button
+                        key={m}
+                        type="button"
+                        onClick={() => setMetode(m)}
+                        className={`flex-1 py-2.5 rounded-xl border-2 text-sm font-medium transition-colors ${
+                          metode === m
+                            ? "border-primary-500 bg-primary-50 text-primary-700"
+                            : "border-gray-200 text-gray-600 hover:border-neutral-400"
+                        }`}
+                      >
+                        {m === "TRANSFER" ? "Transfer Bank" : "QRIS"}
+                      </button>
+                    ))}
                   </div>
                 </div>
+
+                {/* Info Pembayaran */}
+                {metode === "TRANSFER" ? (
+                  <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-blue-800 flex flex-col gap-1">
+                    <p className="font-semibold">Transfer ke:</p>
+                    {konfig?.bankNoRek ? (
+                      <>
+                        <p>
+                          <span className="font-bold">{konfig.bankNoRek}</span>
+                          {" — "}{konfig.bankNama ?? "Bank"}
+                        </p>
+                        {konfig.bankAtasNama && <p>a.n {konfig.bankAtasNama}</p>}
+                      </>
+                    ) : (
+                      <p className="italic text-blue-600">Info rekening belum dikonfigurasi admin.</p>
+                    )}
+                    <div className="border-t border-blue-200 mt-2 pt-2 flex flex-col gap-1">
+                      <div className="flex justify-between">
+                        <span>Nominal</span>
+                        <span className="font-bold">{formatRupiah(totalHarga)}</span>
+                      </div>
+                      <div className="flex justify-between text-blue-600">
+                        <span>Kode unik</span>
+                        <span className="font-bold font-mono tracking-widest">+{kodeUnik}</span>
+                      </div>
+                      <div className="flex justify-between font-bold text-primary-700 text-base border-t border-blue-200 pt-1 mt-1">
+                        <span>Transfer tepat</span>
+                        <span>{formatRupiah(totalHarga + parseInt(kodeUnik))}</span>
+                      </div>
+                      <p className="text-xs text-blue-400 mt-0.5">Transfer nominal tepat agar mudah diverifikasi admin.</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="bg-purple-50 border border-purple-200 rounded-xl p-4 text-sm text-purple-800 flex flex-col items-center gap-2">
+                    <p className="font-semibold">Scan QRIS berikut:</p>
+                    {qrisDinamis ? (
+                      <img
+                        src={qrisDinamis}
+                        alt="QRIS Dinamis"
+                        className="w-48 h-48 object-contain rounded-lg border border-purple-200 bg-white"
+                      />
+                    ) : konfig?.qrisUrl ? (
+                      <img
+                        src={konfig.qrisUrl}
+                        alt="QRIS"
+                        className="w-48 h-48 object-contain rounded-lg border border-purple-200 bg-white"
+                      />
+                    ) : (
+                      <div className="w-40 h-40 bg-white border border-purple-200 rounded-lg flex items-center justify-center text-gray-400 text-xs">
+                        QRIS belum dikonfigurasi
+                      </div>
+                    )}
+                    <p className="font-semibold">Nominal: {formatRupiah(totalHarga)}</p>
+                    {qrisDinamis ? (
+                      <p className="text-xs text-purple-500 text-center">Nominal sudah otomatis terisi di QRIS — tinggal scan & bayar.</p>
+                    ) : (
+                      <div className="bg-purple-100 rounded-lg px-4 py-2 text-center">
+                        <p className="text-xs text-purple-600">Kode unik</p>
+                        <p className="font-bold font-mono text-xl tracking-widest">{kodeUnik}</p>
+                        <p className="text-xs text-purple-500">Sertakan kode ini saat konfirmasi</p>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Nama */}
                 <div className="flex flex-col gap-1">
@@ -360,7 +435,7 @@ export default function GaleriClient({
                   type="submit"
                   className="bg-primary-500 text-white rounded-xl py-3 font-bold hover:bg-primary-600 transition-colors"
                 >
-                  Kirim Pembelian — {formatRupiah(totalHarga + parseInt(kodeUnik))}
+                  Kirim Pembelian — {formatRupiah(metode === "QRIS" ? totalHarga : totalHarga + parseInt(kodeUnik))}
                 </button>
               </form>
             </div>
