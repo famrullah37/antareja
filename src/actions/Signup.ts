@@ -23,7 +23,7 @@ export default async function signUp(data: FormData) {
       nama,
       password: hashedPass,
       role: "USER",
-      verified: true, // bypass verifikasi email sementara
+      verified: false,
       token,
     });
 
