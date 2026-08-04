@@ -113,11 +113,25 @@ export async function submitVote(data: FormData, userId?: string) {
   if (!bukti || bukti.size === 0) {
     return { success: false, message: "Bukti pembayaran wajib diunggah" };
   }
-  if (!kodeUnik) {
-    return { success: false, message: "Kode pembayaran tidak valid, silakan ulangi" };
+  if (!kodeUnik || !/^\d+$/.test(kodeUnik)) {
+    return { success: false, message: "Kode pembayaran tidak valid, silakan ulangi dari pemilihan tim" };
   }
   if (jumlahVote < 1) {
     return { success: false, message: "Jumlah vote tidak valid" };
+  }
+
+  // Pastikan kodeUnik benar-benar pernah di-reserve (bukan dikarang klien) dan
+  // belum dipakai transaksi lain — mencegah dua transaksi bertabrakan nominal
+  // transfernya, yang akan membingungkan admin saat rekonsiliasi manual.
+  const konfigCheck = await prisma.konfigVoting.findUnique({ where: { id: "singleton" } });
+  if (!konfigCheck || parseInt(kodeUnik) < 1 || parseInt(kodeUnik) > konfigCheck.counterUrut) {
+    return { success: false, message: "Kode pembayaran tidak valid, silakan ulangi dari pemilihan tim" };
+  }
+  const kodeDipakai = await prisma.transaksiVoting.findFirst({
+    where: { kodeUnik, status: { in: ["PENDING", "VERIFIED"] } },
+  });
+  if (kodeDipakai) {
+    return { success: false, message: "Kode pembayaran sudah terpakai, silakan ulangi dari pemilihan tim untuk mendapat kode baru" };
   }
 
   try {

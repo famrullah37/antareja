@@ -49,12 +49,17 @@ export async function updateTimFormAdmin(data: FormData, id: string) {
   await requireAdmin();
   const asal_sekolah = data.get("asal_sekolah") as string;
   const tipe_tim = data.get("tipe_tim") as Tipe;
+  const noUrutRaw = data.get("noUrut") as string;
+  const noUrut = noUrutRaw?.trim() ? parseInt(noUrutRaw) : null;
 
   try {
-    await updateTim({ id }, { asal_sekolah, tipe_tim });
+    await updateTim({ id }, { asal_sekolah, tipe_tim, noUrut });
     revalidatePath("/", "layout");
     return { success: true };
-  } catch {
+  } catch (e: any) {
+    if (e?.code === "P2002") {
+      return { success: false, message: "No. urut sudah dipakai tim lain di jenjang yang sama" };
+    }
     return { success: false };
   }
 }

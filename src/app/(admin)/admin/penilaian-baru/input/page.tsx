@@ -64,7 +64,11 @@ export default async function InputNilaiIndexPage({
                 href={`/admin/penilaian-baru/input/${tim.id}${qs ? `?${qs}` : ""}`}
                 className="bg-white border border-neutral-200 rounded-xl p-4 hover:border-primary-400 transition-colors"
               >
-                <div className="font-semibold">{tim.nama_tim}</div>
+                <div className="font-bold text-lg">
+                  {tim.noUrut != null
+                    ? `${tim.jenjang}-${String(tim.noUrut).padStart(2, "0")}`
+                    : "Belum ada No. Urut"}
+                </div>
                 <div className="text-sm text-gray-400">
                   {tim.asal_sekolah} — {tim.jenjang}
                 </div>

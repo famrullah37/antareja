@@ -145,6 +145,16 @@ export async function beliTiket(data: FormData, userId?: string) {
       if (jumlah < 1) throw new Error("JUMLAH_INVALID");
       if (tiket.sisa < jumlah) throw new Error("STOK_KURANG");
 
+      // Cegah dua transaksi memakai kodeUnik yang sama (kodeUnik dibuat acak di
+      // klien, jadi bisa bertabrakan) — kalau bertabrakan, minta klien coba lagi
+      // dengan kode baru daripada diam-diam diganti di server.
+      if (kodeUnik) {
+        const dipakai = await tx.transaksiTiket.findFirst({
+          where: { kodeUnik, status: { in: ["PENDING", "VERIFIED"] } },
+        });
+        if (dipakai) throw new Error("KODE_UNIK_DIPAKAI");
+      }
+
       await tx.transaksiTiket.create({
         data: {
           tiket: { connect: { id: tiketId } },
@@ -167,6 +177,7 @@ export async function beliTiket(data: FormData, userId?: string) {
     if (msg === "TIKET_TIDAK_DITEMUKAN") return { success: false, message: "Tiket tidak ditemukan" };
     if (msg === "JUMLAH_INVALID") return { success: false, message: "Jumlah tiket tidak valid" };
     if (msg === "STOK_KURANG") return { success: false, message: "Stok tiket tidak mencukupi" };
+    if (msg === "KODE_UNIK_DIPAKAI") return { success: false, message: "Kode unik sudah terpakai, silakan coba lagi" };
     console.error("beliTiket error:", e);
     return { success: false };
   }

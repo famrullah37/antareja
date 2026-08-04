@@ -36,7 +36,7 @@ export default function TimForm({
     const toastId = toast.loading("Loading...");
     const result = await updateTimFormAdmin(data, id!);
     if (!result.success) {
-      toast.error("Gagal mengedit tim!", { id: toastId });
+      toast.error(result.message ?? "Gagal mengedit tim!", { id: toastId });
     } else {
       toast.success("Berhasil mengedit tim!", { id: toastId });
       redirect("/admin/tim");
@@ -57,6 +57,15 @@ export default function TimForm({
           value={data?.nama_tim}
           required={edit ? false : true}
           disabled={true}
+        />
+        <TextField
+          id="noUrut"
+          type="number"
+          label="No. Urut (tampil di penjurian, per jenjang)"
+          name="noUrut"
+          placeholder="Belum di-assign — otomatis saat pembayaran dikonfirmasi"
+          value={data?.noUrut != null ? String(data.noUrut) : ""}
+          required={false}
         />
         <TextField
           id="asal_sekolah"

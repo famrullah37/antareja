@@ -115,6 +115,15 @@ export async function beliFoto(data: FormData, userId?: string) {
     const uniqueAlbumPrices = Array.from(new Map(fotos.map((f) => [f.albumId, f.album.harga])).values());
     const harga = uniqueAlbumPrices.reduce((sum, h) => sum + h, 0);
     const expiredAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+
+    // Cegah dua transaksi memakai kodeUnik yang sama (kodeUnik dibuat acak di
+    // klien, jadi bisa bertabrakan) — kalau bertabrakan, minta klien coba lagi
+    // dengan kode baru daripada diam-diam diganti di server.
+    const dipakai = await prisma.transaksiFoto.findFirst({
+      where: { kodeUnik, status: { in: ["PENDING", "VERIFIED"] } },
+    });
+    if (dipakai) return { success: false, message: "Kode unik sudah terpakai, silakan coba lagi" };
+
     const upload = await imageUploader(Buffer.from(await bukti.arrayBuffer()));
     if (!upload.data?.url) return { success: false, message: "Upload bukti gagal" };
     const transaksi = await createTransaksiFoto({

@@ -59,7 +59,7 @@ export default function GaleriClient({
   const [showCheckout, setShowCheckout] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [transaksiId, setTransaksiId] = useState<string | null>(null);
-  const [kodeUnik] = useState(() => String(Math.floor(100 + Math.random() * 900)));
+  const [kodeUnik, setKodeUnik] = useState(() => String(Math.floor(100 + Math.random() * 900)));
   const [metode, setMetode] = useState<"TRANSFER" | "QRIS">("TRANSFER");
   const [qrisDinamis, setQrisDinamis] = useState<string | null>(null);
 
@@ -108,7 +108,10 @@ export default function GaleriClient({
       setSubmitted(true);
       setShowCheckout(false);
     } else {
-      toast.error("Gagal memproses pembelian", { id: toastId });
+      toast.error(result.message ?? "Gagal memproses pembelian", { id: toastId });
+      if (result.message?.includes("sudah terpakai")) {
+        setKodeUnik(String(Math.floor(100 + Math.random() * 900)));
+      }
     }
   }
 

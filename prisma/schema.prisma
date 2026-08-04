@@ -43,6 +43,7 @@ model Tim {
   has_cc        Boolean        @default(false)
   has_maskot    Boolean        @default(false)
   totalVote     Int            @default(0)
+  noUrut        Int?
   anggotas      Anggota[]
   pembayaran    Pembayaran?
   penilaian     Penilaian?
@@ -50,6 +51,8 @@ model Tim {
   sertifikat    Sertifikat[]
   transaksiVoting TransaksiVoting[]
   user          User           @relation(fields: [userId], references: [id])
+
+  @@unique([jenjang, noUrut])
 }
 
 model Anggota {

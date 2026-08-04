@@ -12,7 +12,7 @@ const POINT_OF_INITIATION_TAG = "01";
 const AMOUNT_TAG = "54";
 const CRC_TAG = "63";
 // Tag yang harus muncul setelah Transaction Amount (54) sesuai urutan EMVCo.
-const TAGS_AFTER_AMOUNT = ["55", "57", "58", "59", "60", "61", "62", "63", "64"];
+const TAGS_AFTER_AMOUNT = ["55", "56", "57", "58", "59", "60", "61", "62", "63", "64"];
 
 function parseQrisTags(payload: string): QrisTag[] {
   const tags: QrisTag[] = [];
@@ -88,6 +88,11 @@ export async function generateQrisImageDataUrl(payload: string): Promise<string>
   return QRCode.toDataURL(payload, { width: 320, margin: 1 });
 }
 
+// Batas atas nominal — mencegah nominal non-integer/ekstrem (mis. notasi ilmiah
+// pada string hasil Math.round) merusak format tag 54, dan membatasi penyalahgunaan
+// endpoint publik ini sebagai generator QRIS bebas untuk nominal sembarang.
+const MAX_AMOUNT_RUPIAH = 100_000_000;
+
 /**
  * Dari payload statis + nominal, langsung hasilkan data URL QRIS dinamis siap-scan.
  * Mengembalikan null bila payload statis tidak tersedia/tidak valid.
@@ -96,7 +101,14 @@ export async function buildDynamicQrisImage(
   staticPayload: string | null | undefined,
   amountRupiah: number
 ): Promise<string | null> {
-  if (!staticPayload || amountRupiah <= 0) return null;
+  if (
+    !staticPayload ||
+    !Number.isInteger(amountRupiah) ||
+    amountRupiah <= 0 ||
+    amountRupiah > MAX_AMOUNT_RUPIAH
+  ) {
+    return null;
+  }
   try {
     const dynamicPayload = buildDynamicQris(staticPayload, amountRupiah);
     return await generateQrisImageDataUrl(dynamicPayload);

@@ -96,7 +96,11 @@ export default function VoteForm({
       );
       setSubmitted(true);
     } else {
-      toast.error(result.message ?? "Gagal mengirim dukungan", { id: toastId });
+      toast.error(result.message ?? "Gagal mengirim dukungan", { id: toastId, duration: 6000 });
+      if (result.message?.includes("ulangi dari pemilihan tim")) {
+        setSelected(null);
+        setReserved(null);
+      }
     }
   }
 

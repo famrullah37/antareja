@@ -11,10 +11,25 @@ async function requireAdmin() {
   if (session?.user?.role !== "ADMIN") throw new Error("Forbidden");
 }
 
+// No. urut ditampilkan untuk peserta saat penjurian (bukan nama tim), diberikan
+// per jenjang secara berurutan begitu tim dikonfirmasi pembayarannya. Admin tetap
+// bisa mengubahnya manual lewat halaman detail tim jika perlu reorder.
+async function assignNoUrutIfNeeded(timId: string) {
+  const tim = await prisma.tim.findUnique({ where: { id: timId } });
+  if (!tim || tim.noUrut !== null) return;
+  const agg = await prisma.tim.aggregate({
+    where: { jenjang: tim.jenjang },
+    _max: { noUrut: true },
+  });
+  const next = (agg._max.noUrut ?? 0) + 1;
+  await prisma.tim.update({ where: { id: timId }, data: { noUrut: next } });
+}
+
 export async function approvePayment(timId: string, isDP: boolean) {
   try {
     await requireAdmin();
     await updateTim({ id: timId }, { confirmed: true });
+    await assignNoUrutIfNeeded(timId);
     await updatePembayaran({ tim_id: timId }, { isDP });
 
     const tim = await prisma.tim.findUnique({
@@ -70,6 +85,7 @@ export default async function konfirmasiPembayaran(
 
   try {
     await updateTim({ id: idTim }, { confirmed: status });
+    if (status) await assignNoUrutIfNeeded(idTim);
     await updatePembayaran({ tim_id: idTim }, { isDP: statusPembayaran });
 
     if (status) {

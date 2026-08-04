@@ -32,7 +32,11 @@ export default async function InputNilaiPage({
   return (
     <div className="max-w-4xl mx-auto py-6">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold">{tim.nama_tim}</h1>
+        <h1 className="text-2xl font-bold">
+          {tim.noUrut != null
+            ? `${tim.jenjang}-${String(tim.noUrut).padStart(2, "0")}`
+            : "Belum ada No. Urut"}
+        </h1>
         <p className="text-gray-500">
           {tim.asal_sekolah} — {tim.jenjang}
         </p>

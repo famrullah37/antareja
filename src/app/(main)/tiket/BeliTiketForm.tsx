@@ -33,7 +33,7 @@ export default function BeliTiketForm({
   const [jumlah, setJumlah] = useState(1);
   const [metode, setMetode] = useState<"TRANSFER" | "QRIS">("TRANSFER");
   const [submitted, setSubmitted] = useState(false);
-  const [kodeUnik] = useState(() => String(Math.floor(100 + Math.random() * 900)));
+  const [kodeUnik, setKodeUnik] = useState(() => String(Math.floor(100 + Math.random() * 900)));
   const [qrisDinamis, setQrisDinamis] = useState<string | null>(null);
 
   const totalQris = selected ? selected.harga * jumlah : 0;
@@ -64,7 +64,10 @@ export default function BeliTiketForm({
       );
       setSubmitted(true);
     } else {
-      toast.error("Gagal memproses pembelian", { id: toastId });
+      toast.error(result.message ?? "Gagal memproses pembelian", { id: toastId });
+      if (result.message?.includes("sudah terpakai")) {
+        setKodeUnik(String(Math.floor(100 + Math.random() * 900)));
+      }
     }
   }
 
