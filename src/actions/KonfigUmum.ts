@@ -12,6 +12,7 @@ async function requireAdmin() {
 export async function saveKonfigUmum(data: FormData) {
   await requireAdmin();
   const countdownRaw = data.get("countdownTarget") as string;
+  const countdownAktif = data.get("countdownAktif") === "on";
   const biayaSD = parseInt(data.get("biayaSD") as string);
   const biayaSDDP = parseInt(data.get("biayaSDDP") as string);
   const biayaSMP = parseInt(data.get("biayaSMP") as string);
@@ -19,9 +20,23 @@ export async function saveKonfigUmum(data: FormData) {
   const biayaSMA = parseInt(data.get("biayaSMA") as string);
   const biayaSMADP = parseInt(data.get("biayaSMADP") as string);
 
+  const countdownTarget = new Date(countdownRaw);
+  if (isNaN(countdownTarget.getTime())) {
+    return { success: false, message: "Target waktu tidak valid" };
+  }
+  for (const [label, n] of [
+    ["SD", biayaSD], ["SD DP", biayaSDDP], ["SMP", biayaSMP],
+    ["SMP DP", biayaSMPDP], ["SMA", biayaSMA], ["SMA DP", biayaSMADP],
+  ] as const) {
+    if (!Number.isFinite(n) || n < 0) {
+      return { success: false, message: `Biaya ${label} tidak valid` };
+    }
+  }
+
   try {
     await upsertKonfigUmum({
-      countdownTarget: new Date(countdownRaw),
+      countdownTarget,
+      countdownAktif,
       biayaSD, biayaSDDP, biayaSMP, biayaSMPDP, biayaSMA, biayaSMADP,
     });
     revalidatePath("/", "layout");

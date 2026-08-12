@@ -6,9 +6,12 @@ import { revalidatePath } from "next/cache";
 import prisma from "@/lib/prisma";
 import { getServerSession } from "@/lib/next-auth";
 
+// Halaman /admin/pembayaran juga bisa diakses role BENDAHARA (lihat middleware),
+// jadi aksi konfirmasinya harus mengizinkan BENDAHARA juga — bukan cuma ADMIN.
 async function requireAdmin() {
   const session = await getServerSession();
-  if (session?.user?.role !== "ADMIN") throw new Error("Forbidden");
+  if (session?.user?.role !== "ADMIN" && session?.user?.role !== "BENDAHARA")
+    throw new Error("Forbidden");
 }
 
 // No. urut ditampilkan untuk peserta saat penjurian (bukan nama tim), diberikan

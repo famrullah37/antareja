@@ -5,6 +5,7 @@ import { toast } from "sonner";
 
 type Konfig = {
   countdownTarget: Date;
+  countdownAktif: boolean;
   biayaSD: number;
   biayaSDDP: number;
   biayaSMP: number;
@@ -28,12 +29,24 @@ export default function PengaturanForm({ konfig }: { konfig: Konfig }) {
 
   return (
     <form action={handleSubmit} className="flex flex-col gap-8 max-w-2xl">
-      {/* Countdown */}
+      {/* Countdown / Coming Soon */}
       <div className="bg-white border border-neutral-200 rounded-xl p-6 flex flex-col gap-4">
-        <h2 className="font-semibold text-lg">Countdown Registrasi</h2>
+        <h2 className="font-semibold text-lg">Countdown & Coming Soon</h2>
         <p className="text-sm text-gray-500">
-          Tanggal dan waktu yang dijadikan target hitung mundur di halaman utama.
+          Selama belum diaktifkan, halaman utama akan menampilkan halaman{" "}
+          <strong>Coming Soon</strong> untuk pengunjung (admin tetap bisa login &
+          masuk ke dashboard seperti biasa). Setelah diaktifkan, halaman utama akan
+          otomatis terbuka sendiri tepat saat waktu target tercapai.
         </p>
+        <label className="flex items-center gap-2 text-sm font-medium">
+          <input
+            type="checkbox"
+            name="countdownAktif"
+            defaultChecked={konfig.countdownAktif}
+            className="w-4 h-4"
+          />
+          Aktifkan countdown (buka situs otomatis pada waktu target)
+        </label>
         <div className="flex flex-col gap-1">
           <label className="text-sm font-medium">Target Waktu</label>
           <input

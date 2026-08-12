@@ -36,6 +36,10 @@ export async function upsertAnggotaForm(
     return { success: false, message: "Max. Ukuran foto adalah 10MB" };
 
   const tryFindAnggota = await findAnggota({ id });
+  // id anggota dikirim dari klien — pastikan anggota yang mau diedit memang
+  // milik tim yang barusan divalidasi kepemilikannya, bukan tim lain.
+  if (tryFindAnggota && tryFindAnggota.timId !== timId)
+    return { success: false, message: "Forbidden" };
 
   try {
     let fotoUrl: string | undefined;

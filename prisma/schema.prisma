@@ -383,6 +383,7 @@ model Pengumuman {
 model KonfigUmum {
   id              String   @id @default("singleton")
   countdownTarget DateTime @default("2025-11-08T00:00:00.000Z")
+  countdownAktif  Boolean  @default(false)
   biayaSD         Int      @default(375000)
   biayaSDDP       Int      @default(187500)
   biayaSMP        Int      @default(400000)

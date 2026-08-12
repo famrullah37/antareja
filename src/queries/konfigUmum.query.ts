@@ -10,6 +10,7 @@ export async function getKonfigUmum() {
 
 export async function upsertKonfigUmum(data: {
   countdownTarget?: Date;
+  countdownAktif?: boolean;
   biayaSD?: number;
   biayaSDDP?: number;
   biayaSMP?: number;

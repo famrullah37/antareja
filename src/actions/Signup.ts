@@ -11,6 +11,13 @@ export default async function signUp(data: FormData) {
   const nama = data.get("nama") as string;
   const password = data.get("password") as string;
 
+  if (!email || !nama || !password) {
+    return { success: false, message: "Data tidak lengkap" };
+  }
+  if (password.length < 8) {
+    return { success: false, message: "Password minimal 8 karakter" };
+  }
+
   const existing = await findUser({ email });
   if (existing) return { success: false, message: "Email sudah terdaftar!" };
 

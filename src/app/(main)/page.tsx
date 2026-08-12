@@ -9,8 +9,18 @@ import Juri from "./components/Juri";
 import Throwback from "./components/Throwback";
 import TiketSection from "./components/TiketSection";
 import RevealSection from "./components/parts/RevealSection";
+import ComingSoon from "./components/ComingSoon";
+import { getKonfigUmum } from "@/queries/konfigUmum.query";
 
-export default function LandingPage() {
+export default async function LandingPage() {
+  const konfig = await getKonfigUmum();
+  const countdownTarget = new Date(konfig.countdownTarget);
+  const isLive = konfig.countdownAktif && countdownTarget.getTime() <= Date.now();
+
+  if (!isLive) {
+    return <ComingSoon target={konfig.countdownAktif ? countdownTarget : null} />;
+  }
+
   return (
     <>
       <Hero />

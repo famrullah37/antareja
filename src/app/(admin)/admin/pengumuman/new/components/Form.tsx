@@ -5,6 +5,7 @@ import SubmitButton from "@/app/components/global/SubmitButton";
 import { toast } from "sonner";
 import { redirect } from "next/navigation";
 import { createPengumumanForm } from "@/actions/Pengumuman";
+import type { Pengumuman } from "@prisma/client";
 
 export default function UserForm({ data }: { data?: Pengumuman }) {
   async function Create(data: FormData) {

@@ -18,7 +18,13 @@ function TimeFigure({ time, title }: { time: number; title: string }) {
   );
 }
 
-export default function Countdown({ endDate }: { endDate: Date }) {
+export default function Countdown({
+  endDate,
+  label = "Penutupan Pendaftaran",
+}: {
+  endDate: Date;
+  label?: string;
+}) {
   const [days, hours, minutes, seconds] = useCountdown(endDate);
 
   return (
@@ -26,7 +32,7 @@ export default function Countdown({ endDate }: { endDate: Date }) {
       <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm border border-white/20 rounded-full px-4 py-1.5">
         <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
         <span className="text-white text-xs sm:text-sm font-semibold tracking-wide">
-          Penutupan Pendaftaran
+          {label}
         </span>
       </div>
       <div className="flex gap-3 sm:gap-5">
