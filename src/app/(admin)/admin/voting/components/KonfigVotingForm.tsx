@@ -13,7 +13,14 @@ type Konfig = {
   bankNama?: string | null;
   bankNoRek?: string | null;
   bankAtasNama?: string | null;
+  mulaiPada?: Date | string | null;
+  tutupPada?: Date | string | null;
 };
+
+function toDatetimeLocal(d: Date) {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
 
 export default function KonfigVotingForm({ konfig }: { konfig: Konfig | null }) {
   const [preview, setPreview] = useState(konfig?.qrisUrl ?? "");
@@ -45,6 +52,30 @@ export default function KonfigVotingForm({ konfig }: { konfig: Konfig | null }) 
         />
         Buka voting untuk publik
       </label>
+
+      <div className="grid sm:grid-cols-2 gap-4">
+        <div className="flex flex-col gap-1">
+          <label className="text-sm font-medium">Mulai (opsional)</label>
+          <input
+            type="datetime-local"
+            name="mulaiPada"
+            defaultValue={konfig?.mulaiPada ? toDatetimeLocal(new Date(konfig.mulaiPada)) : ""}
+            className="border border-neutral-300 rounded-lg px-3 py-2 text-sm"
+          />
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-sm font-medium">Tutup (opsional)</label>
+          <input
+            type="datetime-local"
+            name="tutupPada"
+            defaultValue={konfig?.tutupPada ? toDatetimeLocal(new Date(konfig.tutupPada)) : ""}
+            className="border border-neutral-300 rounded-lg px-3 py-2 text-sm"
+          />
+        </div>
+      </div>
+      <p className="text-xs text-gray-400 -mt-2">
+        Kosongkan kalau tidak mau pakai jadwal — voting cuma dikontrol toggle "Buka voting" di atas. Kalau diisi, halaman /vote menampilkan countdown dan otomatis tertutup begitu waktunya lewat.
+      </p>
 
       <div className="flex flex-col gap-1">
         <label className="text-sm font-medium">Nominal per Dukungan (Rp)</label>

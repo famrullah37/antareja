@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { updateTim } from "@/queries/tim.query";
 import { Tipe } from "@prisma/client";
 import prisma from "@/lib/prisma";
+import { imageUploader, validateUploadFile } from "./fileUploader";
 
 async function requireAdmin() {
   const session = await getServerSession();
@@ -35,9 +36,19 @@ export async function updateTimForm(id: string, formData: FormData) {
 
   const link_berkas = formData.get("link_berkas") as string;
   const link_video = formData.get("link_video") as string;
+  const foto = formData.get("foto") as File | null;
 
   try {
-    await updateTim({ id }, { link_berkas, link_video });
+    let fotoUrl: string | undefined;
+    if (foto && foto.size > 0) {
+      const fileCheck = await validateUploadFile(foto);
+      if (!fileCheck.valid) return { success: false, message: fileCheck.message };
+      const upload = await imageUploader(Buffer.from(await foto.arrayBuffer()));
+      if (upload.error) return { success: false, message: "Gagal upload foto tim" };
+      fotoUrl = upload.data!.url;
+    }
+
+    await updateTim({ id }, { link_berkas, link_video, ...(fotoUrl ? { foto: fotoUrl } : {}) });
     revalidatePath("/", "layout");
     return { success: true, message: "Berhasil memperbarui Link" };
   } catch {

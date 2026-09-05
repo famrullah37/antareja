@@ -5,8 +5,6 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
-const MEDALS = ["🥇", "🥈", "🥉"];
-
 function formatRupiah(n: number) {
   return new Intl.NumberFormat("id-ID", {
     style: "currency",
@@ -15,12 +13,20 @@ function formatRupiah(n: number) {
   }).format(n);
 }
 
+function initials(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[1][0]).toUpperCase();
+}
+
 type TimVote = {
   id: string;
   nama_tim: string;
   asal_sekolah: string;
   jenjang: string;
   totalVote: number;
+  foto: string | null;
 };
 
 type KonfigVoting = {
@@ -29,6 +35,24 @@ type KonfigVoting = {
   bankNoRek?: string | null;
   bankAtasNama?: string | null;
 } | null;
+
+function Avatar({ tim, className }: { tim: TimVote; className: string }) {
+  return tim.foto ? (
+    <img src={tim.foto} alt={tim.nama_tim} className={`${className} object-cover`} />
+  ) : (
+    <div className={`${className} bg-primary-100 text-primary-600 font-bold flex items-center justify-center`}>
+      {initials(tim.nama_tim)}
+    </div>
+  );
+}
+
+// Podium 3 besar: #1 di tengah (paling tinggi & emas), #2 di kiri (silver),
+// #3 di kanan (perunggu) — urutan klasik podium juara.
+const PODIUM_STYLES = [
+  { order: "order-2", height: "h-44", bg: "bg-gradient-to-b from-amber-400 to-amber-500" },
+  { order: "order-1", height: "h-36", bg: "bg-gradient-to-b from-slate-300 to-slate-400" },
+  { order: "order-3", height: "h-32", bg: "bg-gradient-to-b from-orange-300 to-orange-400" },
+];
 
 export default function VoteForm({
   tims,
@@ -48,6 +72,10 @@ export default function VoteForm({
   const [qrisDinamis, setQrisDinamis] = useState<string | null>(null);
 
   const totalBayar = reserved ? reserved.hargaSatuan * jumlahVote + parseInt(reserved.kodeUnik) : 0;
+
+  const ranked = tims.slice().sort((a, b) => b.totalVote - a.totalVote);
+  const top3 = ranked.slice(0, 3);
+  const rest = ranked.slice(3);
 
   // Papan Dukungan (leaderboard) update otomatis tanpa reload halaman.
   useEffect(() => {
@@ -121,67 +149,87 @@ export default function VoteForm({
   return (
     <div className="flex flex-col gap-8">
       {/* Papan Peringkat */}
-      {tims.length > 0 && (
+      {ranked.length > 0 && (
         <div className="bg-white rounded-2xl border border-gray-200 p-5">
-          <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center justify-between mb-4">
             <h3 className="font-semibold text-lg">Papan Dukungan</h3>
             <span className="text-[11px] text-gray-400">Update otomatis setelah verifikasi admin</span>
           </div>
-          <div className="flex flex-col divide-y divide-gray-100">
-            {tims
-              .slice()
-              .sort((a, b) => b.totalVote - a.totalVote)
-              .map((t, i) => {
-                const isTop3 = i < 3;
-                return (
+
+          {/* Podium top 3 */}
+          <div className="flex items-end justify-center gap-3 mb-4">
+            {top3.map((t, i) => {
+              const style = PODIUM_STYLES[i];
+              return (
+                <div key={t.id} className={`flex-1 max-w-[170px] ${style.order}`}>
                   <div
-                    key={t.id}
-                    className={`flex items-center justify-between py-2.5 text-sm transition-colors ${
-                      isTop3 ? "px-2 -mx-2 rounded-lg bg-amber-50/60" : ""
-                    }`}
+                    className={`rounded-2xl ${style.bg} ${style.height} text-white flex flex-col items-center justify-between p-3 shadow-md`}
                   >
-                    <div className="flex items-center gap-3">
-                      <span
-                        className={`w-6 text-center ${
-                          isTop3 ? "text-lg leading-none" : "text-gray-400 font-mono text-xs"
-                        }`}
-                      >
-                        {isTop3 ? MEDALS[i] : i + 1}
-                      </span>
-                      <div>
-                        <div className={`font-medium ${isTop3 ? "font-bold" : ""}`}>{t.nama_tim}</div>
-                        <div className="text-xs text-gray-400">{t.asal_sekolah} — {t.jenjang}</div>
-                      </div>
-                    </div>
-                    <span className={`font-bold ${isTop3 ? "text-amber-600" : "text-primary-600"}`}>
-                      {t.totalVote} suara
+                    <span className="text-xs font-bold bg-white/25 rounded-full px-2.5 py-0.5">
+                      #{i + 1}
                     </span>
+                    <Avatar tim={t} className="w-12 h-12 rounded-full border-2 border-white/70" />
+                    <div className="text-center">
+                      <div className="font-bold text-sm leading-tight line-clamp-2">{t.nama_tim}</div>
+                      <div className="text-xs opacity-90 mt-1">{t.totalVote} suara</div>
+                    </div>
                   </div>
-                );
-              })}
+                </div>
+              );
+            })}
           </div>
+
+          {/* Sisanya (ranking 4 dst) */}
+          {rest.length > 0 && (
+            <div className="flex flex-col divide-y divide-gray-100">
+              {rest.map((t, i) => (
+                <div key={t.id} className="flex items-center justify-between py-2.5 text-sm">
+                  <div className="flex items-center gap-3">
+                    <span className="w-6 text-center text-gray-400 font-mono text-xs">{i + 4}</span>
+                    <Avatar tim={t} className="w-8 h-8 rounded-full" />
+                    <div>
+                      <div className="font-medium">{t.nama_tim}</div>
+                      <div className="text-xs text-gray-400">{t.asal_sekolah} — {t.jenjang}</div>
+                    </div>
+                  </div>
+                  <span className="font-bold text-primary-600">{t.totalVote} suara</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
       {/* Pilih Tim */}
       <div>
-        <h3 className="font-semibold text-lg mb-3">Pilih Tim yang Didukung</h3>
+        <h3 className="font-semibold text-lg mb-3">Pilih Peserta Favorit untuk Vote</h3>
         <div className="grid sm:grid-cols-2 gap-4">
-          {tims.map((t) => (
-            <button
+          {ranked.map((t, i) => (
+            <div
               key={t.id}
-              type="button"
-              onClick={() => handlePilihTim(t)}
-              className={`rounded-2xl border-2 p-5 text-left transition-all ${
+              className={`rounded-2xl border-2 p-5 flex flex-col items-center text-center gap-2 transition-all ${
                 selected?.id === t.id
                   ? "border-primary-500 bg-primary-50"
-                  : "border-gray-200 bg-white hover:border-gray-400"
+                  : "border-gray-200 bg-white"
               }`}
             >
-              <div className="font-bold text-lg mb-1">{t.nama_tim}</div>
-              <div className="text-sm text-gray-500">{t.asal_sekolah}</div>
-              <div className="text-xs text-gray-400 mt-1">Jenjang: {t.jenjang}</div>
-            </button>
+              <div className="relative mb-1">
+                <Avatar tim={t} className="w-20 h-20 rounded-full border-2 border-white shadow" />
+                <span className="absolute -top-1 -left-1 bg-primary-500 text-white text-xs font-bold w-7 h-7 rounded-full flex items-center justify-center border-2 border-white">
+                  #{i + 1}
+                </span>
+              </div>
+              <div className="font-bold text-base leading-snug line-clamp-2">{t.nama_tim}</div>
+              <div className="text-xs text-gray-400 -mt-1">{t.asal_sekolah}</div>
+              <div className="text-sm text-gray-500">{t.totalVote} suara</div>
+              <button
+                type="button"
+                onClick={() => handlePilihTim(t)}
+                className="w-full bg-primary-500 hover:bg-primary-600 text-white rounded-xl py-2.5 font-semibold transition-colors mt-1"
+              >
+                Pilih
+              </button>
+            </div>
           ))}
         </div>
       </div>

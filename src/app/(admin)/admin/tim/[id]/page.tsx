@@ -29,6 +29,7 @@ export default async function TimEdit({ params }: { params: { id: string } }) {
     tipe_tim: "NORMAL",
     link_berkas: "",
     link_video: "",
+    foto: null,
     has_cc: false,
     has_maskot: false,
     totalVote: 0,

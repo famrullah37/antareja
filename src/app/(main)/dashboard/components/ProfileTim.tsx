@@ -171,6 +171,29 @@ export default function ProfileTim({ tim, penilaian }: { tim: TimWithRelations; 
 
         {tim.confirmed ? (
           <form action={submitForm} className="mb-4">
+            <H3 className="mb-4">Foto Tim</H3>
+            <P className="text-sm text-gray-500 mb-2">
+              Ditampilkan di halaman Vote (/vote) supaya pendukung mudah mengenali timmu.
+            </P>
+            <div className="flex items-center gap-4 mb-4">
+              {tim.foto ? (
+                <img
+                  src={tim.foto}
+                  alt={tim.nama_tim}
+                  className="w-20 h-20 rounded-full object-cover border border-neutral-200"
+                />
+              ) : (
+                <div className="w-20 h-20 rounded-full bg-primary-100 text-primary-600 font-bold flex items-center justify-center border border-neutral-200">
+                  {tim.nama_tim.slice(0, 2).toUpperCase()}
+                </div>
+              )}
+              <input
+                name="foto"
+                type="file"
+                accept="image/*"
+                className="text-sm file:bg-primary-500 file:text-white file:rounded-md file:border-none file:py-1.5 file:px-3 file:mr-3 hover:cursor-pointer"
+              />
+            </div>
             <H3 className="mb-4">Video Tiktok + Foto Pasukan</H3>
             <TextField
               id="link_video"
