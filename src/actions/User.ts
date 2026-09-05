@@ -63,6 +63,9 @@ export async function updateUserForm(data: FormData, id: string) {
   const role = data.get("role") as Role;
   const verified = data.get("verified") === "true";
 
+  if (password && password.length < 8)
+    return { success: false, message: "Password minimal 8 karakter" };
+
   try {
     if (password) {
       const hashedPass = generateHash(password);
@@ -101,6 +104,9 @@ export async function updateProfileUser(data: FormData) {
 
   const nama = data.get("nama") as string;
   const password = (data.get("password") as string) || undefined;
+
+  if (password && password.length < 8)
+    return { success: false, message: "Password minimal 8 karakter" };
 
   try {
     if (password) {

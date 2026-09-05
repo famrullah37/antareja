@@ -1,10 +1,13 @@
 "use server";
 import { findTims } from "@/queries/tim.query";
 import { Jenjang, Tipe } from "@prisma/client";
-import { imageUploader } from "./fileUploader";
+import { imageUploader, validateUploadFile } from "./fileUploader";
 import { revalidatePath } from "next/cache";
 import { getServerSession } from "@/lib/next-auth";
 import prisma from "@/lib/prisma";
+
+const VALID_JENJANG: Jenjang[] = ["SD", "SMP", "SMA"];
+const VALID_TIPE: Tipe[] = ["SMALL", "NORMAL"];
 
 export default async function submitFormRegistrasi(data: FormData) {
   const session = await getServerSession();
@@ -21,6 +24,14 @@ export default async function submitFormRegistrasi(data: FormData) {
   const nama_rek = data.get("namarek") as string;
   const tipe_pembayaran = data.get("tipe-pembayaran") as string;
   const no_pelatih = data.get("no-pelatih") as string;
+
+  if (!nama_tim || !pelatih || !asal_sekolah || !no_pelatih || !bank || !nama_rek)
+    return { success: false, message: "Mohon lengkapi semua data" };
+  if (!VALID_JENJANG.includes(jenjang)) return { success: false, message: "Jenjang tidak valid" };
+  if (!VALID_TIPE.includes(tipe_tim)) return { success: false, message: "Jumlah pasukan tidak valid" };
+
+  const fileCheck = await validateUploadFile(bukti);
+  if (!fileCheck.valid) return { success: false, message: fileCheck.message };
 
   const existingTim = await findTims({ userId });
   if (existingTim.length > 0)
@@ -63,6 +74,10 @@ export default async function submitFormRegistrasi(data: FormData) {
   } catch (e: any) {
     if (e?.message === "KUOTA_PENUH")
       return { success: false, message: `Kuota jenjang ${jenjang} telah penuh!` };
+    // Tim.userId sekarang @unique di database — jaring pengaman kalau dua
+    // submit nyaris bersamaan lolos dari pengecekan existingTim di atas.
+    if (e?.code === "P2002")
+      return { success: false, message: "Akun Anda sudah memiliki tim terdaftar." };
     return { success: false, message: "Gagal membuat Tim" };
   }
 }

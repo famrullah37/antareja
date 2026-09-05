@@ -2,9 +2,11 @@
 
 import { updatePembayaran } from "@/queries/pembayaran.query";
 import { updateTim } from "@/queries/tim.query";
+import { getKonfigUmum } from "@/queries/konfigUmum.query";
 import { revalidatePath } from "next/cache";
 import prisma from "@/lib/prisma";
 import { getServerSession } from "@/lib/next-auth";
+import { Jenjang } from "@prisma/client";
 
 // Halaman /admin/pembayaran juga bisa diakses role BENDAHARA (lihat middleware),
 // jadi aksi konfirmasinya harus mengizinkan BENDAHARA juga — bukan cuma ADMIN.
@@ -28,35 +30,55 @@ async function assignNoUrutIfNeeded(timId: string) {
   await prisma.tim.update({ where: { id: timId }, data: { noUrut: next } });
 }
 
+// Biaya pendaftaran per jenjang & tipe pembayaran diambil dari KonfigUmum (bisa
+// diubah admin lewat /admin/pengaturan) — jangan hardcode di sini, supaya kas
+// selalu mencatat nominal yang sesungguhnya berlaku, termasuk untuk jenjang SD.
+async function biayaPendaftaran(jenjang: Jenjang, isDP: boolean) {
+  const konfig = await getKonfigUmum();
+  const table: Record<Jenjang, { full: number; dp: number }> = {
+    SD: { full: konfig.biayaSD, dp: konfig.biayaSDDP },
+    SMP: { full: konfig.biayaSMP, dp: konfig.biayaSMPDP },
+    SMA: { full: konfig.biayaSMA, dp: konfig.biayaSMADP },
+  };
+  return isDP ? table[jenjang].dp : table[jenjang].full;
+}
+
+// Logika inti dipakai baik dari toggle cepat di daftar pembayaran (approvePayment)
+// maupun form konfirmasi di halaman detail (konfirmasiPembayaran) — sebelumnya
+// dua fungsi ini duplikat persis, gampang saling tidak sinkron kalau salah satu
+// diubah tanpa yang lain.
+async function setStatusPembayaran(timId: string, confirmed: boolean, isDP: boolean) {
+  await updateTim({ id: timId }, { confirmed });
+  await updatePembayaran({ tim_id: timId }, { isDP });
+  if (!confirmed) return;
+
+  await assignNoUrutIfNeeded(timId);
+
+  const tim = await prisma.tim.findUnique({ where: { id: timId } });
+  if (!tim) return;
+
+  const existing = await prisma.kasTransaksi.findFirst({
+    where: { sumber: "PENDAFTARAN", referensiId: timId },
+  });
+  if (existing) return;
+
+  const jumlah = await biayaPendaftaran(tim.jenjang, isDP);
+  await prisma.kasTransaksi.create({
+    data: {
+      tipe: "PEMASUKAN",
+      keterangan: `Pendaftaran Tim ${tim.nama_tim} — ${tim.asal_sekolah}`,
+      jumlah,
+      kategori: "PENDAFTARAN_TIM",
+      sumber: "PENDAFTARAN",
+      referensiId: timId,
+    },
+  });
+}
+
 export async function approvePayment(timId: string, isDP: boolean) {
   try {
     await requireAdmin();
-    await updateTim({ id: timId }, { confirmed: true });
-    await assignNoUrutIfNeeded(timId);
-    await updatePembayaran({ tim_id: timId }, { isDP });
-
-    const tim = await prisma.tim.findUnique({
-      where: { id: timId },
-      include: { pembayaran: true },
-    });
-    if (tim) {
-      const existing = await prisma.kasTransaksi.findFirst({
-        where: { sumber: "PENDAFTARAN", referensiId: timId },
-      });
-      if (!existing) {
-        await prisma.kasTransaksi.create({
-          data: {
-            tipe: "PEMASUKAN",
-            keterangan: `Pendaftaran Tim ${tim.nama_tim} — ${tim.asal_sekolah}`,
-            jumlah: isDP ? 200000 : 400000,
-            kategori: "PENDAFTARAN_TIM",
-            sumber: "PENDAFTARAN",
-            referensiId: timId,
-          },
-        });
-      }
-    }
-
+    await setStatusPembayaran(timId, true, isDP);
     revalidatePath("/", "layout");
     revalidatePath("/admin/kas");
     return { success: true };
@@ -87,35 +109,7 @@ export default async function konfirmasiPembayaran(
   const statusPembayaran = data.get("isDP") === "true";
 
   try {
-    await updateTim({ id: idTim }, { confirmed: status });
-    if (status) await assignNoUrutIfNeeded(idTim);
-    await updatePembayaran({ tim_id: idTim }, { isDP: statusPembayaran });
-
-    if (status) {
-      const tim = await prisma.tim.findUnique({
-        where: { id: idTim },
-        include: { pembayaran: true },
-      });
-      if (tim) {
-        const jumlah = statusPembayaran ? 200000 : 400000;
-        const existing = await prisma.kasTransaksi.findFirst({
-          where: { sumber: "PENDAFTARAN", referensiId: idTim },
-        });
-        if (!existing) {
-          await prisma.kasTransaksi.create({
-            data: {
-              tipe: "PEMASUKAN",
-              keterangan: `Pendaftaran Tim ${tim.nama_tim} — ${tim.asal_sekolah}`,
-              jumlah,
-              kategori: "PENDAFTARAN_TIM",
-              sumber: "PENDAFTARAN",
-              referensiId: idTim,
-            },
-          });
-        }
-      }
-    }
-
+    await setStatusPembayaran(idTim, status, statusPembayaran);
     revalidatePath("/", "layout");
     revalidatePath("/admin/kas");
     return { success: true, message: "Berhasil mengupdate status pembayaran!" };

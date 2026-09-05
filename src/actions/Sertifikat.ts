@@ -1,7 +1,7 @@
 "use server";
 
 import { getServerSession } from "@/lib/next-auth";
-import { imageUploader } from "./fileUploader";
+import { imageUploader, validateUploadFile } from "./fileUploader";
 import {
   createSertifikat,
   deleteSertifikatById,
@@ -24,6 +24,8 @@ export async function addSertifikat(data: FormData) {
   try {
     for (const file of files) {
       if (!file || file.size === 0) continue;
+      const fileCheck = await validateUploadFile(file, { maxMB: 15, allowPdf: true });
+      if (!fileCheck.valid) return { success: false, message: fileCheck.message };
       const upload = await imageUploader(Buffer.from(await file.arrayBuffer()));
       if (upload.error) return { success: false, message: upload.message };
       await createSertifikat({ timId, fileUrl: upload.data!.url, namaAnggota, namaJuara });

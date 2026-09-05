@@ -8,7 +8,7 @@ import {
 } from "@/queries/anggota.query";
 import { findTimsByUser } from "@/queries/tim.query";
 import { Kelas, Posisi } from "@prisma/client";
-import { imageUploader } from "./fileUploader";
+import { imageUploader, validateUploadFile } from "./fileUploader";
 import { revalidatePath } from "next/cache";
 
 export async function upsertAnggotaForm(
@@ -32,9 +32,6 @@ export async function upsertAnggotaForm(
   const kelas = data.get("kelas") as Kelas | undefined;
   const link_ig = data.get("link_ig") as string | undefined;
 
-  if (foto.size / 1024 / 1024 > 10)
-    return { success: false, message: "Max. Ukuran foto adalah 10MB" };
-
   const tryFindAnggota = await findAnggota({ id });
   // id anggota dikirim dari klien — pastikan anggota yang mau diedit memang
   // milik tim yang barusan divalidasi kepemilikannya, bukan tim lain.
@@ -44,6 +41,8 @@ export async function upsertAnggotaForm(
   try {
     let fotoUrl: string | undefined;
     if (foto.name !== "undefined") {
+      const fileCheck = await validateUploadFile(foto, { maxMB: 10 });
+      if (!fileCheck.valid) return { success: false, message: fileCheck.message };
       const fotoBuffer = await foto.arrayBuffer();
       const uploadedFoto = await imageUploader(Buffer.from(fotoBuffer));
       fotoUrl = uploadedFoto?.data?.url;

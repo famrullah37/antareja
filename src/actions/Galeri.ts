@@ -11,7 +11,7 @@ import {
   updateAlbum,
   updateTransaksiFoto,
 } from "@/queries/galeri.query";
-import { imageUploader } from "./fileUploader";
+import { imageUploader, validateUploadFile } from "./fileUploader";
 import { sendMailTo } from "@/lib/mailer";
 import prisma from "@/lib/prisma";
 
@@ -69,6 +69,8 @@ export async function uploadFoto(data: FormData) {
 
   const results = await Promise.allSettled(
     files.map(async (file) => {
+      const fileCheck = await validateUploadFile(file);
+      if (!fileCheck.valid) throw new Error(fileCheck.message);
       const buffer = Buffer.from(await file.arrayBuffer());
       const uploaded = await imageUploader(buffer);
       if (!uploaded.data?.url) throw new Error("Upload gagal");
@@ -123,6 +125,9 @@ export async function beliFoto(data: FormData, userId?: string) {
       where: { kodeUnik, status: { in: ["PENDING", "VERIFIED"] } },
     });
     if (dipakai) return { success: false, message: "Kode unik sudah terpakai, silakan coba lagi" };
+
+    const fileCheck = await validateUploadFile(bukti);
+    if (!fileCheck.valid) return { success: false, message: fileCheck.message };
 
     const upload = await imageUploader(Buffer.from(await bukti.arrayBuffer()));
     if (!upload.data?.url) return { success: false, message: "Upload bukti gagal" };

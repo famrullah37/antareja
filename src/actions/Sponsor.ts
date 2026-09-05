@@ -1,7 +1,7 @@
 "use server";
 
 import { getServerSession } from "@/lib/next-auth";
-import { imageUploader } from "./fileUploader";
+import { imageUploader, validateUploadFile } from "./fileUploader";
 import {
   createSponsor,
   deleteSponsor,
@@ -24,6 +24,8 @@ export async function createSponsorForm(data: FormData) {
 
   try {
     if (!logo || logo.size === 0) return { success: false, message: "Logo wajib diupload" };
+    const fileCheck = await validateUploadFile(logo);
+    if (!fileCheck.valid) return { success: false, message: fileCheck.message };
     const upload = await imageUploader(Buffer.from(await logo.arrayBuffer()));
     if (upload.error) return { success: false, message: upload.message };
 
