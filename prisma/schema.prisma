@@ -34,12 +34,13 @@ model Tim {
   pelatih       String
   jenjang       Jenjang
   confirmed     Boolean        @default(false)
-  userId        String
+  userId        String         @unique
   asal_sekolah  String
   tipe_tim      Tipe
   no_pelatih    String
   link_berkas   String?
   link_video    String?
+  foto          String?
   has_cc        Boolean        @default(false)
   has_maskot    Boolean        @default(false)
   totalVote     Int            @default(0)
@@ -268,15 +269,17 @@ model KonfigTiket {
 // ─── Sistem Voting (Dukungan Berbayar) ────────────────────────────────────────
 
 model KonfigVoting {
-  id           String  @id @default("singleton")
-  aktif        Boolean @default(true)
-  nominalVote  Int     @default(5000)
-  counterUrut  Int     @default(0)
+  id           String    @id @default("singleton")
+  aktif        Boolean   @default(true)
+  nominalVote  Int       @default(5000)
+  counterUrut  Int       @default(0)
   qrisUrl      String?
-  qrisPayload  String? @db.Text
+  qrisPayload  String?   @db.Text
   bankNama     String?
   bankNoRek    String?
   bankAtasNama String?
+  mulaiPada    DateTime?
+  tutupPada    DateTime?
 }
 
 model TransaksiVoting {
