@@ -11,6 +11,7 @@ import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { FaEyeSlash } from "react-icons/fa";
 import { toast } from "sonner";
+import { resendVerificationEmail } from "@/actions/Signup";
 
 export default function Login() {
   const { status } = useSession();
@@ -19,6 +20,8 @@ export default function Login() {
   const pass = useRef("");
   const [isShown, setIsShown] = useState(false);
   const [isLoading, setisLoading] = useState(false);
+  const [showResend, setShowResend] = useState(false);
+  const [resending, setResending] = useState(false);
 
   if (status === "authenticated") return router.push("/");
 
@@ -44,7 +47,20 @@ export default function Login() {
       toast.success("Berhasil Login!", { id: toastId });
       const session = await getSession();
       return router.push(session?.user?.role === "ADMIN" ? "/admin" : "/dashboard");
-    } else return toast.error("Email/password salah, atau akun belum diverifikasi. Cek email Anda.", { id: toastId, duration: 5000 });
+    } else {
+      setShowResend(true);
+      return toast.error("Email/password salah, atau akun belum diverifikasi. Cek email Anda.", { id: toastId, duration: 5000 });
+    }
+  };
+
+  const onResend = async () => {
+    if (!email.current) return toast.error("Isi email Anda dulu di atas");
+    setResending(true);
+    const toastId = toast.loading("Mengirim ulang email verifikasi...");
+    const result = await resendVerificationEmail(email.current);
+    setResending(false);
+    if (result.success) toast.success(result.message, { id: toastId, duration: 6000 });
+    else toast.error(result.message, { id: toastId });
   };
 
   return (
@@ -136,6 +152,18 @@ export default function Login() {
                 </Link>
               </P>
             </div>
+            {showResend && (
+              <div className="w-full flex justify-center items-center">
+                <button
+                  type="button"
+                  onClick={onResend}
+                  disabled={resending}
+                  className="text-sm text-primary-500 font-bold underline disabled:opacity-50"
+                >
+                  Belum menerima email verifikasi? Kirim ulang
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>

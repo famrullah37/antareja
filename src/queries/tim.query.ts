@@ -30,6 +30,19 @@ export async function findTimsByUser(userId: string, include?: Prisma.TimInclude
   });
 }
 
+// Dipakai untuk autocomplete "Asal Sekolah" di form pendaftaran — asal_sekolah
+// cuma teks bebas, jadi PIC berbeda dari sekolah yang sama gampang mengetik
+// nama yang beda-beda (typo/variasi) kalau tidak dibantu daftar nama yang
+// sudah pernah dipakai.
+export async function findDistinctAsalSekolah() {
+  const rows = await prisma.tim.findMany({
+    select: { asal_sekolah: true },
+    distinct: ["asal_sekolah"],
+    orderBy: { asal_sekolah: "asc" },
+  });
+  return rows.map((r) => r.asal_sekolah);
+}
+
 export async function updateTim(
   where: Prisma.TimWhereUniqueInput,
   data: Prisma.TimUncheckedUpdateInput

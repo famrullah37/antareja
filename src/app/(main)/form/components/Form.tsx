@@ -9,10 +9,12 @@ import { useState } from "react";
 import Select from "react-select";
 import { toast } from "sonner";
 
-const jenjang = [
+// SD disembunyikan dari pendaftaran, konsisten dengan landing page (lihat
+// Kategori.tsx) — konfigurasi biayanya tetap ada di KonfigUmum kalau suatu saat
+// mau diaktifkan lagi, tinggal tambahkan opsinya kembali di sini.
+const jenjangOptions = [
   { label: "SMA/Sederajat", value: "SMA" },
   { label: "SMP/Sederajat", value: "SMP" },
-  { label: "SD/Sederajat", value: "SD" },
 ];
 
 const size = [
@@ -25,9 +27,50 @@ const paymentType = [
   { label: "Full", value: "FALSE" },
 ];
 
-export default function FormComponent() {
+type KonfigUmum = {
+  biayaSD: number;
+  biayaSDDP: number;
+  biayaSMP: number;
+  biayaSMPDP: number;
+  biayaSMA: number;
+  biayaSMADP: number;
+};
+
+type KonfigTiket = {
+  bankNama: string | null;
+  bankNoRek: string | null;
+  bankAtasNama: string | null;
+} | null;
+
+function formatRupiah(n: number) {
+  return `Rp${n.toLocaleString("id-ID")},00`;
+}
+
+// Biaya per jenjang & tipe pembayaran diambil dari KonfigUmum (diatur admin di
+// /admin/pengaturan) — jangan hardcode di sini, supaya nominal yang ditampilkan
+// selalu sama dengan yang dicatat sistem saat admin memverifikasi pembayaran.
+function hitungBiaya(jenjang: string | null, isDP: boolean, konfig: KonfigUmum) {
+  if (!jenjang) return null;
+  const table: Record<string, { full: number; dp: number }> = {
+    SD: { full: konfig.biayaSD, dp: konfig.biayaSDDP },
+    SMP: { full: konfig.biayaSMP, dp: konfig.biayaSMPDP },
+    SMA: { full: konfig.biayaSMA, dp: konfig.biayaSMADP },
+  };
+  const entry = table[jenjang];
+  return entry ? (isDP ? entry.dp : entry.full) : null;
+}
+
+export default function FormComponent({
+  konfigUmum,
+  konfigTiket,
+  daftarSekolah,
+}: {
+  konfigUmum: KonfigUmum;
+  konfigTiket: KonfigTiket;
+  daftarSekolah: string[];
+}) {
   const [isDP, setIsDP] = useState(false);
-  const [isSD, setIsSD] = useState(false);
+  const [selectedJenjang, setSelectedJenjang] = useState<string | null>(null);
   const router = useRouter();
 
   async function submitForm(data: FormData) {
@@ -55,6 +98,8 @@ export default function FormComponent() {
       "hover:bg-neutral-300 hover:cursor-pointer transition-all duration-500 rounded-lg p-2",
     input: () => "focus:bg-[#F1F6F9]",
   };
+
+  const biaya = hitungBiaya(selectedJenjang, isDP, konfigUmum);
 
   return (
     <form className="mx-6 sm:mx-[100px] my-[24px]" action={submitForm}>
@@ -94,8 +139,17 @@ export default function FormComponent() {
           type="text"
           className="w-full"
           label="Asal Sekolah"
+          list="daftar-sekolah"
           required
         />
+        {/* Autocomplete dari nama sekolah yang sudah pernah dipakai tim lain —
+            supaya PIC berbeda dari sekolah yang sama tidak mengetik nama yang
+            beda-beda. Tetap teks bebas, sekolah baru tetap bisa mengetik nama sendiri. */}
+        <datalist id="daftar-sekolah">
+          {daftarSekolah.map((nama) => (
+            <option key={nama} value={nama} />
+          ))}
+        </datalist>
         <div className="flex flex-col gap-2">
           <label htmlFor={"jenjang"} className="text-[16px]">
             Jenjang
@@ -104,10 +158,10 @@ export default function FormComponent() {
             name="jenjang"
             unstyled
             required
-            options={jenjang}
+            options={jenjangOptions}
             id="jenjang"
             placeholder="Pilih Jenjang"
-            onChange={(e) => (e?.value === "SD" ? setIsSD(true) : setIsSD(false))}
+            onChange={(e) => setSelectedJenjang(e?.value ?? null)}
             classNames={selectClassNames}
           />
         </div>
@@ -148,14 +202,20 @@ export default function FormComponent() {
             <P>
               Lakukan pembayaran dengan nominal{" "}
               <span className="text-black font-bold">
-                {isDP ? "Rp200.000,00" : isSD ? "Rp375.000,00" : "Rp400.000,00"}
+                {biaya !== null ? formatRupiah(biaya) : "sesuai jenjang & tipe pembayaran yang dipilih"}
               </span>{" "}
               ke:
             </P>
-            <P className="text-black">
-              1440027643102 <br />
-              Bank Mandiri <br /> a.n Firman Hadi Amrullah Z
-            </P>
+            {konfigTiket?.bankNoRek || konfigTiket?.bankNama || konfigTiket?.bankAtasNama ? (
+              <P className="text-black">
+                {konfigTiket.bankNoRek} <br />
+                {konfigTiket.bankNama} <br /> a.n {konfigTiket.bankAtasNama}
+              </P>
+            ) : (
+              <P className="text-black">
+                Rekening pembayaran belum diatur, hubungi panitia sebelum transfer.
+              </P>
+            )}
           </div>
         </div>
         <div className="flex flex-col gap-4">

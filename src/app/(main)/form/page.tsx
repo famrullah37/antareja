@@ -2,7 +2,9 @@ import { getServerSession } from "@/lib/next-auth";
 import { redirect } from "next/navigation";
 import FormComponent from "./components/Form";
 import { findUser } from "@/queries/user.query";
-import { findTimsByUser } from "@/queries/tim.query";
+import { findTimsByUser, findDistinctAsalSekolah } from "@/queries/tim.query";
+import { getKonfigUmum } from "@/queries/konfigUmum.query";
+import { findKonfigTiket } from "@/queries/tiket.query";
 
 export default async function Form() {
   const session = await getServerSession();
@@ -14,9 +16,15 @@ export default async function Form() {
   const tims = await findTimsByUser(session.user!.id);
   if (tims.length > 0) return redirect("/dashboard");
 
+  const [konfigUmum, konfigTiket, daftarSekolah] = await Promise.all([
+    getKonfigUmum(),
+    findKonfigTiket(),
+    findDistinctAsalSekolah(),
+  ]);
+
   return (
     <div className="my-16">
-      <FormComponent />
+      <FormComponent konfigUmum={konfigUmum} konfigTiket={konfigTiket} daftarSekolah={daftarSekolah} />
     </div>
   );
 }
