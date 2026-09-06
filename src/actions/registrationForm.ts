@@ -1,5 +1,4 @@
 "use server";
-import { findTims } from "@/queries/tim.query";
 import { Jenjang, Tipe } from "@prisma/client";
 import { imageUploader, validateUploadFile } from "./fileUploader";
 import { revalidatePath } from "next/cache";
@@ -33,8 +32,10 @@ export default async function submitFormRegistrasi(data: FormData) {
   const fileCheck = await validateUploadFile(bukti);
   if (!fileCheck.valid) return { success: false, message: fileCheck.message };
 
-  const existingTim = await findTims({ userId });
-  if (existingTim.length > 0)
+  // Cukup cek keberadaan (Tim.userId sekarang @unique) — tidak perlu tarik
+  // anggotas/pembayaran/penilaian segala tim milik user hanya untuk cek ini.
+  const existingTimCount = await prisma.tim.count({ where: { userId } });
+  if (existingTimCount > 0)
     return { success: false, message: "Akun Anda sudah memiliki tim terdaftar." };
 
   // Upload bukti dulu sebelum masuk transaksi DB

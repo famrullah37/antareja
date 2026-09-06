@@ -6,6 +6,7 @@ import SectionWrapper from "@/app/components/global/Wrapper";
 import { TimWithRelations } from "@/types/entityRelations";
 import { AnggotaCard } from "./parts/AnggotaCard";
 import cn from "@/lib/clsx";
+import { initials } from "@/lib/initials";
 import { updateTimForm } from "@/actions/Tim";
 import TextField from "@/app/components/global/Input";
 import Field from "../components/parts/input";
@@ -184,7 +185,7 @@ export default function ProfileTim({ tim, penilaian }: { tim: TimWithRelations; 
                 />
               ) : (
                 <div className="w-20 h-20 rounded-full bg-primary-100 text-primary-600 font-bold flex items-center justify-center border border-neutral-200">
-                  {tim.nama_tim.slice(0, 2).toUpperCase()}
+                  {initials(tim.nama_tim)}
                 </div>
               )}
               <input

@@ -48,14 +48,14 @@ async function biayaPendaftaran(jenjang: Jenjang, isDP: boolean) {
 // dua fungsi ini duplikat persis, gampang saling tidak sinkron kalau salah satu
 // diubah tanpa yang lain.
 async function setStatusPembayaran(timId: string, confirmed: boolean, isDP: boolean) {
-  await updateTim({ id: timId }, { confirmed });
-  await updatePembayaran({ tim_id: timId }, { isDP });
+  // Dua write independen (tabel berbeda, tidak saling bergantung) — paralel.
+  const [tim] = await Promise.all([
+    updateTim({ id: timId }, { confirmed }),
+    updatePembayaran({ tim_id: timId }, { isDP }),
+  ]);
   if (!confirmed) return;
 
   await assignNoUrutIfNeeded(timId);
-
-  const tim = await prisma.tim.findUnique({ where: { id: timId } });
-  if (!tim) return;
 
   const existing = await prisma.kasTransaksi.findFirst({
     where: { sumber: "PENDAFTARAN", referensiId: timId },

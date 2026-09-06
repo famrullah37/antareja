@@ -69,7 +69,9 @@ export async function uploadFoto(data: FormData) {
 
   const results = await Promise.allSettled(
     files.map(async (file) => {
-      const fileCheck = await validateUploadFile(file);
+      // maxMB 15: foto event dari kamera (bukan HP) umum 8-15MB — default 10MB
+      // dulu bikin foto besar diam-diam gagal tanpa alasan jelas ke fotografer.
+      const fileCheck = await validateUploadFile(file, { maxMB: 15 });
       if (!fileCheck.valid) throw new Error(fileCheck.message);
       const buffer = Buffer.from(await file.arrayBuffer());
       const uploaded = await imageUploader(buffer);
@@ -84,10 +86,12 @@ export async function uploadFoto(data: FormData) {
     })
   );
 
-  const failed = results.filter((r) => r.status === "rejected").length;
+  const failedReasons = results
+    .filter((r): r is PromiseRejectedResult => r.status === "rejected")
+    .map((r) => (r.reason instanceof Error ? r.reason.message : "Upload gagal"));
   revalidatePath("/admin/galeri");
   revalidatePath("/galeri");
-  return { success: true, uploaded: files.length - failed, failed };
+  return { success: true, uploaded: files.length - failedReasons.length, failed: failedReasons.length, failedReasons };
 }
 
 export async function deleteFotoAdmin(fotoId: string) {

@@ -21,6 +21,9 @@ export default function UploadFotoSection({ albums }: { albums: Album[] }) {
         `Berhasil upload ${result.uploaded} foto${result.failed ? `, gagal: ${result.failed}` : ""}`,
         { id: toastId }
       );
+      if (result.failedReasons?.length) {
+        toast.error(`Alasan gagal: ${result.failedReasons.join("; ")}`, { duration: 8000 });
+      }
     } else {
       toast.error("Gagal upload", { id: toastId });
     }

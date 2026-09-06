@@ -67,27 +67,17 @@ export async function updateUserForm(data: FormData, id: string) {
     return { success: false, message: "Password minimal 8 karakter" };
 
   try {
-    if (password) {
-      const hashedPass = generateHash(password);
-      await updateUser(
-        { id: id },
-        {
-          nama: name,
-          email: email,
-          password: hashedPass,
-          role: role,
-        }
-      );
-      revalidatePath("/", "layout");
-      return { success: true };
-    }
     await updateUser(
       { id: id },
       {
         nama: name,
         email: email,
         role: role,
-        verified : verified,
+        verified: verified,
+        // Bug lama: cabang ganti password sebelumnya tidak menyertakan
+        // `verified`, jadi kalau admin ganti password & centang "Verified"
+        // di submit yang sama, status verified-nya diam-diam tidak tersimpan.
+        ...(password ? { password: generateHash(password) } : {}),
       }
     );
     revalidatePath("/", "layout");

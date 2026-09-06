@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import prisma from "@/lib/prisma";
 import { imageUploader, validateUploadFile } from "./fileUploader";
 import { buildDynamicQrisImage, decodeQrisFromImage } from "@/lib/qris";
+import { parseWibDatetimeLocal } from "@/lib/datetime";
 import {
   findKonfigVoting,
   findTransaksiVoting,
@@ -25,12 +26,18 @@ async function requireAdminOrBendahara() {
 // Voting dianggap buka kalau: toggle aktif ON, dan (kalau diisi) waktu sekarang
 // berada di antara mulaiPada..tutupPada. mulaiPada/tutupPada opsional — kalau
 // tidak diisi, admin cukup andalkan toggle aktif seperti sebelumnya.
-function cekJendelaVoting(konfig: { aktif: boolean; mulaiPada: Date | null; tutupPada: Date | null } | null) {
-  if (!konfig || !konfig.aktif) return { open: false, message: "Voting dukungan belum/tidak dibuka" };
+// Diekspor (bukan cuma dipakai reserveKodeVoting/submitVote) supaya
+// src/app/(main)/vote/page.tsx pakai fungsi yang sama persis untuk
+// menentukan banner apa yang ditampilkan — dulu logikanya diduplikasi
+// di sana, gampang beda sendiri kalau salah satu diubah tanpa yang lain.
+export async function cekJendelaVoting(
+  konfig: { aktif: boolean; mulaiPada: Date | null; tutupPada: Date | null } | null
+) {
+  if (!konfig || !konfig.aktif) return { open: false, belumMulai: false, sudahTutup: false, message: "Voting dukungan belum/tidak dibuka" };
   const now = new Date();
-  if (konfig.mulaiPada && now < konfig.mulaiPada) return { open: false, message: "Voting belum dibuka" };
-  if (konfig.tutupPada && now > konfig.tutupPada) return { open: false, message: "Voting sudah ditutup, terima kasih atas dukungannya!" };
-  return { open: true, message: undefined as string | undefined };
+  if (konfig.mulaiPada && now < konfig.mulaiPada) return { open: false, belumMulai: true, sudahTutup: false, message: "Voting belum dibuka" };
+  if (konfig.tutupPada && now > konfig.tutupPada) return { open: false, belumMulai: false, sudahTutup: true, message: "Voting sudah ditutup, terima kasih atas dukungannya!" };
+  return { open: true, belumMulai: false, sudahTutup: false, message: undefined as string | undefined };
 }
 
 // ─── Admin: Konfigurasi Voting ────────────────────────────────────────────────
@@ -46,9 +53,9 @@ export async function saveKonfigVoting(data: FormData) {
   const mulaiPadaRaw = data.get("mulaiPada") as string;
   const tutupPadaRaw = data.get("tutupPada") as string;
 
-  const mulaiPada = mulaiPadaRaw ? new Date(mulaiPadaRaw) : null;
-  const tutupPada = tutupPadaRaw ? new Date(tutupPadaRaw) : null;
-  if ((mulaiPada && isNaN(mulaiPada.getTime())) || (tutupPada && isNaN(tutupPada.getTime()))) {
+  const mulaiPada = parseWibDatetimeLocal(mulaiPadaRaw);
+  const tutupPada = parseWibDatetimeLocal(tutupPadaRaw);
+  if ((mulaiPadaRaw && !mulaiPada) || (tutupPadaRaw && !tutupPada)) {
     return { success: false, message: "Format tanggal tidak valid" };
   }
   if (mulaiPada && tutupPada && mulaiPada >= tutupPada) {
@@ -113,7 +120,7 @@ export async function reserveKodeVoting() {
   try {
     const konfig = await prisma.konfigVoting.findUnique({ where: { id: "singleton" } });
     if (!konfig) return { success: false, message: "Voting dukungan belum/tidak dibuka" };
-    const status = cekJendelaVoting(konfig);
+    const status = await cekJendelaVoting(konfig);
     if (!status.open) return { success: false, message: status.message };
     const updated = await prisma.konfigVoting.update({
       where: { id: "singleton" },
@@ -165,7 +172,7 @@ export async function submitVote(data: FormData, userId?: string) {
   try {
     const konfig = await prisma.konfigVoting.findUnique({ where: { id: "singleton" } });
     if (!konfig) return { success: false, message: "Voting dukungan belum/tidak dibuka" };
-    const status = cekJendelaVoting(konfig);
+    const status = await cekJendelaVoting(konfig);
     if (!status.open) return { success: false, message: status.message };
 
     const tim = await prisma.tim.findUnique({ where: { id: timId } });
