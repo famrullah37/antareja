@@ -6,12 +6,16 @@ import { toast } from "sonner";
 type Konfig = {
   countdownTarget: Date;
   countdownAktif: boolean;
+  pendaftaranDeadline: Date | null;
   biayaSD: number;
   biayaSDDP: number;
   biayaSMP: number;
   biayaSMPDP: number;
   biayaSMA: number;
   biayaSMADP: number;
+  bankNama: string | null;
+  bankNoRek: string | null;
+  bankAtasNama: string | null;
 };
 
 function toDatetimeLocal(d: Date) {
@@ -55,6 +59,73 @@ export default function PengaturanForm({ konfig }: { konfig: Konfig }) {
             defaultValue={toDatetimeLocal(new Date(konfig.countdownTarget))}
             className="border border-neutral-300 rounded-lg px-3 py-2 text-sm"
             required
+          />
+        </div>
+        <button
+          type="submit"
+          className="self-start bg-primary-500 text-white rounded-lg py-2 px-6 text-sm font-semibold hover:bg-primary-600 transition-colors"
+        >
+          Simpan
+        </button>
+      </div>
+
+      {/* Penutupan Pendaftaran */}
+      <div className="bg-white border border-neutral-200 rounded-xl p-6 flex flex-col gap-4">
+        <h2 className="font-semibold text-lg">Penutupan Pendaftaran</h2>
+        <p className="text-sm text-gray-500">
+          Tanggal ini yang ditampilkan sebagai countdown "Penutupan Pendaftaran" di
+          Hero halaman utama — <strong>berbeda</strong> dari "Target Waktu" di atas
+          (itu untuk gerbang peluncuran situs/Coming Soon). Kosongkan kalau belum
+          mau menampilkan countdown pendaftaran.
+        </p>
+        <div className="flex flex-col gap-1">
+          <label className="text-sm font-medium">Tutup Pendaftaran (opsional)</label>
+          <input
+            type="datetime-local"
+            name="pendaftaranDeadline"
+            defaultValue={konfig.pendaftaranDeadline ? toDatetimeLocal(new Date(konfig.pendaftaranDeadline)) : ""}
+            className="border border-neutral-300 rounded-lg px-3 py-2 text-sm"
+          />
+        </div>
+        <button
+          type="submit"
+          className="self-start bg-primary-500 text-white rounded-lg py-2 px-6 text-sm font-semibold hover:bg-primary-600 transition-colors"
+        >
+          Simpan
+        </button>
+      </div>
+
+      {/* Rekening Pendaftaran */}
+      <div className="bg-white border border-neutral-200 rounded-xl p-6 flex flex-col gap-4">
+        <h2 className="font-semibold text-lg">Rekening Pendaftaran</h2>
+        <p className="text-sm text-gray-500">
+          Rekening yang ditampilkan di form pendaftaran tim (/form) untuk transfer biaya pendaftaran.
+        </p>
+        <div className="flex flex-col gap-1">
+          <label className="text-sm font-medium">Nama Bank</label>
+          <input
+            name="bankNama"
+            defaultValue={konfig.bankNama ?? ""}
+            placeholder="Bank Mandiri"
+            className="border border-neutral-300 rounded-lg px-3 py-2 text-sm"
+          />
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-sm font-medium">Nomor Rekening</label>
+          <input
+            name="bankNoRek"
+            defaultValue={konfig.bankNoRek ?? ""}
+            placeholder="1440027643102"
+            className="border border-neutral-300 rounded-lg px-3 py-2 text-sm font-mono"
+          />
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-sm font-medium">Atas Nama</label>
+          <input
+            name="bankAtasNama"
+            defaultValue={konfig.bankAtasNama ?? ""}
+            placeholder="Nama Pemilik Rekening"
+            className="border border-neutral-300 rounded-lg px-3 py-2 text-sm"
           />
         </div>
         <button

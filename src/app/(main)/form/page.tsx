@@ -4,7 +4,6 @@ import FormComponent from "./components/Form";
 import { findUser } from "@/queries/user.query";
 import { findTimsByUser, findDistinctAsalSekolah } from "@/queries/tim.query";
 import { getKonfigUmum } from "@/queries/konfigUmum.query";
-import { findKonfigTiket } from "@/queries/tiket.query";
 
 export default async function Form() {
   const session = await getServerSession();
@@ -16,15 +15,14 @@ export default async function Form() {
   const tims = await findTimsByUser(session.user!.id);
   if (tims.length > 0) return redirect("/dashboard");
 
-  const [konfigUmum, konfigTiket, daftarSekolah] = await Promise.all([
+  const [konfigUmum, daftarSekolah] = await Promise.all([
     getKonfigUmum(),
-    findKonfigTiket(),
     findDistinctAsalSekolah(),
   ]);
 
   return (
     <div className="my-16">
-      <FormComponent konfigUmum={konfigUmum} konfigTiket={konfigTiket} daftarSekolah={daftarSekolah} />
+      <FormComponent konfigUmum={konfigUmum} daftarSekolah={daftarSekolah} />
     </div>
   );
 }

@@ -34,16 +34,19 @@ type KonfigUmum = {
   biayaSMPDP: number;
   biayaSMA: number;
   biayaSMADP: number;
-};
-
-type KonfigTiket = {
   bankNama: string | null;
   bankNoRek: string | null;
   bankAtasNama: string | null;
-} | null;
+};
 
+// Format sama dengan formatRupiah di VoteForm.tsx/BeliTiketForm.tsx dkk —
+// "Rp375.000" tanpa ",00" manual, biar konsisten di seluruh halaman publik.
 function formatRupiah(n: number) {
-  return `Rp${n.toLocaleString("id-ID")},00`;
+  return new Intl.NumberFormat("id-ID", {
+    style: "currency",
+    currency: "IDR",
+    minimumFractionDigits: 0,
+  }).format(n);
 }
 
 // Biaya per jenjang & tipe pembayaran diambil dari KonfigUmum (diatur admin di
@@ -62,11 +65,9 @@ function hitungBiaya(jenjang: string | null, isDP: boolean, konfig: KonfigUmum) 
 
 export default function FormComponent({
   konfigUmum,
-  konfigTiket,
   daftarSekolah,
 }: {
   konfigUmum: KonfigUmum;
-  konfigTiket: KonfigTiket;
   daftarSekolah: string[];
 }) {
   const [isDP, setIsDP] = useState(false);
@@ -206,10 +207,10 @@ export default function FormComponent({
               </span>{" "}
               ke:
             </P>
-            {konfigTiket?.bankNoRek || konfigTiket?.bankNama || konfigTiket?.bankAtasNama ? (
+            {konfigUmum.bankNoRek || konfigUmum.bankNama || konfigUmum.bankAtasNama ? (
               <P className="text-black">
-                {konfigTiket.bankNoRek} <br />
-                {konfigTiket.bankNama} <br /> a.n {konfigTiket.bankAtasNama}
+                {konfigUmum.bankNoRek} <br />
+                {konfigUmum.bankNama} <br /> a.n {konfigUmum.bankAtasNama}
               </P>
             ) : (
               <P className="text-black">

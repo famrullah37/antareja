@@ -11,12 +11,16 @@ export async function getKonfigUmum() {
 export async function upsertKonfigUmum(data: {
   countdownTarget?: Date;
   countdownAktif?: boolean;
+  pendaftaranDeadline?: Date | null;
   biayaSD?: number;
   biayaSDDP?: number;
   biayaSMP?: number;
   biayaSMPDP?: number;
   biayaSMA?: number;
   biayaSMADP?: number;
+  bankNama?: string;
+  bankNoRek?: string;
+  bankAtasNama?: string;
 }) {
   return prisma.konfigUmum.upsert({
     where: { id: SINGLETON_ID },

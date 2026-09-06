@@ -1,6 +1,7 @@
 "use client";
 
 import { useCountdown } from "@/app/hooks/useCountdown";
+import { useEffect, useRef } from "react";
 
 function TimeFigure({ time, title }: { time: number; title: string }) {
   const display = time.toString().padStart(2, "0");
@@ -21,11 +22,25 @@ function TimeFigure({ time, title }: { time: number; title: string }) {
 export default function Countdown({
   endDate,
   label = "Penutupan Pendaftaran",
+  onComplete,
 }: {
   endDate: Date;
   label?: string;
+  // Dipanggil sekali begitu hitungan mundur mencapai nol — dipakai ComingSoon
+  // untuk auto-refresh halaman saat waktunya tiba (bukan default di sini,
+  // karena Countdown juga dipakai Hero untuk sekadar tampilan tanpa efek samping).
+  onComplete?: () => void;
 }) {
   const [days, hours, minutes, seconds] = useCountdown(endDate);
+  const habis = days === 0 && hours === 0 && minutes === 0 && seconds === 0;
+  const fired = useRef(false);
+
+  useEffect(() => {
+    if (habis && !fired.current && onComplete) {
+      fired.current = true;
+      onComplete();
+    }
+  }, [habis, onComplete]);
 
   return (
     <div suppressHydrationWarning className="flex flex-col items-center gap-5">

@@ -1,9 +1,14 @@
+"use client";
+
 import Image from "next/image";
 import dynamic from "next/dynamic";
+import { useRouter } from "next/navigation";
 
 const Countdown = dynamic(() => import("./parts/Countdown"), { ssr: false });
 
 export default function ComingSoon({ target }: { target: Date | null }) {
+  const router = useRouter();
+
   return (
     <section className="relative w-full min-h-screen flex flex-col items-center justify-center px-6 text-center overflow-hidden">
       <Image
@@ -42,7 +47,11 @@ export default function ComingSoon({ target }: { target: Date | null }) {
 
       {target && (
         <div className="bg-white/5 backdrop-blur-md border border-white/15 rounded-3xl p-6 sm:p-8 shadow-2xl">
-          <Countdown endDate={target} label="Menuju Peluncuran Situs" />
+          <Countdown
+            endDate={target}
+            label="Menuju Peluncuran Situs"
+            onComplete={() => router.refresh()}
+          />
         </div>
       )}
     </section>

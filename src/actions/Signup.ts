@@ -32,6 +32,7 @@ export default async function signUp(data: FormData) {
       role: "USER",
       verified: false,
       token,
+      verifyTokenSentAt: new Date(),
     });
 
     const verifyLink = `${process.env.NEXTAUTH_URL ?? "http://localhost:3000"}/auth/verify?token=${token}`;
@@ -50,9 +51,14 @@ export default async function signUp(data: FormData) {
   }
 }
 
+const RESEND_COOLDOWN_MS = 60 * 1000;
+
 // Dipanggil dari halaman login saat user gagal masuk karena akunnya belum
 // diverifikasi — sebelumnya kalau email pertama gagal terkirim (kuota Gmail
 // API dsb.), user terkunci total tanpa jalan keluar sendiri (lihat PRD §7).
+// Cooldown 60 detik (dicatat di DB, bukan in-memory — tetap benar walau
+// serverless instance-nya beda-beda) mencegah endpoint publik ini dipakai
+// untuk spam email verifikasi berulang-ulang ke alamat yang sama.
 export async function resendVerificationEmail(email: string) {
   if (!email) return { success: false, message: "Email wajib diisi" };
 
@@ -60,9 +66,17 @@ export async function resendVerificationEmail(email: string) {
   if (!user) return { success: false, message: "Email tidak ditemukan" };
   if (user.verified) return { success: false, message: "Akun sudah terverifikasi, silakan login." };
 
+  if (user.verifyTokenSentAt) {
+    const elapsed = Date.now() - new Date(user.verifyTokenSentAt).getTime();
+    if (elapsed < RESEND_COOLDOWN_MS) {
+      const sisaDetik = Math.ceil((RESEND_COOLDOWN_MS - elapsed) / 1000);
+      return { success: false, message: `Tunggu ${sisaDetik} detik sebelum kirim ulang lagi.` };
+    }
+  }
+
   try {
     const token = crypto.randomUUID();
-    await updateUser({ id: user.id }, { token });
+    await updateUser({ id: user.id }, { token, verifyTokenSentAt: new Date() });
 
     const verifyLink = `${process.env.NEXTAUTH_URL ?? "http://localhost:3000"}/auth/verify?token=${token}`;
     await sendMailTo({
