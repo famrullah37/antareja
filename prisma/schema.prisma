@@ -17,6 +17,7 @@ model User {
   role             Role
   verified         Boolean          @default(false)
   token            String?          @unique
+  verifyTokenSentAt DateTime?
   penilaian        Penilaian[]
   tims             Tim[]
   juri             Juri?
@@ -384,15 +385,27 @@ model Pengumuman {
 // ─── Konfigurasi Umum (singleton) ────────────────────────────────────────────
 
 model KonfigUmum {
-  id              String   @id @default("singleton")
-  countdownTarget DateTime @default("2025-11-08T00:00:00.000Z")
-  countdownAktif  Boolean  @default(false)
-  biayaSD         Int      @default(375000)
-  biayaSDDP       Int      @default(187500)
-  biayaSMP        Int      @default(400000)
-  biayaSMPDP      Int      @default(200000)
-  biayaSMA        Int      @default(400000)
-  biayaSMADP      Int      @default(200000)
+  id                  String    @id @default("singleton")
+  countdownTarget     DateTime  @default("2025-11-08T00:00:00.000Z")
+  countdownAktif      Boolean   @default(false)
+  // Terpisah dari countdownTarget (itu gerbang peluncuran situs) — dulu Hero
+  // memakai countdownTarget juga untuk countdown "Penutupan Pendaftaran",
+  // padahal begitu situs live (countdownTarget sudah lewat), countdown itu
+  // otomatis rusak karena tanggalnya sudah di masa lalu.
+  pendaftaranDeadline DateTime?
+  biayaSD             Int       @default(375000)
+  biayaSDDP           Int       @default(187500)
+  biayaSMP            Int       @default(400000)
+  biayaSMPDP          Int       @default(200000)
+  biayaSMA            Int       @default(400000)
+  biayaSMADP          Int       @default(200000)
+  // Rekening pendaftaran tim — dulu form pendaftaran ikut memakai KonfigTiket
+  // (halaman /admin/tiket, biasanya baru dikonfigurasi belakangan setelah
+  // pendaftaran dibuka), jadi bisa memblokir pendaftaran baru kalau admin
+  // belum sempat isi config tiket duluan.
+  bankNama            String?
+  bankNoRek           String?
+  bankAtasNama        String?
 }
 
 // ─── Sponsor ─────────────────────────────────────────────────────────────────
