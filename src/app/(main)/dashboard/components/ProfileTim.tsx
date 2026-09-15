@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { ReactNode, useState } from "react";
 import { H2, H3, P } from "@/app/components/global/Text";
 import SectionWrapper from "@/app/components/global/Wrapper";
@@ -178,10 +179,11 @@ export default function ProfileTim({ tim, penilaian }: { tim: TimWithRelations; 
             </P>
             <div className="flex items-center gap-4 mb-4">
               {tim.foto ? (
-                // eslint-disable-next-line @next/next/no-img-element -- foto hasil upload, ukuran kecil & jarang berubah
-                <img
+                <Image
                   src={tim.foto}
                   alt={tim.nama_tim}
+                  width={80}
+                  height={80}
                   className="w-20 h-20 rounded-full object-cover border border-neutral-200"
                 />
               ) : (

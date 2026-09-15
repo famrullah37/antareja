@@ -2,6 +2,7 @@
 
 import { getDynamicQrisVoting, reserveKodeVoting, submitVote } from "@/actions/Voting";
 import { initials } from "@/lib/initials";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -30,10 +31,15 @@ type KonfigVoting = {
   bankAtasNama?: string | null;
 } | null;
 
-function Avatar({ tim, className }: { tim: TimVote; className: string }) {
+function Avatar({ tim, className, size }: { tim: TimVote; className: string; size: number }) {
   return tim.foto ? (
-    // eslint-disable-next-line @next/next/no-img-element -- foto tim hasil upload, ukuran kecil
-    <img src={tim.foto} alt={tim.nama_tim} className={`${className} object-cover`} />
+    <Image
+      src={tim.foto}
+      alt={tim.nama_tim}
+      width={size}
+      height={size}
+      className={`${className} object-cover`}
+    />
   ) : (
     <div className={`${className} bg-primary-100 text-primary-600 font-bold flex items-center justify-center`}>
       {initials(tim.nama_tim)}
@@ -163,7 +169,7 @@ export default function VoteForm({
                     <span className="text-xs font-bold bg-white/25 rounded-full px-2.5 py-0.5">
                       #{i + 1}
                     </span>
-                    <Avatar tim={t} className="w-12 h-12 rounded-full border-2 border-white/70" />
+                    <Avatar tim={t} size={48} className="w-12 h-12 rounded-full border-2 border-white/70" />
                     <div className="text-center">
                       <div className="font-bold text-sm leading-tight line-clamp-2">{t.nama_tim}</div>
                       <div className="text-xs opacity-90 mt-1">{t.totalVote} suara</div>
@@ -181,7 +187,7 @@ export default function VoteForm({
                 <div key={t.id} className="flex items-center justify-between py-2.5 text-sm">
                   <div className="flex items-center gap-3">
                     <span className="w-6 text-center text-gray-400 font-mono text-xs">{i + 4}</span>
-                    <Avatar tim={t} className="w-8 h-8 rounded-full" />
+                    <Avatar tim={t} size={32} className="w-8 h-8 rounded-full" />
                     <div>
                       <div className="font-medium">{t.nama_tim}</div>
                       <div className="text-xs text-gray-400">{t.asal_sekolah} — {t.jenjang}</div>
@@ -209,7 +215,7 @@ export default function VoteForm({
               }`}
             >
               <div className="relative mb-1">
-                <Avatar tim={t} className="w-20 h-20 rounded-full border-2 border-white shadow" />
+                <Avatar tim={t} size={80} className="w-20 h-20 rounded-full border-2 border-white shadow" />
                 <span className="absolute -top-1 -left-1 bg-primary-500 text-white text-xs font-bold w-7 h-7 rounded-full flex items-center justify-center border-2 border-white">
                   #{i + 1}
                 </span>
@@ -268,10 +274,11 @@ export default function VoteForm({
                   className="w-48 h-48 object-contain rounded-lg border border-purple-200 bg-white"
                 />
               ) : konfig?.qrisUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element -- gambar QRIS statis dari admin
-                <img
+                <Image
                   src={konfig.qrisUrl}
                   alt="QRIS"
+                  width={192}
+                  height={192}
                   className="w-48 h-48 object-contain rounded-lg border border-purple-200 bg-white"
                 />
               ) : (

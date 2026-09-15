@@ -2,6 +2,7 @@
 
 import { beliTiket, getDynamicQrisTiket } from "@/actions/Tiket";
 import { Tiket } from "@prisma/client";
+import Image from "next/image";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
@@ -241,10 +242,11 @@ export default function BeliTiketForm({
                     className="w-48 h-48 object-contain rounded-lg border border-purple-200 bg-white"
                   />
                 ) : konfig?.qrisUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element -- gambar QRIS statis dari admin
-                  <img
+                  <Image
                     src={konfig.qrisUrl}
                     alt="QRIS"
+                    width={192}
+                    height={192}
                     className="w-48 h-48 object-contain rounded-lg border border-purple-200 bg-white"
                   />
                 ) : (
