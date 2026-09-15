@@ -1,11 +1,13 @@
 "use client";
 
+import Image from "next/image";
 import { ReactNode, useState } from "react";
 import { H2, H3, P } from "@/app/components/global/Text";
 import SectionWrapper from "@/app/components/global/Wrapper";
 import { TimWithRelations } from "@/types/entityRelations";
 import { AnggotaCard } from "./parts/AnggotaCard";
 import cn from "@/lib/clsx";
+import { initials } from "@/lib/initials";
 import { updateTimForm } from "@/actions/Tim";
 import TextField from "@/app/components/global/Input";
 import Field from "../components/parts/input";
@@ -171,6 +173,31 @@ export default function ProfileTim({ tim, penilaian }: { tim: TimWithRelations; 
 
         {tim.confirmed ? (
           <form action={submitForm} className="mb-4">
+            <H3 className="mb-4">Foto Tim</H3>
+            <P className="text-sm text-gray-500 mb-2">
+              Ditampilkan di halaman Vote (/vote) supaya pendukung mudah mengenali timmu.
+            </P>
+            <div className="flex items-center gap-4 mb-4">
+              {tim.foto ? (
+                <Image
+                  src={tim.foto}
+                  alt={tim.nama_tim}
+                  width={80}
+                  height={80}
+                  className="w-20 h-20 rounded-full object-cover border border-neutral-200"
+                />
+              ) : (
+                <div className="w-20 h-20 rounded-full bg-primary-100 text-primary-600 font-bold flex items-center justify-center border border-neutral-200">
+                  {initials(tim.nama_tim)}
+                </div>
+              )}
+              <input
+                name="foto"
+                type="file"
+                accept="image/*"
+                className="text-sm file:bg-primary-500 file:text-white file:rounded-md file:border-none file:py-1.5 file:px-3 file:mr-3 hover:cursor-pointer"
+              />
+            </div>
             <H3 className="mb-4">Video Tiktok + Foto Pasukan</H3>
             <TextField
               id="link_video"

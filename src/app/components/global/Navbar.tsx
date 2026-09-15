@@ -67,6 +67,7 @@ export default function Navbar() {
             {/* Logo organisasi — tersembunyi otomatis jika file belum ada */}
             <div className="flex items-center gap-1.5">
               {OrgLogos.map((org) => (
+                // eslint-disable-next-line @next/next/no-img-element -- logo kecil, ada fallback onError sembunyikan diri
                 <img
                   key={org.alt}
                   src={org.src}

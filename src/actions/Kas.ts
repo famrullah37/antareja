@@ -1,7 +1,7 @@
 "use server";
 
 import prisma from "@/lib/prisma";
-import { imageUploader } from "./fileUploader";
+import { imageUploader, validateUploadFile } from "./fileUploader";
 import { revalidatePath } from "next/cache";
 import { getServerSession } from "@/lib/next-auth";
 
@@ -22,6 +22,8 @@ export async function addKasTransaksi(data: FormData) {
 
   let notaUrl: string | undefined;
   if (notaFile && notaFile.size > 0) {
+    const fileCheck = await validateUploadFile(notaFile, { allowPdf: true });
+    if (!fileCheck.valid) return { success: false, message: fileCheck.message };
     const buffer = Buffer.from(await notaFile.arrayBuffer());
     const result = await imageUploader(buffer);
     if (result.error) return { success: false, message: result.message };

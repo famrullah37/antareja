@@ -13,6 +13,8 @@ export async function upsertKonfigVoting(data: {
   bankNama?: string;
   bankNoRek?: string;
   bankAtasNama?: string;
+  mulaiPada?: Date | null;
+  tutupPada?: Date | null;
 }) {
   return prisma.konfigVoting.upsert({
     where: { id: "singleton" },
@@ -30,6 +32,7 @@ export async function findTimsForVoting() {
       asal_sekolah: true,
       jenjang: true,
       totalVote: true,
+      foto: true,
     },
     orderBy: { totalVote: "desc" },
   });

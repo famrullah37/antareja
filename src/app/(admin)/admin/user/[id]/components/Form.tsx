@@ -46,7 +46,7 @@ export default function UserForm({
     const toastId = toast.loading("Loading...");
     const result = await updateUserForm(data, id!);
     if (!result.success) {
-      toast.error("Gagal mengedit user!", { id: toastId });
+      toast.error(result.message || "Gagal mengedit user!", { id: toastId });
     } else {
       toast.success("Berhasil mengedit user!", { id: toastId });
       redirect("/admin/user");

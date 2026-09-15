@@ -1,29 +1,27 @@
 ﻿import SectionWrapper from "@/app/components/global/Wrapper";
+import type { TimelineItem } from "@/queries/konfigUmum.query";
 
-const timelineData = [
+// Default kalau admin belum pernah isi timeline di halaman Pengaturan.
+const defaultTimeline: TimelineItem[] = [
   {
-    step: "01",
     title: "Pendaftaran Peserta",
     dateString: "1 Sep – 8 Nov 2026",
     description: "Pendaftaran melalui website antareja.smktelkom-mlg.sch.id",
     icon: "📋",
   },
   {
-    step: "02",
     title: "Technical Meeting",
     dateString: "11 Oktober 2026",
     description: "Dilaksanakan di SMK Telkom Malang",
     icon: "🤝",
   },
   {
-    step: "03",
     title: "Uji Coba Lapangan",
     dateString: "14 November 2026",
     description: "15.00–18.00 WIB (Malang) · 19.00–22.30 WIB (Luar Malang)",
     icon: "🏃",
   },
   {
-    step: "04",
     title: "Pelaksanaan Lomba",
     dateString: "15 November 2026",
     description: "06.00 WIB – selesai di SMK Telkom Malang",
@@ -31,7 +29,11 @@ const timelineData = [
   },
 ];
 
-export default function Timeline() {
+export default function Timeline({ items }: { items?: TimelineItem[] | null }) {
+  const timelineData = (items && items.length === 4 ? items : defaultTimeline).map(
+    (item, idx) => ({ ...item, step: String(idx + 1).padStart(2, "0") })
+  );
+
   return (
     <SectionWrapper id="timeline">
       <div className="w-full flex flex-col gap-12">

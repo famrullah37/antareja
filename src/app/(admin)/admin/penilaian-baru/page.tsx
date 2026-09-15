@@ -5,6 +5,7 @@ import {
   findSubKategoriMasters,
   findJuriKategoris,
   findKategoriLombas,
+  findPenilaianBarus,
 } from "@/queries/penilaianBaru.query";
 import { findJuris } from "@/queries/juri.query";
 import { H1 } from "@/app/components/global/Text";
@@ -13,9 +14,10 @@ import SubKategoriSection from "./components/SubKategoriSection";
 import PelanggaranSection from "./components/PelanggaranSection";
 import JuriKategoriSection from "./components/JuriKategoriSection";
 import KategoriLombaSection from "./components/KategoriLombaSection";
+import RankingSection from "./components/RankingSection";
 
 export default async function PenilaianBaruPage() {
-  const [nilaiMasters, subKategoris, pelanggarans, juris, juriKategoris, kategoriLombas] =
+  const [nilaiMasters, subKategoris, pelanggarans, juris, juriKategoris, kategoriLombas, penilaians] =
     await Promise.all([
       findNilaiDiskritMasters(),
       findSubKategoriMasters(),
@@ -23,6 +25,7 @@ export default async function PenilaianBaruPage() {
       findJuris(),
       findJuriKategoris(),
       findKategoriLombas(),
+      findPenilaianBarus(),
     ]);
 
   return (
@@ -38,6 +41,8 @@ export default async function PenilaianBaruPage() {
       <SubKategoriSection subKategoris={subKategoris} kategoris={kategoriLombas} />
 
       <PelanggaranSection pelanggarans={pelanggarans} />
+
+      <RankingSection penilaians={penilaians} kategoris={kategoriLombas} />
     </div>
   );
 }

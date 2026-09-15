@@ -9,7 +9,12 @@ const Countdown = dynamic(() => import("./parts/Countdown"), { ssr: false });
 
 export default async function Hero() {
   const [session, konfig] = await Promise.all([getServerSession(), getKonfigUmum()]);
-  const countdownTarget = new Date(konfig.countdownTarget);
+  // pendaftaranDeadline (bukan countdownTarget — itu gerbang peluncuran situs,
+  // sudah pasti lewat begitu Hero ini bisa dirender) dipakai untuk countdown
+  // "Penutupan Pendaftaran". Opsional: kalau belum diatur atau sudah lewat,
+  // countdown-nya disembunyikan daripada menampilkan hitungan mundur rusak.
+  const pendaftaranDeadline = konfig.pendaftaranDeadline ? new Date(konfig.pendaftaranDeadline) : null;
+  const showPendaftaranCountdown = !!pendaftaranDeadline && pendaftaranDeadline.getTime() > Date.now();
 
   const dashboardHref =
     session?.user?.role === "ADMIN" ? "/admin" : session ? "/dashboard" : "/auth/register";
@@ -79,11 +84,13 @@ export default async function Hero() {
           </div>
 
           {/* Right — countdown */}
-          <div className="w-full lg:w-auto flex justify-center">
-            <div className="bg-white/5 backdrop-blur-md border border-white/15 rounded-3xl p-8 shadow-2xl">
-              <Countdown endDate={countdownTarget} />
+          {showPendaftaranCountdown && (
+            <div className="w-full lg:w-auto flex justify-center">
+              <div className="bg-white/5 backdrop-blur-md border border-white/15 rounded-3xl p-8 shadow-2xl">
+                <Countdown endDate={pendaftaranDeadline!} />
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
 

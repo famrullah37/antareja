@@ -26,7 +26,7 @@ import {
   updateTransaksiTiket,
   upsertKonfigTiket,
 } from "@/queries/tiket.query";
-import { imageUploader } from "./fileUploader";
+import { imageUploader, validateUploadFile } from "./fileUploader";
 import prisma from "@/lib/prisma";
 
 // ─── Admin: Master Tiket ──────────────────────────────────────────────────────
@@ -68,6 +68,8 @@ export async function saveKonfigTiket(data: FormData) {
     };
     let qrisTerbaca = true;
     if (qrisFile && qrisFile.size > 0) {
+      const fileCheck = await validateUploadFile(qrisFile);
+      if (!fileCheck.valid) return { success: false, message: fileCheck.message };
       const buffer = Buffer.from(await qrisFile.arrayBuffer());
       const upload = await imageUploader(buffer);
       if (upload.error) return { success: false, message: upload.message };
@@ -129,6 +131,8 @@ export async function beliTiket(data: FormData, userId?: string) {
   // Upload bukti dulu sebelum transaksi DB
   let buktiUrl: string | undefined;
   if (bukti && bukti.size > 0) {
+    const fileCheck = await validateUploadFile(bukti);
+    if (!fileCheck.valid) return { success: false, message: fileCheck.message };
     const upload = await imageUploader(Buffer.from(await bukti.arrayBuffer()));
     if (upload.error) {
       console.error("Upload bukti gagal:", upload.message);

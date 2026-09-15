@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { publishNilaiBaru } from "@/actions/PenilaianBaru";
 import { toast } from "sonner";
@@ -14,7 +14,7 @@ type PelanggaranTimItem = {
   id: string;
   jumlahKejadian: number;
   totalPengurang: number;
-  pelanggaran: { kode: string; nama: string };
+  pelanggaran: { kode: string; nama: string; kategori: string };
 };
 
 type PenilaianBaruItem = {
@@ -30,12 +30,16 @@ type PenilaianBaruItem = {
   pelanggaranTim: PelanggaranTimItem[];
 };
 
+type KategoriLomba = { id: string; nama: string };
+
 const JENJANG_ORDER = ["SD", "SMP", "SMA"];
 
 export default function RankingSection({
   penilaians,
+  kategoris,
 }: {
   penilaians: PenilaianBaruItem[];
+  kategoris: KategoriLomba[];
 }) {
   async function handlePublish(id: string, current: boolean) {
     const toastId = toast.loading(current ? "Menyembunyikan..." : "Mempublish...");
@@ -45,10 +49,25 @@ export default function RankingSection({
     else toast.error("Gagal", { id: toastId });
   }
 
+  // Kolom kategori lomba: dari master, ditambah kategori yang muncul di data
+  // tapi belum/tidak ada di master (jaga-jaga kategori lama yang sudah dihapus).
+  const kategoriNama = Array.from(
+    new Set([
+      ...kategoris.map((k) => k.nama),
+      ...penilaians.flatMap((p) => p.nilaiJuri.map((n) => n.subKategori.kategori)),
+    ])
+  );
+
+  function nilaiKategori(p: PenilaianBaruItem, kategori: string) {
+    return p.nilaiJuri
+      .filter((n) => n.subKategori.kategori === kategori)
+      .reduce((sum, n) => sum + n.nilaiDipilih, 0);
+  }
+
   if (penilaians.length === 0) {
     return (
       <section>
-        <h2 className="text-xl font-semibold mb-3">Ranking Tim</h2>
+        <h2 className="text-xl font-semibold mb-3">Rekap Nilai</h2>
         <p className="text-gray-400 text-sm">Belum ada data penilaian.</p>
       </section>
     );
@@ -56,7 +75,7 @@ export default function RankingSection({
 
   return (
     <section>
-      <h2 className="text-xl font-semibold mb-3">Ranking Tim</h2>
+      <h2 className="text-xl font-semibold mb-3">Rekap Nilai</h2>
       {JENJANG_ORDER.map((jenjang) => {
         const grouped = penilaians
           .filter((p) => p.tim.jenjang === jenjang)
@@ -75,6 +94,11 @@ export default function RankingSection({
                   <tr>
                     <th className="px-4 py-3 text-left w-10">#</th>
                     <th className="px-4 py-3 text-left">Tim</th>
+                    {kategoriNama.map((k) => (
+                      <th key={k} className="px-4 py-3 text-right whitespace-nowrap">
+                        {k}
+                      </th>
+                    ))}
                     <th className="px-4 py-3 text-right">Nilai Kotor</th>
                     <th className="px-4 py-3 text-right">Pengurang</th>
                     <th className="px-4 py-3 text-right font-bold">Nilai Akhir</th>
@@ -92,6 +116,11 @@ export default function RankingSection({
                         <div className="font-medium">{p.tim.nama_tim}</div>
                         <div className="text-xs text-gray-400">{p.tim.asal_sekolah}</div>
                       </td>
+                      {kategoriNama.map((k) => (
+                        <td key={k} className="px-4 py-3 text-right">
+                          {nilaiKategori(p, k)}
+                        </td>
+                      ))}
                       <td className="px-4 py-3 text-right">{p.nilaiKotor}</td>
                       <td className="px-4 py-3 text-right text-red-500">
                         -{p.totalPengurang}

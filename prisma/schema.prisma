@@ -17,6 +17,7 @@ model User {
   role             Role
   verified         Boolean          @default(false)
   token            String?          @unique
+  verifyTokenSentAt DateTime?
   penilaian        Penilaian[]
   tims             Tim[]
   juri             Juri?
@@ -34,12 +35,13 @@ model Tim {
   pelatih       String
   jenjang       Jenjang
   confirmed     Boolean        @default(false)
-  userId        String
+  userId        String         @unique
   asal_sekolah  String
   tipe_tim      Tipe
   no_pelatih    String
   link_berkas   String?
   link_video    String?
+  foto          String?
   has_cc        Boolean        @default(false)
   has_maskot    Boolean        @default(false)
   totalVote     Int            @default(0)
@@ -268,15 +270,17 @@ model KonfigTiket {
 // ─── Sistem Voting (Dukungan Berbayar) ────────────────────────────────────────
 
 model KonfigVoting {
-  id           String  @id @default("singleton")
-  aktif        Boolean @default(true)
-  nominalVote  Int     @default(5000)
-  counterUrut  Int     @default(0)
+  id           String    @id @default("singleton")
+  aktif        Boolean   @default(true)
+  nominalVote  Int       @default(5000)
+  counterUrut  Int       @default(0)
   qrisUrl      String?
-  qrisPayload  String? @db.Text
+  qrisPayload  String?   @db.Text
   bankNama     String?
   bankNoRek    String?
   bankAtasNama String?
+  mulaiPada    DateTime?
+  tutupPada    DateTime?
 }
 
 model TransaksiVoting {
@@ -381,14 +385,31 @@ model Pengumuman {
 // ─── Konfigurasi Umum (singleton) ────────────────────────────────────────────
 
 model KonfigUmum {
-  id              String   @id @default("singleton")
-  countdownTarget DateTime @default("2025-11-08T00:00:00.000Z")
-  biayaSD         Int      @default(375000)
-  biayaSDDP       Int      @default(187500)
-  biayaSMP        Int      @default(400000)
-  biayaSMPDP      Int      @default(200000)
-  biayaSMA        Int      @default(400000)
-  biayaSMADP      Int      @default(200000)
+  id                  String    @id @default("singleton")
+  countdownTarget     DateTime  @default("2025-11-08T00:00:00.000Z")
+  countdownAktif      Boolean   @default(false)
+  // Terpisah dari countdownTarget (itu gerbang peluncuran situs) — dulu Hero
+  // memakai countdownTarget juga untuk countdown "Penutupan Pendaftaran",
+  // padahal begitu situs live (countdownTarget sudah lewat), countdown itu
+  // otomatis rusak karena tanggalnya sudah di masa lalu.
+  pendaftaranDeadline DateTime?
+  biayaSD             Int       @default(375000)
+  biayaSDDP           Int       @default(187500)
+  biayaSMP            Int       @default(400000)
+  biayaSMPDP          Int       @default(200000)
+  biayaSMA            Int       @default(400000)
+  biayaSMADP          Int       @default(200000)
+  // Rekening pendaftaran tim — dulu form pendaftaran ikut memakai KonfigTiket
+  // (halaman /admin/tiket, biasanya baru dikonfigurasi belakangan setelah
+  // pendaftaran dibuka), jadi bisa memblokir pendaftaran baru kalau admin
+  // belum sempat isi config tiket duluan.
+  bankNama            String?
+  bankNoRek           String?
+  bankAtasNama        String?
+  // Array 4 tahap timeline (judul, tanggal, deskripsi, ikon) untuk section
+  // Timeline di halaman utama — null berarti belum pernah diisi admin,
+  // Timeline.tsx fallback ke default hardcoded-nya sendiri.
+  timeline            Json?
 }
 
 // ─── Sponsor ─────────────────────────────────────────────────────────────────

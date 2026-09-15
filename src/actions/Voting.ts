@@ -3,8 +3,9 @@
 import { getServerSession } from "@/lib/next-auth";
 import { revalidatePath } from "next/cache";
 import prisma from "@/lib/prisma";
-import { imageUploader } from "./fileUploader";
+import { imageUploader, validateUploadFile } from "./fileUploader";
 import { buildDynamicQrisImage, decodeQrisFromImage } from "@/lib/qris";
+import { parseWibDatetimeLocal } from "@/lib/datetime";
 import {
   findKonfigVoting,
   findTransaksiVoting,
@@ -22,6 +23,23 @@ async function requireAdminOrBendahara() {
   if (!["ADMIN", "BENDAHARA"].includes(session?.user?.role ?? "")) throw new Error("Forbidden");
 }
 
+// Voting dianggap buka kalau: toggle aktif ON, dan (kalau diisi) waktu sekarang
+// berada di antara mulaiPada..tutupPada. mulaiPada/tutupPada opsional — kalau
+// tidak diisi, admin cukup andalkan toggle aktif seperti sebelumnya.
+// Diekspor (bukan cuma dipakai reserveKodeVoting/submitVote) supaya
+// src/app/(main)/vote/page.tsx pakai fungsi yang sama persis untuk
+// menentukan banner apa yang ditampilkan — dulu logikanya diduplikasi
+// di sana, gampang beda sendiri kalau salah satu diubah tanpa yang lain.
+export async function cekJendelaVoting(
+  konfig: { aktif: boolean; mulaiPada: Date | null; tutupPada: Date | null } | null
+) {
+  if (!konfig || !konfig.aktif) return { open: false, belumMulai: false, sudahTutup: false, message: "Voting dukungan belum/tidak dibuka" };
+  const now = new Date();
+  if (konfig.mulaiPada && now < konfig.mulaiPada) return { open: false, belumMulai: true, sudahTutup: false, message: "Voting belum dibuka" };
+  if (konfig.tutupPada && now > konfig.tutupPada) return { open: false, belumMulai: false, sudahTutup: true, message: "Voting sudah ditutup, terima kasih atas dukungannya!" };
+  return { open: true, belumMulai: false, sudahTutup: false, message: undefined as string | undefined };
+}
+
 // ─── Admin: Konfigurasi Voting ────────────────────────────────────────────────
 
 export async function saveKonfigVoting(data: FormData) {
@@ -32,6 +50,17 @@ export async function saveKonfigVoting(data: FormData) {
   const bankNoRek = data.get("bankNoRek") as string;
   const bankAtasNama = data.get("bankAtasNama") as string;
   const qrisFile = data.get("qris") as File;
+  const mulaiPadaRaw = data.get("mulaiPada") as string;
+  const tutupPadaRaw = data.get("tutupPada") as string;
+
+  const mulaiPada = parseWibDatetimeLocal(mulaiPadaRaw);
+  const tutupPada = parseWibDatetimeLocal(tutupPadaRaw);
+  if ((mulaiPadaRaw && !mulaiPada) || (tutupPadaRaw && !tutupPada)) {
+    return { success: false, message: "Format tanggal tidak valid" };
+  }
+  if (mulaiPada && tutupPada && mulaiPada >= tutupPada) {
+    return { success: false, message: "Waktu mulai harus sebelum waktu tutup" };
+  }
 
   try {
     const update: Parameters<typeof upsertKonfigVoting>[0] = {
@@ -40,9 +69,13 @@ export async function saveKonfigVoting(data: FormData) {
       bankNama,
       bankNoRek,
       bankAtasNama,
+      mulaiPada,
+      tutupPada,
     };
     let qrisTerbaca = true;
     if (qrisFile && qrisFile.size > 0) {
+      const fileCheck = await validateUploadFile(qrisFile);
+      if (!fileCheck.valid) return { success: false, message: fileCheck.message };
       const buffer = Buffer.from(await qrisFile.arrayBuffer());
       const upload = await imageUploader(buffer);
       if (upload.error) return { success: false, message: upload.message };
@@ -86,9 +119,9 @@ export async function getDynamicQrisVoting(amount: number) {
 export async function reserveKodeVoting() {
   try {
     const konfig = await prisma.konfigVoting.findUnique({ where: { id: "singleton" } });
-    if (!konfig || !konfig.aktif) {
-      return { success: false, message: "Voting dukungan belum/tidak dibuka" };
-    }
+    if (!konfig) return { success: false, message: "Voting dukungan belum/tidak dibuka" };
+    const status = await cekJendelaVoting(konfig);
+    if (!status.open) return { success: false, message: status.message };
     const updated = await prisma.konfigVoting.update({
       where: { id: "singleton" },
       data: { counterUrut: { increment: 1 } },
@@ -113,6 +146,8 @@ export async function submitVote(data: FormData, userId?: string) {
   if (!bukti || bukti.size === 0) {
     return { success: false, message: "Bukti pembayaran wajib diunggah" };
   }
+  const fileCheck = await validateUploadFile(bukti);
+  if (!fileCheck.valid) return { success: false, message: fileCheck.message };
   if (!kodeUnik || !/^\d+$/.test(kodeUnik)) {
     return { success: false, message: "Kode pembayaran tidak valid, silakan ulangi dari pemilihan tim" };
   }
@@ -136,9 +171,9 @@ export async function submitVote(data: FormData, userId?: string) {
 
   try {
     const konfig = await prisma.konfigVoting.findUnique({ where: { id: "singleton" } });
-    if (!konfig || !konfig.aktif) {
-      return { success: false, message: "Voting dukungan belum/tidak dibuka" };
-    }
+    if (!konfig) return { success: false, message: "Voting dukungan belum/tidak dibuka" };
+    const status = await cekJendelaVoting(konfig);
+    if (!status.open) return { success: false, message: status.message };
 
     const tim = await prisma.tim.findUnique({ where: { id: timId } });
     if (!tim) return { success: false, message: "Tim tidak ditemukan" };

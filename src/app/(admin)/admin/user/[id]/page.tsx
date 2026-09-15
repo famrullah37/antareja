@@ -12,6 +12,7 @@ export default async function UserEdit({ params }: { params: { id: string } }) {
     role: "USER",
     token: "",
     verified: false,
+    verifyTokenSentAt: null,
   };
 
   if (params.id !== "new") {
