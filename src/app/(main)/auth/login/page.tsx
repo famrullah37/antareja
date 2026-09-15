@@ -87,7 +87,7 @@ export default function Login() {
         </div>
         <H1>
           Kami Tunggu Tim Kalian di
-          <span className="text-primary-500"> Antareja Season 3</span>
+          <span className="text-primary-500"> Antareja Season 4</span>
         </H1>
         <P className="text-sm sm:text-base">
           Sudah siap menjadi pemenang Antareja?
