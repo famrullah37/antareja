@@ -8,6 +8,7 @@ type TransaksiWithRelations = {
   nama: string;
   email: string;
   noHp: string;
+  kategori: string;
   jumlahVote: number;
   hargaSatuan: number;
   totalBayar: number;
@@ -69,6 +70,7 @@ export default function TransaksiVotingTable({
           <tr>
             <th className="px-4 py-3 text-left">Pendukung</th>
             <th className="px-4 py-3 text-left">Tim</th>
+            <th className="px-4 py-3 text-left">Kategori</th>
             <th className="px-4 py-3 text-left">Jml Vote</th>
             <th className="px-4 py-3 text-left">Total Bayar</th>
             <th className="px-4 py-3 text-left">No. Urut</th>
@@ -87,6 +89,11 @@ export default function TransaksiVotingTable({
               <td className="px-4 py-3">
                 <div>{tr.tim.nama_tim}</div>
                 <div className="text-gray-400 text-xs">{tr.tim.asal_sekolah}</div>
+              </td>
+              <td className="px-4 py-3">
+                <span className="px-2 py-1 rounded-full text-xs bg-neutral-100 text-neutral-600">
+                  {tr.kategori === "tim_favorit" ? "Tim Favorit" : tr.kategori.replace(/_/g, " ")}
+                </span>
               </td>
               <td className="px-4 py-3">{tr.jumlahVote}×</td>
               <td className="px-4 py-3">

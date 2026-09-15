@@ -52,6 +52,7 @@ model Tim {
   penilaianBaru PenilaianBaru?
   sertifikat    Sertifikat[]
   transaksiVoting TransaksiVoting[]
+  votingTally   VotingTally[]
   user          User           @relation(fields: [userId], references: [id])
 
   @@unique([jenjang, noUrut])
@@ -281,6 +282,11 @@ model KonfigVoting {
   bankAtasNama String?
   mulaiPada    DateTime?
   tutupPada    DateTime?
+  // Kategori dukungan tambahan di luar "Tim Favorit" (bawaan, selalu ada).
+  // Array of {key, label, unit} — unit menentukan apa yang ditampilkan/
+  // dipilih pendukung: "TIM" (nama tim), "PELATIH" (Tim.pelatih), atau
+  // "DANTON" (nama anggota posisi DANTON di tim itu).
+  kategoriList Json?
 }
 
 model TransaksiVoting {
@@ -290,6 +296,9 @@ model TransaksiVoting {
   nama         String
   email        String
   noHp         String
+  // "tim_favorit" (bawaan, dihitung lewat Tim.totalVote) atau key kategori
+  // tambahan dari KonfigVoting.kategoriList (dihitung lewat VotingTally).
+  kategori     String   @default("tim_favorit")
   jumlahVote   Int      @default(1)
   hargaSatuan  Int
   kodeUnik     String
@@ -300,6 +309,18 @@ model TransaksiVoting {
   createdAt    DateTime @default(now())
   user         User?    @relation(fields: [userId], references: [id])
   tim          Tim      @relation(fields: [timId], references: [id])
+}
+
+// Total dukungan per tim, per kategori tambahan (di luar "tim_favorit" yang
+// masih pakai Tim.totalVote demi tidak mengubah leaderboard yang sudah jalan).
+model VotingTally {
+  id       String @id @default(uuid())
+  timId    String
+  kategori String
+  total    Int    @default(0)
+  tim      Tim    @relation(fields: [timId], references: [id], onDelete: Cascade)
+
+  @@unique([timId, kategori])
 }
 
 // ─── Galeri Foto Premium ──────────────────────────────────────────────────────
@@ -410,6 +431,9 @@ model KonfigUmum {
   // Timeline di halaman utama — null berarti belum pernah diisi admin,
   // Timeline.tsx fallback ke default hardcoded-nya sendiri.
   timeline            Json?
+  // Link download Juklak (petunjuk pelaksanaan), diupload admin lewat
+  // Pengaturan — muncul sebagai tombol download di Hero halaman utama.
+  juklakUrl           String?
 }
 
 // ─── Sponsor ─────────────────────────────────────────────────────────────────

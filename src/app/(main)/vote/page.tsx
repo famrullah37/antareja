@@ -1,16 +1,25 @@
 export const dynamic = "force-dynamic";
-import { findKonfigVoting, findTimsForVoting } from "@/queries/voting.query";
+import {
+  findDantonMap,
+  findKonfigVoting,
+  findTimsForVoting,
+  findVotingTallyMap,
+  getKategoriList,
+} from "@/queries/voting.query";
 import { getServerSession } from "@/lib/next-auth";
 import { cekJendelaVoting } from "@/actions/Voting";
 import VoteForm from "./VoteForm";
 import VotingCountdownBanner from "./VotingCountdownBanner";
 
 export default async function VotePage() {
-  const [tims, session, konfig] = await Promise.all([
+  const [tims, session, konfig, dantonMap, tallyMap] = await Promise.all([
     findTimsForVoting(),
     getServerSession(),
     findKonfigVoting(),
+    findDantonMap(),
+    findVotingTallyMap(),
   ]);
+  const kategoriList = getKategoriList(konfig);
 
   // Pakai fungsi yang sama persis dengan yang menegakkan aturan di server
   // (reserveKodeVoting/submitVote) — supaya banner yang ditampilkan tidak
@@ -39,7 +48,14 @@ export default async function VotePage() {
           {konfig?.tutupPada && (
             <VotingCountdownBanner target={konfig.tutupPada} label="Voting ditutup dalam" tone="tutup" />
           )}
-          <VoteForm tims={tims} userId={session?.user?.id} konfig={konfig} />
+          <VoteForm
+            tims={tims}
+            userId={session?.user?.id}
+            konfig={konfig}
+            kategoriList={kategoriList}
+            dantonMap={dantonMap}
+            tallyMap={tallyMap}
+          />
         </div>
       )}
     </section>

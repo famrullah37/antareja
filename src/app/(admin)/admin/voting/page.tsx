@@ -1,5 +1,5 @@
 export const dynamic = "force-dynamic";
-import { findKonfigVoting, findTimsForVoting, findTransaksiVotings } from "@/queries/voting.query";
+import { findKonfigVoting, findTimsForVoting, findTransaksiVotings, type KategoriVoting } from "@/queries/voting.query";
 import { H1 } from "@/app/components/global/Text";
 import KonfigVotingForm from "./components/KonfigVotingForm";
 import TransaksiVotingTable from "./components/TransaksiVotingTable";
@@ -16,7 +16,7 @@ export default async function AdminVotingPage() {
       <H1 className="mb-0">Manajemen Voting Dukungan</H1>
 
       <div className="grid lg:grid-cols-2 gap-6">
-        <KonfigVotingForm konfig={konfig} />
+        <KonfigVotingForm konfig={konfig ? { ...konfig, kategoriList: konfig.kategoriList as KategoriVoting[] | null } : null} />
 
         <div className="bg-white border border-neutral-200 rounded-xl p-5">
           <h3 className="font-semibold text-lg mb-3">Papan Dukungan</h3>

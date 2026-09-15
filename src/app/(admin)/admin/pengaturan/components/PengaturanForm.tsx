@@ -18,6 +18,7 @@ type Konfig = {
   bankNoRek: string | null;
   bankAtasNama: string | null;
   timeline: TimelineItem[] | null;
+  juklakUrl: string | null;
 };
 
 const defaultTimelineForForm: TimelineItem[] = [
@@ -157,6 +158,40 @@ export default function PengaturanForm({ konfig }: { konfig: Konfig }) {
             </div>
           )
         )}
+        <button
+          type="submit"
+          className="self-start bg-primary-500 text-white rounded-lg py-2 px-6 text-sm font-semibold hover:bg-primary-600 transition-colors"
+        >
+          Simpan
+        </button>
+      </div>
+
+      {/* Juklak */}
+      <div className="bg-white border border-neutral-200 rounded-xl p-6 flex flex-col gap-4">
+        <h2 className="font-semibold text-lg">Juklak (Petunjuk Pelaksanaan)</h2>
+        <p className="text-sm text-gray-500">
+          File PDF yang muncul sebagai tombol download di halaman utama (Hero).
+        </p>
+        {konfig.juklakUrl && (
+          <a
+            href={konfig.juklakUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="text-sm text-primary-600 hover:underline w-fit"
+          >
+            Lihat file Juklak saat ini
+          </a>
+        )}
+        <div className="flex flex-col gap-1">
+          <label className="text-sm font-medium">Upload File Juklak (PDF)</label>
+          <input
+            type="file"
+            name="juklak"
+            accept="application/pdf"
+            className="text-sm text-gray-500 file:mr-3 file:py-1.5 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary-50 file:text-primary-600 hover:file:bg-primary-100"
+          />
+          <span className="text-xs text-gray-400">Kosongkan jika tidak ingin mengubah file</span>
+        </div>
         <button
           type="submit"
           className="self-start bg-primary-500 text-white rounded-lg py-2 px-6 text-sm font-semibold hover:bg-primary-600 transition-colors"

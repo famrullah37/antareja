@@ -2,9 +2,10 @@
 
 import { getDynamicQrisVoting, reserveKodeVoting, submitVote } from "@/actions/Voting";
 import { initials } from "@/lib/initials";
+import type { KategoriVoting } from "@/queries/voting.query";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 function formatRupiah(n: number) {
@@ -20,6 +21,7 @@ type TimVote = {
   nama_tim: string;
   asal_sekolah: string;
   jenjang: string;
+  pelatih: string;
   totalVote: number;
   foto: string | null;
 };
@@ -30,6 +32,17 @@ type KonfigVoting = {
   bankNoRek?: string | null;
   bankAtasNama?: string | null;
 } | null;
+
+const JENJANG_TABS = ["SEMUA", "SD", "SMP", "SMA"] as const;
+
+// Nama yang ditampilkan/dipilih pendukung untuk kategori tertentu — untuk
+// "Tim Favorit" ya nama tim, untuk kategori ber-unit PELATIH/DANTON nama
+// orangnya (tim-nya tetap yang di-vote di database, cuma label beda).
+function displayName(tim: TimVote, kategori: KategoriVoting, dantonMap: Record<string, string>) {
+  if (kategori.unit === "PELATIH") return tim.pelatih || null;
+  if (kategori.unit === "DANTON") return dantonMap[tim.id] || null;
+  return tim.nama_tim;
+}
 
 function Avatar({ tim, className, size }: { tim: TimVote; className: string; size: number }) {
   return tim.foto ? (
@@ -59,12 +72,20 @@ export default function VoteForm({
   tims,
   userId,
   konfig,
+  kategoriList,
+  dantonMap,
+  tallyMap,
 }: {
   tims: TimVote[];
   userId?: string;
   konfig: KonfigVoting;
+  kategoriList: KategoriVoting[];
+  dantonMap: Record<string, string>;
+  tallyMap: Record<string, Record<string, number>>;
 }) {
   const router = useRouter();
+  const [activeKategori, setActiveKategori] = useState<KategoriVoting>(kategoriList[0]);
+  const [activeJenjang, setActiveJenjang] = useState<(typeof JENJANG_TABS)[number]>("SEMUA");
   const [selected, setSelected] = useState<TimVote | null>(null);
   const [reserved, setReserved] = useState<{ kodeUnik: string; hargaSatuan: number } | null>(null);
   const [loadingReserve, setLoadingReserve] = useState(false);
@@ -74,9 +95,35 @@ export default function VoteForm({
 
   const totalBayar = reserved ? reserved.hargaSatuan * jumlahVote + parseInt(reserved.kodeUnik) : 0;
 
-  const ranked = tims.slice().sort((a, b) => b.totalVote - a.totalVote);
+  function getCount(tim: TimVote) {
+    return activeKategori.key === "tim_favorit"
+      ? tim.totalVote
+      : tallyMap[tim.id]?.[activeKategori.key] ?? 0;
+  }
+
+  // Untuk kategori ber-unit PELATIH/DANTON, tim yang belum isi data itu
+  // (mis. Danton belum diisi) disembunyikan dari daftar pilihan kategori ini.
+  const ranked = useMemo(() => {
+    return tims
+      .filter((t) => activeJenjang === "SEMUA" || t.jenjang === activeJenjang)
+      .filter((t) => displayName(t, activeKategori, dantonMap) !== null)
+      .slice()
+      .sort((a, b) => getCount(b) - getCount(a));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tims, activeJenjang, activeKategori, dantonMap, tallyMap]);
   const top3 = ranked.slice(0, 3);
   const rest = ranked.slice(3);
+
+  function pilihKategori(k: KategoriVoting) {
+    setActiveKategori(k);
+    setSelected(null);
+    setReserved(null);
+  }
+  function pilihJenjang(j: (typeof JENJANG_TABS)[number]) {
+    setActiveJenjang(j);
+    setSelected(null);
+    setReserved(null);
+  }
 
   // Papan Dukungan (leaderboard) update otomatis tanpa reload halaman.
   useEffect(() => {
@@ -149,11 +196,49 @@ export default function VoteForm({
 
   return (
     <div className="flex flex-col gap-8">
+      {/* Tab Kategori */}
+      {kategoriList.length > 1 && (
+        <div className="flex flex-wrap gap-2">
+          {kategoriList.map((k) => (
+            <button
+              key={k.key}
+              type="button"
+              onClick={() => pilihKategori(k)}
+              className={`px-4 py-2 rounded-full text-sm font-semibold transition-colors ${
+                activeKategori.key === k.key
+                  ? "bg-primary-500 text-white"
+                  : "bg-white border border-gray-200 text-gray-600 hover:border-primary-300"
+              }`}
+            >
+              {k.label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Tab Jenjang */}
+      <div className="flex flex-wrap gap-2 -mt-4">
+        {JENJANG_TABS.map((j) => (
+          <button
+            key={j}
+            type="button"
+            onClick={() => pilihJenjang(j)}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+              activeJenjang === j
+                ? "bg-neutral-800 text-white"
+                : "bg-neutral-100 text-neutral-500 hover:bg-neutral-200"
+            }`}
+          >
+            {j === "SEMUA" ? "Semua Jenjang" : j}
+          </button>
+        ))}
+      </div>
+
       {/* Papan Peringkat */}
       {ranked.length > 0 && (
         <div className="bg-white rounded-2xl border border-gray-200 p-5">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-lg">Papan Dukungan</h3>
+            <h3 className="font-semibold text-lg">Papan {activeKategori.label}</h3>
             <span className="text-[11px] text-gray-400">Update otomatis setelah verifikasi admin</span>
           </div>
 
@@ -171,8 +256,10 @@ export default function VoteForm({
                     </span>
                     <Avatar tim={t} size={48} className="w-12 h-12 rounded-full border-2 border-white/70" />
                     <div className="text-center">
-                      <div className="font-bold text-sm leading-tight line-clamp-2">{t.nama_tim}</div>
-                      <div className="text-xs opacity-90 mt-1">{t.totalVote} suara</div>
+                      <div className="font-bold text-sm leading-tight line-clamp-2">
+                        {displayName(t, activeKategori, dantonMap)}
+                      </div>
+                      <div className="text-xs opacity-90 mt-1">{getCount(t)} suara</div>
                     </div>
                   </div>
                 </div>
@@ -189,11 +276,11 @@ export default function VoteForm({
                     <span className="w-6 text-center text-gray-400 font-mono text-xs">{i + 4}</span>
                     <Avatar tim={t} size={32} className="w-8 h-8 rounded-full" />
                     <div>
-                      <div className="font-medium">{t.nama_tim}</div>
+                      <div className="font-medium">{displayName(t, activeKategori, dantonMap)}</div>
                       <div className="text-xs text-gray-400">{t.asal_sekolah} — {t.jenjang}</div>
                     </div>
                   </div>
-                  <span className="font-bold text-primary-600">{t.totalVote} suara</span>
+                  <span className="font-bold text-primary-600">{getCount(t)} suara</span>
                 </div>
               ))}
             </div>
@@ -203,7 +290,10 @@ export default function VoteForm({
 
       {/* Pilih Tim */}
       <div>
-        <h3 className="font-semibold text-lg mb-3">Pilih Peserta Favorit untuk Vote</h3>
+        <h3 className="font-semibold text-lg mb-3">Pilih {activeKategori.label} untuk Vote</h3>
+        {ranked.length === 0 && (
+          <p className="text-sm text-gray-400">Belum ada peserta untuk kategori/jenjang ini.</p>
+        )}
         <div className="grid sm:grid-cols-2 gap-4">
           {ranked.map((t, i) => (
             <div
@@ -220,9 +310,13 @@ export default function VoteForm({
                   #{i + 1}
                 </span>
               </div>
-              <div className="font-bold text-base leading-snug line-clamp-2">{t.nama_tim}</div>
-              <div className="text-xs text-gray-400 -mt-1">{t.asal_sekolah}</div>
-              <div className="text-sm text-gray-500">{t.totalVote} suara</div>
+              <div className="font-bold text-base leading-snug line-clamp-2">
+                {displayName(t, activeKategori, dantonMap)}
+              </div>
+              <div className="text-xs text-gray-400 -mt-1">
+                {activeKategori.unit === "TIM" ? t.asal_sekolah : `${t.nama_tim} — ${t.asal_sekolah}`}
+              </div>
+              <div className="text-sm text-gray-500">{getCount(t)} suara</div>
               <button
                 type="button"
                 onClick={() => handlePilihTim(t)}
@@ -244,10 +338,11 @@ export default function VoteForm({
           <input type="hidden" name="timId" value={selected.id} />
           <input type="hidden" name="kodeUnik" value={reserved.kodeUnik} />
           <input type="hidden" name="jumlahVote" value={jumlahVote} />
+          <input type="hidden" name="kategori" value={activeKategori.key} />
 
           <div className="bg-white rounded-2xl border border-gray-200 p-6 flex flex-col gap-4">
             <h3 className="font-semibold text-lg">
-              Dukung {selected.nama_tim}
+              Dukung {displayName(selected, activeKategori, dantonMap)}
             </h3>
 
             <div className="flex flex-col gap-1">

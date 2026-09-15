@@ -4,6 +4,7 @@ import { getServerSession } from "@/lib/next-auth";
 import { upsertKonfigUmum, type TimelineItem } from "@/queries/konfigUmum.query";
 import { revalidatePath } from "next/cache";
 import { parseWibDatetimeLocal } from "@/lib/datetime";
+import { imageUploader, validateUploadFile } from "./fileUploader";
 
 async function requireAdmin() {
   const session = await getServerSession();
@@ -57,6 +58,18 @@ export async function saveKonfigUmum(data: FormData) {
     }
   }
 
+  // Juklak (PDF) — opsional, hanya ikut disimpan kalau admin upload file baru
+  // (dikosongkan berarti tidak mengubah link Juklak yang sudah ada).
+  const juklakFile = data.get("juklak") as File | null;
+  let juklakUrl: string | undefined;
+  if (juklakFile && juklakFile.size > 0) {
+    const fileCheck = await validateUploadFile(juklakFile, { maxMB: 15, allowPdf: true });
+    if (!fileCheck.valid) return { success: false, message: fileCheck.message };
+    const upload = await imageUploader(Buffer.from(await juklakFile.arrayBuffer()));
+    if (upload.error) return { success: false, message: upload.message };
+    juklakUrl = upload.data!.url;
+  }
+
   try {
     await upsertKonfigUmum({
       countdownTarget,
@@ -65,6 +78,7 @@ export async function saveKonfigUmum(data: FormData) {
       biayaSD, biayaSDDP, biayaSMP, biayaSMPDP, biayaSMA, biayaSMADP,
       bankNama, bankNoRek, bankAtasNama,
       timeline,
+      ...(juklakUrl ? { juklakUrl } : {}),
     });
     revalidatePath("/", "layout");
     return { success: true };

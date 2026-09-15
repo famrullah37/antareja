@@ -9,9 +9,19 @@ import { parseWibDatetimeLocal } from "@/lib/datetime";
 import {
   findKonfigVoting,
   findTransaksiVoting,
+  getKategoriList,
   updateTransaksiVoting,
   upsertKonfigVoting,
+  type KategoriVoting,
 } from "@/queries/voting.query";
+
+function slugify(s: string) {
+  return s
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "") || "kategori";
+}
 
 async function requireAdmin() {
   const session = await getServerSession();
@@ -62,6 +72,23 @@ export async function saveKonfigVoting(data: FormData) {
     return { success: false, message: "Waktu mulai harus sebelum waktu tutup" };
   }
 
+  // Kategori tambahan (di luar "Tim Favorit" bawaan) — dikirim sebagai
+  // pasangan array kategoriLabel[]/kategoriUnit[] dengan indeks yang sama.
+  const labels = data.getAll("kategoriLabel") as string[];
+  const units = data.getAll("kategoriUnit") as string[];
+  const usedKeys = new Set<string>();
+  const kategoriList: KategoriVoting[] = [];
+  for (let i = 0; i < labels.length; i++) {
+    const label = (labels[i] || "").trim();
+    if (!label) continue;
+    const unit: KategoriVoting["unit"] =
+      units[i] === "PELATIH" ? "PELATIH" : units[i] === "DANTON" ? "DANTON" : "TIM";
+    let key = slugify(label);
+    while (usedKeys.has(key) || key === "tim_favorit") key = `${key}_2`;
+    usedKeys.add(key);
+    kategoriList.push({ key, label, unit });
+  }
+
   try {
     const update: Parameters<typeof upsertKonfigVoting>[0] = {
       aktif,
@@ -71,6 +98,7 @@ export async function saveKonfigVoting(data: FormData) {
       bankAtasNama,
       mulaiPada,
       tutupPada,
+      kategoriList,
     };
     let qrisTerbaca = true;
     if (qrisFile && qrisFile.size > 0) {
@@ -140,8 +168,19 @@ export async function submitVote(data: FormData, userId?: string) {
   const email = data.get("email") as string;
   const noHp = data.get("noHp") as string;
   const kodeUnik = data.get("kodeUnik") as string;
+  const kategoriRaw = (data.get("kategori") as string) || "tim_favorit";
   const jumlahVote = parseInt(data.get("jumlahVote") as string) || 1;
   const bukti = data.get("bukti") as File;
+
+  // Kategori wajib salah satu dari "tim_favorit" atau yang terdaftar di
+  // KonfigVoting.kategoriList — cegah klien mengarang key kategori sendiri
+  // (nanti dukungannya tidak ke-hitung di leaderboard manapun).
+  const konfigKategori = await prisma.konfigVoting.findUnique({ where: { id: "singleton" } });
+  const kategoriValid = getKategoriList(konfigKategori).some((k) => k.key === kategoriRaw);
+  if (!kategoriValid) {
+    return { success: false, message: "Kategori dukungan tidak valid, silakan ulangi dari pemilihan tim" };
+  }
+  const kategori = kategoriRaw;
 
   if (!bukti || bukti.size === 0) {
     return { success: false, message: "Bukti pembayaran wajib diunggah" };
@@ -192,6 +231,7 @@ export async function submitVote(data: FormData, userId?: string) {
         nama,
         email,
         noHp,
+        kategori,
         jumlahVote,
         hargaSatuan: konfig.nominalVote,
         kodeUnik,
@@ -221,10 +261,20 @@ export async function verifikasiVoting(transaksiId: string) {
 
     await updateTransaksiVoting({ id: transaksiId }, { status: "VERIFIED" });
 
-    await prisma.tim.update({
-      where: { id: transaksi.timId },
-      data: { totalVote: { increment: transaksi.jumlahVote } },
-    });
+    // "tim_favorit" tetap lewat Tim.totalVote (leaderboard lama, tidak
+    // diubah) — kategori tambahan dihitung lewat VotingTally per kategori.
+    if (transaksi.kategori === "tim_favorit") {
+      await prisma.tim.update({
+        where: { id: transaksi.timId },
+        data: { totalVote: { increment: transaksi.jumlahVote } },
+      });
+    } else {
+      await prisma.votingTally.upsert({
+        where: { timId_kategori: { timId: transaksi.timId, kategori: transaksi.kategori } },
+        update: { total: { increment: transaksi.jumlahVote } },
+        create: { timId: transaksi.timId, kategori: transaksi.kategori, total: transaksi.jumlahVote },
+      });
+    }
 
     await prisma.kasTransaksi.create({
       data: {
