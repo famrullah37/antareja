@@ -234,12 +234,14 @@ export default function BeliTiketForm({
               <div className="bg-purple-50 border border-purple-200 rounded-xl p-4 text-sm text-purple-800 flex flex-col items-center gap-2">
                 <p className="font-semibold">Scan QRIS berikut:</p>
                 {qrisDinamis ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- QRIS dinamis (data URL sekali pakai)
                   <img
                     src={qrisDinamis}
                     alt="QRIS Dinamis"
                     className="w-48 h-48 object-contain rounded-lg border border-purple-200 bg-white"
                   />
                 ) : konfig?.qrisUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- gambar QRIS statis dari admin
                   <img
                     src={konfig.qrisUrl}
                     alt="QRIS"

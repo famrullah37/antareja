@@ -177,6 +177,7 @@ export default function SertifikatForm({ tim, sertifikats, juaraLabel }: Props) 
             {previews.length > 0 && (
               <div className="flex flex-wrap gap-2 mt-1">
                 {previews.map((p, i) => (
+                  // eslint-disable-next-line @next/next/no-img-element -- preview blob lokal, bukan aset remote
                   <img key={i} src={p} alt={`preview-${i}`} className="w-16 h-12 object-cover rounded border border-gray-200" />
                 ))}
               </div>

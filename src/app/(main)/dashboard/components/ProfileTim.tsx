@@ -178,6 +178,7 @@ export default function ProfileTim({ tim, penilaian }: { tim: TimWithRelations; 
             </P>
             <div className="flex items-center gap-4 mb-4">
               {tim.foto ? (
+                // eslint-disable-next-line @next/next/no-img-element -- foto hasil upload, ukuran kecil & jarang berubah
                 <img
                   src={tim.foto}
                   alt={tim.nama_tim}

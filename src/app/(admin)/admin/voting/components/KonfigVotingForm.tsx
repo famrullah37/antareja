@@ -74,7 +74,7 @@ export default function KonfigVotingForm({ konfig }: { konfig: Konfig | null }) 
         </div>
       </div>
       <p className="text-xs text-gray-400 -mt-2">
-        Kosongkan kalau tidak mau pakai jadwal — voting cuma dikontrol toggle "Buka voting" di atas. Kalau diisi, halaman /vote menampilkan countdown dan otomatis tertutup begitu waktunya lewat.
+        Kosongkan kalau tidak mau pakai jadwal — voting cuma dikontrol toggle &quot;Buka voting&quot; di atas. Kalau diisi, halaman /vote menampilkan countdown dan otomatis tertutup begitu waktunya lewat.
       </p>
 
       <div className="flex flex-col gap-1">

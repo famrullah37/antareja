@@ -100,6 +100,7 @@ export default function SponsorForm() {
           />
           {preview && (
             <div className="mt-2 bg-neutral-100 rounded-xl p-4 flex items-center justify-center h-24">
+              {/* eslint-disable-next-line @next/next/no-img-element -- preview blob lokal, bukan aset remote */}
               <img src={preview} alt="preview" className="max-h-full max-w-[200px] object-contain" />
             </div>
           )}

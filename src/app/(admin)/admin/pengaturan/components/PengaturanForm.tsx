@@ -73,8 +73,8 @@ export default function PengaturanForm({ konfig }: { konfig: Konfig }) {
       <div className="bg-white border border-neutral-200 rounded-xl p-6 flex flex-col gap-4">
         <h2 className="font-semibold text-lg">Penutupan Pendaftaran</h2>
         <p className="text-sm text-gray-500">
-          Tanggal ini yang ditampilkan sebagai countdown "Penutupan Pendaftaran" di
-          Hero halaman utama — <strong>berbeda</strong> dari "Target Waktu" di atas
+          Tanggal ini yang ditampilkan sebagai countdown &quot;Penutupan Pendaftaran&quot; di
+          Hero halaman utama — <strong>berbeda</strong> dari &quot;Target Waktu&quot; di atas
           (itu untuk gerbang peluncuran situs/Coming Soon). Kosongkan kalau belum
           mau menampilkan countdown pendaftaran.
         </p>
