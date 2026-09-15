@@ -16,7 +16,7 @@ services:
       GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI}
       GOOGLE_REFRESH_TOKEN: ${GOOGLE_REFRESH_TOKEN}
     networks:
-      - traefik-public
+      - proxy
       - postgresql-wsnb_default
     labels:
       - "traefik.enable=true"
@@ -26,7 +26,7 @@ services:
       - "traefik.http.services.antareja.loadbalancer.server.port=3000"
 
 networks:
-  traefik-public:
+  proxy:
     external: true
   postgresql-wsnb_default:
     external: true
