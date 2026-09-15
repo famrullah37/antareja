@@ -10,7 +10,7 @@ import Throwback from "./components/Throwback";
 import TiketSection from "./components/TiketSection";
 import RevealSection from "./components/parts/RevealSection";
 import ComingSoon from "./components/ComingSoon";
-import { getKonfigUmum } from "@/queries/konfigUmum.query";
+import { getKonfigUmum, type TimelineItem } from "@/queries/konfigUmum.query";
 
 export default async function LandingPage() {
   const konfig = await getKonfigUmum();
@@ -31,7 +31,7 @@ export default async function LandingPage() {
         <Video />
       </RevealSection>
       <RevealSection delay={0}>
-        <Timeline />
+        <Timeline items={konfig.timeline as TimelineItem[] | null} />
       </RevealSection>
       <RevealSection delay={0}>
         <Juri />

@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import { saveKonfigUmum } from "@/actions/KonfigUmum";
+import type { TimelineItem } from "@/queries/konfigUmum.query";
 import { toast } from "sonner";
 
 type Konfig = {
@@ -16,7 +17,15 @@ type Konfig = {
   bankNama: string | null;
   bankNoRek: string | null;
   bankAtasNama: string | null;
+  timeline: TimelineItem[] | null;
 };
+
+const defaultTimelineForForm: TimelineItem[] = [
+  { title: "Pendaftaran Peserta", dateString: "", description: "", icon: "📋" },
+  { title: "Technical Meeting", dateString: "", description: "", icon: "🤝" },
+  { title: "Uji Coba Lapangan", dateString: "", description: "", icon: "🏃" },
+  { title: "Pelaksanaan Lomba", dateString: "", description: "", icon: "🏆" },
+];
 
 function toDatetimeLocal(d: Date) {
   const pad = (n: number) => String(n).padStart(2, "0");
@@ -87,6 +96,67 @@ export default function PengaturanForm({ konfig }: { konfig: Konfig }) {
             className="border border-neutral-300 rounded-lg px-3 py-2 text-sm"
           />
         </div>
+        <button
+          type="submit"
+          className="self-start bg-primary-500 text-white rounded-lg py-2 px-6 text-sm font-semibold hover:bg-primary-600 transition-colors"
+        >
+          Simpan
+        </button>
+      </div>
+
+      {/* Timeline Perlombaan */}
+      <div className="bg-white border border-neutral-200 rounded-xl p-6 flex flex-col gap-4">
+        <h2 className="font-semibold text-lg">Timeline Perlombaan</h2>
+        <p className="text-sm text-gray-500">
+          4 tahap yang ditampilkan di section Timeline halaman utama. Judul & tanggal wajib diisi.
+        </p>
+        {(konfig.timeline && konfig.timeline.length === 4 ? konfig.timeline : defaultTimelineForForm).map(
+          (item, idx) => (
+            <div key={idx} className="border border-neutral-200 rounded-lg p-4 flex flex-col gap-3">
+              <span className="text-xs font-bold text-primary-500">Tahap {idx + 1}</span>
+              <div className="grid sm:grid-cols-[80px_1fr] gap-3">
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium text-gray-500">Ikon</label>
+                  <input
+                    name={`timelineIcon${idx + 1}`}
+                    defaultValue={item.icon}
+                    maxLength={4}
+                    className="border border-neutral-300 rounded-lg px-3 py-2 text-sm text-center"
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium text-gray-500">Judul</label>
+                  <input
+                    name={`timelineTitle${idx + 1}`}
+                    defaultValue={item.title}
+                    placeholder="Pendaftaran Peserta"
+                    required
+                    className="border border-neutral-300 rounded-lg px-3 py-2 text-sm"
+                  />
+                </div>
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium text-gray-500">Tanggal</label>
+                <input
+                  name={`timelineDate${idx + 1}`}
+                  defaultValue={item.dateString}
+                  placeholder="1 Sep – 8 Nov 2026"
+                  required
+                  className="border border-neutral-300 rounded-lg px-3 py-2 text-sm"
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium text-gray-500">Deskripsi</label>
+                <input
+                  name={`timelineDesc${idx + 1}`}
+                  defaultValue={item.description}
+                  placeholder="Dilaksanakan di SMK Telkom Malang"
+                  className="border border-neutral-300 rounded-lg px-3 py-2 text-sm"
+                />
+              </div>
+            </div>
+          )
+        )}
         <button
           type="submit"
           className="self-start bg-primary-500 text-white rounded-lg py-2 px-6 text-sm font-semibold hover:bg-primary-600 transition-colors"

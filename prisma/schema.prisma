@@ -406,6 +406,10 @@ model KonfigUmum {
   bankNama            String?
   bankNoRek           String?
   bankAtasNama        String?
+  // Array 4 tahap timeline (judul, tanggal, deskripsi, ikon) untuk section
+  // Timeline di halaman utama — null berarti belum pernah diisi admin,
+  // Timeline.tsx fallback ke default hardcoded-nya sendiri.
+  timeline            Json?
 }
 
 // ─── Sponsor ─────────────────────────────────────────────────────────────────
