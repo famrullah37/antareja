@@ -25,6 +25,7 @@ export default function TimForm({
   const options = [
     { label: "SMP", value: "SMP" },
     { label: "SMA", value: "SMA" },
+    { label: "Purna", value: "PURNA" },
   ];
 
   const options_type = [

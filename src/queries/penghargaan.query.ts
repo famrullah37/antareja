@@ -1,5 +1,5 @@
 import prisma from "@/lib/prisma";
-import { Prisma } from "@prisma/client";
+import { Jenjang, Prisma } from "@prisma/client";
 
 export async function findKonfigJuaras(where?: Prisma.KonfigJuaraWhereInput) {
   return prisma.konfigJuara.findMany({
@@ -28,7 +28,7 @@ export async function deleteKonfigJuara(where: Prisma.KonfigJuaraWhereUniqueInpu
 }
 
 export async function getRankingPerJenjang(
-  jenjang: "SD" | "SMP" | "SMA",
+  jenjang: Jenjang,
   _kategoriList: string[]
 ) {
   const penilaians = await prisma.penilaianBaru.findMany({

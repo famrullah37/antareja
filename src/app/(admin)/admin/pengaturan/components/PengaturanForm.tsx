@@ -14,6 +14,8 @@ type Konfig = {
   biayaSMPDP: number;
   biayaSMA: number;
   biayaSMADP: number;
+  biayaPurna: number;
+  biayaPurnaDP: number;
   bankNama: string | null;
   bankNoRek: string | null;
   bankAtasNama: string | null;
@@ -255,6 +257,8 @@ export default function PengaturanForm({ konfig }: { konfig: Konfig }) {
           { label: "SMP / Sederajat – DP 50%", name: "biayaSMPDP", value: konfig.biayaSMPDP },
           { label: "SMA / Sederajat – Full", name: "biayaSMA", value: konfig.biayaSMA },
           { label: "SMA / Sederajat – DP 50%", name: "biayaSMADP", value: konfig.biayaSMADP },
+          { label: "Purna – Full", name: "biayaPurna", value: konfig.biayaPurna },
+          { label: "Purna – DP 50%", name: "biayaPurnaDP", value: konfig.biayaPurnaDP },
         ].map(({ label, name, value }) => (
           <div key={name} className="flex flex-col gap-1">
             <label className="text-sm font-medium">{label}</label>

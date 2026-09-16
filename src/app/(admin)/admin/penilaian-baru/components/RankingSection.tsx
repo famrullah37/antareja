@@ -32,7 +32,7 @@ type PenilaianBaruItem = {
 
 type KategoriLomba = { id: string; nama: string };
 
-const JENJANG_ORDER = ["SD", "SMP", "SMA"];
+const JENJANG_ORDER = ["SD", "SMP", "SMA", "PURNA"];
 
 export default function RankingSection({
   penilaians,

@@ -18,6 +18,12 @@ const JENJANG_META = [
     accent: "text-violet-600",
     dpBg: "bg-violet-50",
   },
+  {
+    color: "from-emerald-500 to-emerald-600",
+    badge: "bg-emerald-50 text-emerald-600 border-emerald-200",
+    accent: "text-emerald-600",
+    dpBg: "bg-emerald-50",
+  },
 ];
 
 export default async function Kategori() {
@@ -26,6 +32,7 @@ export default async function Kategori() {
   const jenjangList = [
     { label: "SMP", full: "Jenjang SMP", harga: konfig.biayaSMP, dp: konfig.biayaSMPDP },
     { label: "SMA", full: "Jenjang SMA", harga: konfig.biayaSMA, dp: konfig.biayaSMADP },
+    { label: "Purna", full: "Jenjang Purna", harga: konfig.biayaPurna, dp: konfig.biayaPurnaDP },
   ];
 
   return (
@@ -42,12 +49,12 @@ export default async function Kategori() {
             <span className="text-primary-500">Antareja 2026</span>
           </h2>
           <p className="text-gray-500 max-w-md">
-            Antareja hadir untuk 2 jenjang perlombaan. Daftarkan tim terbaik Anda sekarang.
+            Antareja hadir untuk 3 jenjang perlombaan. Daftarkan tim terbaik Anda sekarang.
           </p>
         </div>
 
         {/* Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {jenjangList.map((j, i) => {
             const meta = JENJANG_META[i];
             return (

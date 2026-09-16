@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { getServerSession } from "@/lib/next-auth";
 import prisma from "@/lib/prisma";
 
-const VALID_JENJANG: Jenjang[] = ["SD", "SMP", "SMA"];
+const VALID_JENJANG: Jenjang[] = ["SD", "SMP", "SMA", "PURNA"];
 const VALID_TIPE: Tipe[] = ["SMALL", "NORMAL"];
 
 export default async function submitFormRegistrasi(data: FormData) {

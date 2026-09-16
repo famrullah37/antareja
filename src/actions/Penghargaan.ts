@@ -30,7 +30,10 @@ export async function saveKonfigJuaraUmum(data: FormData) {
 
 export async function saveKonfigJuaraPeringkat(data: FormData) {
   await requireAdmin();
-  const jenjang = data.get("jenjang") as "SD" | "SMP" | "SMA";
+  // Field bebas teks (lihat JENJANG_OPTIONS di KonfigJuaraPeringkatForm — sudah
+  // termasuk "PURNA"/"UMUM", bukan cuma jenjang Tim SD/SMP/SMA), jadi cast-nya
+  // "string" biasa saja, bukan union sempit yang bisa menyesatkan.
+  const jenjang = data.get("jenjang") as string;
   const namaJuara = data.get("namaJuara") as string;
   const kode = data.get("kode") as string;
   const urutan = parseInt(data.get("urutan") as string);

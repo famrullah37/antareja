@@ -22,6 +22,8 @@ export async function saveKonfigUmum(data: FormData) {
   const biayaSMPDP = parseInt(data.get("biayaSMPDP") as string);
   const biayaSMA = parseInt(data.get("biayaSMA") as string);
   const biayaSMADP = parseInt(data.get("biayaSMADP") as string);
+  const biayaPurna = parseInt(data.get("biayaPurna") as string);
+  const biayaPurnaDP = parseInt(data.get("biayaPurnaDP") as string);
   const bankNama = (data.get("bankNama") as string) || "";
   const bankNoRek = (data.get("bankNoRek") as string) || "";
   const bankAtasNama = (data.get("bankAtasNama") as string) || "";
@@ -52,6 +54,7 @@ export async function saveKonfigUmum(data: FormData) {
   for (const [label, n] of [
     ["SD", biayaSD], ["SD DP", biayaSDDP], ["SMP", biayaSMP],
     ["SMP DP", biayaSMPDP], ["SMA", biayaSMA], ["SMA DP", biayaSMADP],
+    ["Purna", biayaPurna], ["Purna DP", biayaPurnaDP],
   ] as const) {
     if (!Number.isFinite(n) || n < 0) {
       return { success: false, message: `Biaya ${label} tidak valid` };
@@ -76,6 +79,7 @@ export async function saveKonfigUmum(data: FormData) {
       countdownAktif,
       pendaftaranDeadline,
       biayaSD, biayaSDDP, biayaSMP, biayaSMPDP, biayaSMA, biayaSMADP,
+      biayaPurna, biayaPurnaDP,
       bankNama, bankNoRek, bankAtasNama,
       timeline,
       ...(juklakUrl ? { juklakUrl } : {}),

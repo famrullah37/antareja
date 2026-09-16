@@ -420,6 +420,8 @@ model KonfigUmum {
   biayaSMPDP          Int       @default(200000)
   biayaSMA            Int       @default(400000)
   biayaSMADP          Int       @default(200000)
+  biayaPurna          Int       @default(400000)
+  biayaPurnaDP        Int       @default(200000)
   // Rekening pendaftaran tim — dulu form pendaftaran ikut memakai KonfigTiket
   // (halaman /admin/tiket, biasanya baru dikonfigurasi belakangan setelah
   // pendaftaran dibuka), jadi bisa memblokir pendaftaran baru kalau admin
@@ -466,6 +468,7 @@ enum Jenjang {
   SD
   SMP
   SMA
+  PURNA
 }
 
 enum Kelas {

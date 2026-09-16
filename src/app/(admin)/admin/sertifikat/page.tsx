@@ -5,7 +5,7 @@ import { findSertifikats } from "@/queries/sertifikat.query";
 import { findKonfigJuaras, getRankingPerJenjang } from "@/queries/penghargaan.query";
 import SertifikatForm from "./components/SertifikatForm";
 
-const JENJANG_LIST = ["SD", "SMP", "SMA"] as const;
+const JENJANG_LIST = ["SD", "SMP", "SMA", "PURNA"] as const;
 
 export default async function SertifikatPage() {
   const [tims, sertifikats, konfigs] = await Promise.all([

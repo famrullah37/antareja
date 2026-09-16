@@ -15,6 +15,7 @@ import { toast } from "sonner";
 const jenjangOptions = [
   { label: "SMA/Sederajat", value: "SMA" },
   { label: "SMP/Sederajat", value: "SMP" },
+  { label: "Purna", value: "PURNA" },
 ];
 
 const size = [
@@ -34,6 +35,8 @@ type KonfigUmum = {
   biayaSMPDP: number;
   biayaSMA: number;
   biayaSMADP: number;
+  biayaPurna: number;
+  biayaPurnaDP: number;
   bankNama: string | null;
   bankNoRek: string | null;
   bankAtasNama: string | null;
@@ -58,6 +61,7 @@ function hitungBiaya(jenjang: string | null, isDP: boolean, konfig: KonfigUmum) 
     SD: { full: konfig.biayaSD, dp: konfig.biayaSDDP },
     SMP: { full: konfig.biayaSMP, dp: konfig.biayaSMPDP },
     SMA: { full: konfig.biayaSMA, dp: konfig.biayaSMADP },
+    PURNA: { full: konfig.biayaPurna, dp: konfig.biayaPurnaDP },
   };
   const entry = table[jenjang];
   return entry ? (isDP ? entry.dp : entry.full) : null;

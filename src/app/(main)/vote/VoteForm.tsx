@@ -33,7 +33,7 @@ type KonfigVoting = {
   bankAtasNama?: string | null;
 } | null;
 
-const JENJANG_TABS = ["SEMUA", "SD", "SMP", "SMA"] as const;
+const JENJANG_TABS = ["SEMUA", "SD", "SMP", "SMA", "PURNA"] as const;
 
 // Nama yang ditampilkan/dipilih pendukung untuk kategori tertentu — untuk
 // "Tim Favorit" ya nama tim, untuk kategori ber-unit PELATIH/DANTON nama

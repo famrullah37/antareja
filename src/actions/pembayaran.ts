@@ -39,6 +39,7 @@ async function biayaPendaftaran(jenjang: Jenjang, isDP: boolean) {
     SD: { full: konfig.biayaSD, dp: konfig.biayaSDDP },
     SMP: { full: konfig.biayaSMP, dp: konfig.biayaSMPDP },
     SMA: { full: konfig.biayaSMA, dp: konfig.biayaSMADP },
+    PURNA: { full: konfig.biayaPurna, dp: konfig.biayaPurnaDP },
   };
   return isDP ? table[jenjang].dp : table[jenjang].full;
 }
