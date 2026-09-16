@@ -14,9 +14,22 @@ const config: Config = {
           "conic-gradient(from 180deg at 50% 50%, var(--tw-gradient-stops))",
       },
       colors: {
-        "primary-500": "#E4252C",
-        "primary-700": "#7E1418",
+        // Skala lengkap warna brand — dulu cuma 300/500/700 yang terdaftar,
+        // padahal 50/100/200/400/600/800/900 dipakai di puluhan tempat di
+        // seluruh situs (tombol, hover, badge) sehingga class itu diam-diam
+        // tidak menerapkan warna apa pun (Tailwind skip class yang tidak
+        // dikenal). Paling kentara: "Masuk" di menu mobile (text-primary-400)
+        // jadi nyaris tak terlihat di atas background gelap.
+        "primary-50": "#FFFAFA",
+        "primary-100": "#FFF4F5",
+        "primary-200": "#FFEAEB",
         "primary-300": "#FFE0E1",
+        "primary-400": "#F28387",
+        "primary-500": "#E4252C",
+        "primary-600": "#B11D22",
+        "primary-700": "#7E1418",
+        "primary-800": "#651013",
+        "primary-900": "#4C0C0E",
         secondary: "#B10134",
         "neutral-200": "#858585",
         "neutral-300": "#F3F3F3",
