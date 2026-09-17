@@ -57,10 +57,14 @@ export async function getLaporanKas() {
   const totalPemasukanManual = kasTransaksis
     .filter((k) => k.tipe === "PEMASUKAN" && k.sumber === "MANUAL")
     .reduce((s, k) => s + k.jumlah, 0);
+  const totalVotingVerified = kasTransaksis
+    .filter((k) => k.tipe === "PEMASUKAN" && k.sumber === "VOTING")
+    .reduce((s, k) => s + k.jumlah, 0);
 
   return {
     totalTiketVerified,
     totalFotoVerified,
+    totalVotingVerified,
     totalPendapatan: totalPemasukan,
     totalPengeluaran,
     saldo: totalPemasukan - totalPengeluaran,
