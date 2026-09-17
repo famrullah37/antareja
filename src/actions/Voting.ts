@@ -252,49 +252,82 @@ export async function submitVote(data: FormData, userId?: string) {
 
 // ─── Admin: Verifikasi Dukungan ──────────────────────────────────────────────
 
+// Inti proses verifikasi — dipakai baik oleh admin (klik manual di
+// /admin/voting) maupun oleh pencocokan otomatis dari webhook pembayaran
+// (lihat autoVerifikasiVotingByNominal). Sengaja TIDAK requireAdmin di sini;
+// pemanggil masing-masing yang menegakkan otorisasinya sendiri.
+async function markVotingVerified(transaksiId: string) {
+  const transaksi = await findTransaksiVoting({ id: transaksiId });
+  if (!transaksi) return { success: false };
+  if (transaksi.status === "VERIFIED") return { success: false, message: "Dukungan sudah diverifikasi sebelumnya" };
+
+  await updateTransaksiVoting({ id: transaksiId }, { status: "VERIFIED" });
+
+  // "tim_favorit" tetap lewat Tim.totalVote (leaderboard lama, tidak
+  // diubah) — kategori tambahan dihitung lewat VotingTally per kategori.
+  if (transaksi.kategori === "tim_favorit") {
+    await prisma.tim.update({
+      where: { id: transaksi.timId },
+      data: { totalVote: { increment: transaksi.jumlahVote } },
+    });
+  } else {
+    await prisma.votingTally.upsert({
+      where: { timId_kategori: { timId: transaksi.timId, kategori: transaksi.kategori } },
+      update: { total: { increment: transaksi.jumlahVote } },
+      create: { timId: transaksi.timId, kategori: transaksi.kategori, total: transaksi.jumlahVote },
+    });
+  }
+
+  await prisma.kasTransaksi.create({
+    data: {
+      tipe: "PEMASUKAN",
+      keterangan: `Dukungan Voting ${transaksi.jumlahVote}x untuk ${transaksi.tim.nama_tim} (${transaksi.nama}) [#${transaksi.kodeUnik}]`,
+      // Catat totalBayar (bukan hargaSatuan x jumlahVote) — itulah uang yang benar-benar masuk ke rekening/QRIS,
+      // termasuk kode unik, jadi kas tetap cocok dengan mutasi nyata.
+      jumlah: transaksi.totalBayar,
+      kategori: "VOTING",
+      sumber: "VOTING",
+      referensiId: transaksiId,
+    },
+  });
+
+  revalidatePath("/admin/voting");
+  revalidatePath("/admin/kas");
+  revalidatePath("/vote");
+  return { success: true };
+}
+
 export async function verifikasiVoting(transaksiId: string) {
   await requireAdminOrBendahara();
   try {
-    const transaksi = await findTransaksiVoting({ id: transaksiId });
-    if (!transaksi) return { success: false };
-    if (transaksi.status === "VERIFIED") return { success: false, message: "Dukungan sudah diverifikasi sebelumnya" };
-
-    await updateTransaksiVoting({ id: transaksiId }, { status: "VERIFIED" });
-
-    // "tim_favorit" tetap lewat Tim.totalVote (leaderboard lama, tidak
-    // diubah) — kategori tambahan dihitung lewat VotingTally per kategori.
-    if (transaksi.kategori === "tim_favorit") {
-      await prisma.tim.update({
-        where: { id: transaksi.timId },
-        data: { totalVote: { increment: transaksi.jumlahVote } },
-      });
-    } else {
-      await prisma.votingTally.upsert({
-        where: { timId_kategori: { timId: transaksi.timId, kategori: transaksi.kategori } },
-        update: { total: { increment: transaksi.jumlahVote } },
-        create: { timId: transaksi.timId, kategori: transaksi.kategori, total: transaksi.jumlahVote },
-      });
-    }
-
-    await prisma.kasTransaksi.create({
-      data: {
-        tipe: "PEMASUKAN",
-        keterangan: `Dukungan Voting ${transaksi.jumlahVote}x untuk ${transaksi.tim.nama_tim} (${transaksi.nama}) [#${transaksi.kodeUnik}]`,
-        // Catat totalBayar (bukan hargaSatuan x jumlahVote) — itulah uang yang benar-benar masuk ke rekening/QRIS,
-        // termasuk kode unik, jadi kas tetap cocok dengan mutasi nyata.
-        jumlah: transaksi.totalBayar,
-        kategori: "VOTING",
-        sumber: "VOTING",
-        referensiId: transaksiId,
-      },
-    });
-
-    revalidatePath("/admin/voting");
-    revalidatePath("/admin/kas");
-    revalidatePath("/vote");
-    return { success: true };
+    return await markVotingVerified(transaksiId);
   } catch (e) {
     console.error("verifikasiVoting error:", e);
+    return { success: false };
+  }
+}
+
+// Dipanggil dari webhook pembayaran otomatis (mis. callback QRIS Mandiri),
+// BUKAN dari sesi admin — endpoint webhook-nya sendiri (src/app/api/webhook/...)
+// yang wajib pastikan requestnya benar-benar dari bank (signature/secret)
+// SEBELUM memanggil fungsi ini. Di sini kita cuma percaya nominal yang
+// dikasih, jadi jangan pernah expose fungsi ini ke client langsung.
+//
+// Pakai kodeUnik (harga × jumlah + kode unik 3 digit) sebagai kunci
+// pencocokan — nominal transfer sengaja dibikin presisi unik per transaksi
+// PENDING, jadi cocok 1:1 tanpa perlu tahu siapa pengirimnya.
+export async function autoVerifikasiVotingByNominal(nominal: number) {
+  try {
+    const transaksi = await prisma.transaksiVoting.findFirst({
+      where: { totalBayar: nominal, status: "PENDING" },
+      orderBy: { createdAt: "asc" },
+    });
+    if (!transaksi) {
+      return { success: false, message: `Tidak ada dukungan PENDING dengan nominal Rp${nominal}` };
+    }
+    return await markVotingVerified(transaksi.id);
+  } catch (e) {
+    console.error("autoVerifikasiVotingByNominal error:", e);
     return { success: false };
   }
 }
