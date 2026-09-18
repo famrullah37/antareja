@@ -6,20 +6,25 @@ import {
   findVotingTallyMap,
   getKategoriList,
 } from "@/queries/voting.query";
+import { findKonfigTiket } from "@/queries/tiket.query";
 import { getServerSession } from "@/lib/next-auth";
 import { cekJendelaVoting } from "@/actions/Voting";
 import VoteForm from "./VoteForm";
 import VotingCountdownBanner from "./VotingCountdownBanner";
 
 export default async function VotePage() {
-  const [tims, session, konfig, dantonMap, tallyMap] = await Promise.all([
+  const [tims, session, konfigVoting, dantonMap, tallyMap, konfigTiket] = await Promise.all([
     findTimsForVoting(),
     getServerSession(),
     findKonfigVoting(),
     findDantonMap(),
     findVotingTallyMap(),
+    findKonfigTiket(),
   ]);
-  const kategoriList = getKategoriList(konfig);
+  const kategoriList = getKategoriList(konfigVoting);
+  // QRIS voting sengaja ikut punya Tiket/Galeri Foto Premium (satu sumber),
+  // lihat komentar di schema.prisma model KonfigTiket.
+  const konfig = konfigVoting ? { ...konfigVoting, qrisUrl: konfigTiket?.qrisUrl ?? null } : null;
 
   // Pakai fungsi yang sama persis dengan yang menegakkan aturan di server
   // (reserveKodeVoting/submitVote) — supaya banner yang ditampilkan tidak

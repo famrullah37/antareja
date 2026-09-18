@@ -267,6 +267,9 @@ model QRTiket {
   transaksi   TransaksiTiket @relation(fields: [transaksiId], references: [id], onDelete: Cascade)
 }
 
+// QRIS di sini dipakai bareng untuk 3 fitur: Tiket, Galeri Foto Premium,
+// dan Voting Dukungan — satu gambar/kode QRIS untuk semuanya, admin tidak
+// perlu upload & sinkronkan manual di 3 tempat berbeda.
 model KonfigTiket {
   id           String  @id @default("singleton")
   qrisUrl      String?
@@ -278,13 +281,14 @@ model KonfigTiket {
 
 // ─── Sistem Voting (Dukungan Berbayar) ────────────────────────────────────────
 
+// QRIS TIDAK ada di sini — Voting sengaja pakai QRIS yang sama dengan
+// Tiket/Galeri Foto Premium (lihat KonfigTiket), supaya admin cuma perlu
+// upload & maintain satu gambar QRIS untuk semua pembayaran QRIS di situs.
 model KonfigVoting {
   id           String    @id @default("singleton")
   aktif        Boolean   @default(true)
   nominalVote  Int       @default(5000)
   counterUrut  Int       @default(0)
-  qrisUrl      String?
-  qrisPayload  String?   @db.Text
   bankNama     String?
   bankNoRek    String?
   bankAtasNama String?

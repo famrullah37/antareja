@@ -3,14 +3,13 @@
 import { saveKonfigVoting } from "@/actions/Voting";
 import type { KategoriVoting } from "@/queries/voting.query";
 import Image from "next/image";
+import Link from "next/link";
 import { useState } from "react";
 import { toast } from "sonner";
 
 type Konfig = {
   aktif: boolean;
   nominalVote: number;
-  qrisUrl?: string | null;
-  qrisPayload?: string | null;
   bankNama?: string | null;
   bankNoRek?: string | null;
   bankAtasNama?: string | null;
@@ -30,8 +29,13 @@ function toDatetimeLocal(d: Date) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-export default function KonfigVotingForm({ konfig }: { konfig: Konfig | null }) {
-  const [preview, setPreview] = useState(konfig?.qrisUrl ?? "");
+export default function KonfigVotingForm({
+  konfig,
+  qrisUrlTiket,
+}: {
+  konfig: Konfig | null;
+  qrisUrlTiket?: string | null;
+}) {
   const [kategoriList, setKategoriList] = useState<Pick<KategoriVoting, "label" | "unit">[]>(
     konfig?.kategoriList?.map((k) => ({ label: k.label, unit: k.unit })) ?? []
   );
@@ -111,39 +115,25 @@ export default function KonfigVotingForm({ konfig }: { konfig: Konfig | null }) 
       </div>
 
       <div className="flex flex-col gap-1">
-        <div className="flex items-center gap-2">
-          <label className="text-sm font-medium">Upload Gambar QRIS</label>
-          {konfig?.qrisUrl && (
-            <span
-              className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                konfig.qrisPayload ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"
-              }`}
-            >
-              {konfig.qrisPayload ? "QRIS Dinamis Aktif" : "Kode QRIS Tidak Terbaca"}
-            </span>
-          )}
-        </div>
-        {preview && (
+        <label className="text-sm font-medium">Gambar QRIS</label>
+        <p className="text-xs text-gray-400 -mt-1">
+          QRIS dukungan pakai gambar yang sama dengan Tiket & Galeri Foto Premium — atur/ganti di{" "}
+          <Link href="/admin/tiket" className="text-primary-600 hover:underline">
+            Pengaturan Pembayaran Tiket
+          </Link>
+          , bukan di sini.
+        </p>
+        {qrisUrlTiket ? (
           <Image
-            src={preview}
+            src={qrisUrlTiket}
             alt="QRIS"
             width={160}
             height={160}
             className="rounded-lg border border-neutral-200 object-contain"
-            unoptimized={preview.startsWith("blob:")}
           />
+        ) : (
+          <p className="text-xs text-amber-600">Belum ada QRIS diupload di halaman Tiket.</p>
         )}
-        <input
-          type="file"
-          name="qris"
-          accept="image/*"
-          onChange={(e) => {
-            const f = e.target.files?.[0];
-            if (f) setPreview(URL.createObjectURL(f));
-          }}
-          className="text-sm text-gray-500 file:mr-3 file:py-1.5 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary-50 file:text-primary-600 hover:file:bg-primary-100"
-        />
-        <span className="text-xs text-gray-400">Kosongkan jika tidak ingin mengubah gambar</span>
       </div>
 
       <div className="flex flex-col gap-1">

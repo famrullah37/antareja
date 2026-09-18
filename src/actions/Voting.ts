@@ -4,10 +4,10 @@ import { getServerSession } from "@/lib/next-auth";
 import { revalidatePath } from "next/cache";
 import prisma from "@/lib/prisma";
 import { imageUploader, validateUploadFile } from "./fileUploader";
-import { buildDynamicQrisImage, decodeQrisFromImage } from "@/lib/qris";
+import { buildDynamicQrisImage } from "@/lib/qris";
 import { parseWibDatetimeLocal } from "@/lib/datetime";
+import { findKonfigTiket } from "@/queries/tiket.query";
 import {
-  findKonfigVoting,
   findTransaksiVoting,
   getKategoriList,
   updateTransaksiVoting,
@@ -59,7 +59,6 @@ export async function saveKonfigVoting(data: FormData) {
   const bankNama = data.get("bankNama") as string;
   const bankNoRek = data.get("bankNoRek") as string;
   const bankAtasNama = data.get("bankAtasNama") as string;
-  const qrisFile = data.get("qris") as File;
   const mulaiPadaRaw = data.get("mulaiPada") as string;
   const tutupPadaRaw = data.get("tutupPada") as string;
 
@@ -100,25 +99,10 @@ export async function saveKonfigVoting(data: FormData) {
       tutupPada,
       kategoriList,
     };
-    let qrisTerbaca = true;
-    if (qrisFile && qrisFile.size > 0) {
-      const fileCheck = await validateUploadFile(qrisFile);
-      if (!fileCheck.valid) return { success: false, message: fileCheck.message };
-      const buffer = Buffer.from(await qrisFile.arrayBuffer());
-      const upload = await imageUploader(buffer);
-      if (upload.error) return { success: false, message: upload.message };
-      update.qrisUrl = upload.data!.url;
-      const payload = await decodeQrisFromImage(buffer);
-      update.qrisPayload = payload;
-      qrisTerbaca = !!payload;
-    }
     await upsertKonfigVoting(update);
     revalidatePath("/admin/voting");
     revalidatePath("/vote");
-    return {
-      success: true,
-      message: qrisTerbaca ? undefined : "Konfigurasi disimpan, tapi kode QRIS pada gambar tidak terbaca — QRIS dinamis nonaktif, dukungan tetap memakai gambar QRIS statis.",
-    };
+    return { success: true };
   } catch {
     return { success: false };
   }
@@ -126,12 +110,13 @@ export async function saveKonfigVoting(data: FormData) {
 
 // ─── Publik: QRIS Dinamis ─────────────────────────────────────────────────────
 
-// Bangun QRIS dinamis (nominal sudah terisi) dari QRIS statis yang diupload admin,
-// dipanggil dari client setiap kali nominal yang harus dibayar berubah.
+// Bangun QRIS dinamis (nominal sudah terisi) dari QRIS statis yang diupload
+// admin di /admin/tiket — Voting sengaja pakai QRIS yang sama dengan Tiket/
+// Galeri Foto Premium, lihat komentar di KonfigTiket (schema.prisma).
 export async function getDynamicQrisVoting(amount: number) {
   if (!Number.isFinite(amount) || amount <= 0) return { success: false };
   try {
-    const konfig = await findKonfigVoting();
+    const konfig = await findKonfigTiket();
     const dataUrl = await buildDynamicQrisImage(konfig?.qrisPayload, amount);
     if (!dataUrl) return { success: false };
     return { success: true, dataUrl };
