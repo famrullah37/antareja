@@ -6,15 +6,13 @@ import { toast } from "sonner";
 
 // Auto-logout kalau tidak ada aktivitas — supaya sesi yang lupa di-logout
 // (mis. di komputer/HP bersama, warnet, dsb) tidak nganggur login selamanya.
-// 30 menit idle → tampilkan peringatan 1 menit terakhir → logout otomatis.
+// Langsung logout begitu 30 menit idle tercapai, tanpa peringatan sebelumnya.
 const IDLE_TIMEOUT_MS = 30 * 60 * 1000;
-const WARNING_BEFORE_MS = 60 * 1000;
 
 const ACTIVITY_EVENTS = ["mousemove", "mousedown", "keydown", "scroll", "touchstart", "click"] as const;
 
 export default function IdleLogout() {
   const { status } = useSession();
-  const warningTimer = useRef<ReturnType<typeof setTimeout>>();
   const logoutTimer = useRef<ReturnType<typeof setTimeout>>();
   const lastReset = useRef(0);
 
@@ -22,17 +20,11 @@ export default function IdleLogout() {
     if (status !== "authenticated") return;
 
     function clearTimers() {
-      clearTimeout(warningTimer.current);
       clearTimeout(logoutTimer.current);
     }
 
     function scheduleTimers() {
       clearTimers();
-      warningTimer.current = setTimeout(() => {
-        toast.warning("Sesi akan berakhir karena tidak ada aktivitas dalam 1 menit.", {
-          duration: WARNING_BEFORE_MS,
-        });
-      }, IDLE_TIMEOUT_MS - WARNING_BEFORE_MS);
       logoutTimer.current = setTimeout(() => {
         toast.error("Sesi berakhir karena tidak ada aktivitas. Silakan login kembali.");
         signOut({ callbackUrl: "/auth/login" });
