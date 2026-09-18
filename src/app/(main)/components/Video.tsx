@@ -19,14 +19,18 @@ const cards = [
 
 export default function Video() {
   return (
-    <SectionWrapper id="video">
+    <SectionWrapper id="video" className="overflow-hidden">
       <div className="w-full relative flex gap-20 items-center md:items-end justify-center xl:justify-between xl:flex-row flex-col">
         <Image
           src={"/image/kategorilogo.png"}
           width={660}
           height={663}
           alt={"logo"}
-          className="absolute -z-[9999] -top-[350px] -left-[315px]"
+          // Dekoratif, dibatasi di dalam section ini (overflow-hidden di
+          // SectionWrapper) supaya tidak "bocor" menutupi konten section
+          // Kategori di atasnya — sebelumnya -top-[350px] membuatnya
+          // meluber jauh ke luar batas section.
+          className="absolute -z-[9999] -top-[120px] -left-[315px]"
         />
         <div className="xl:hidden flex flex-col items-end">
           <div className="w-full sm:w-[530px] text-end flex flex-col gap-3 mb-3">
