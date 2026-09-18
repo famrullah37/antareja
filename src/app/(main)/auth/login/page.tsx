@@ -7,7 +7,6 @@ import { H1, H3, P } from "@/app/components/global/Text";
 import { getSession, signIn, useSession } from "next-auth/react";
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { FaEyeSlash } from "react-icons/fa";
 import { toast } from "sonner";
@@ -15,7 +14,6 @@ import { resendVerificationEmail } from "@/actions/Signup";
 
 export default function Login() {
   const { data: session, status } = useSession();
-  const router = useRouter();
   const email = useRef("");
   const pass = useRef("");
   const [isShown, setIsShown] = useState(false);
@@ -23,14 +21,13 @@ export default function Login() {
   const [showResend, setShowResend] = useState(false);
   const [resending, setResending] = useState(false);
 
-  // Session di-refresh tiap 500ms (lihat SessionProvider) — begitu login
-  // berhasil, ini bisa ke-render duluan sebelum router.push di onSubmit
-  // sempat jalan. Kalau sama-sama push ke "/" (landing page) daripada ikut
-  // role, user harus klik menu Dashboard manual lagi. Samakan tujuannya
-  // dengan onSubmit supaya siapapun yang menang "balapan", hasilnya tetap
-  // ke /admin atau /dashboard, bukan landing page.
+  // Kalau buka /auth/login padahal sudah login (mis. lewat back button),
+  // lempar ke tujuan sesuai role. Pakai reload penuh (bukan router.push)
+  // dengan alasan yang sama seperti di onSubmit — lihat komentar di sana.
   if (status === "authenticated") {
-    return router.push(session?.user?.role === "ADMIN" ? "/admin" : "/dashboard");
+    const dest = session?.user?.role === "ADMIN" ? "/admin" : "/dashboard";
+    if (typeof window !== "undefined") window.location.href = dest;
+    return null;
   }
 
   const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -54,7 +51,14 @@ export default function Login() {
     if (result.success) {
       toast.success("Berhasil Login!", { id: toastId });
       const session = await getSession();
-      return router.push(session?.user?.role === "ADMIN" ? "/admin" : "/dashboard");
+      // Reload penuh (bukan router.push) — signIn() men-set cookie sesi lewat
+      // Set-Cookie di response, tapi navigasi client-side (router.push) ke
+      // /dashboard/​/admin kadang keburu jalan sebelum cookie itu benar-benar
+      // ke-attach ke request berikutnya, jadi middleware/server component
+      // sempat lihat "belum login" dan malah mental ke halaman lain. Reload
+      // penuh menjamin cookie sudah pasti terpasang sebelum request dikirim.
+      window.location.href = session?.user?.role === "ADMIN" ? "/admin" : "/dashboard";
+      return;
     } else {
       setShowResend(true);
       return toast.error("Email/password salah, atau akun belum diverifikasi. Cek email Anda.", { id: toastId, duration: 5000 });

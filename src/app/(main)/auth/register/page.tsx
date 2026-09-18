@@ -28,11 +28,13 @@ export default function Register() {
   const [isShown, setIsShown] = useState(false);
   const { data: session, status } = useSession();
 
-  // Konsisten dengan fix di halaman login — kalau sudah authenticated
-  // (mis. buka /auth/register padahal sudah login), arahkan ke tujuan
-  // sesuai role, bukan ke landing page.
+  // Konsisten dengan fix di halaman login (reload penuh, bukan navigasi
+  // client-side) — kalau sudah authenticated (mis. buka /auth/register
+  // padahal sudah login), arahkan ke tujuan sesuai role, bukan landing page.
   if (status === "authenticated") {
-    return redirect(session?.user?.role === "ADMIN" ? "/admin" : "/dashboard");
+    const dest = session?.user?.role === "ADMIN" ? "/admin" : "/dashboard";
+    if (typeof window !== "undefined") window.location.href = dest;
+    return null;
   }
 
   return (
