@@ -14,7 +14,7 @@ import { toast } from "sonner";
 import { resendVerificationEmail } from "@/actions/Signup";
 
 export default function Login() {
-  const { status } = useSession();
+  const { data: session, status } = useSession();
   const router = useRouter();
   const email = useRef("");
   const pass = useRef("");
@@ -23,7 +23,15 @@ export default function Login() {
   const [showResend, setShowResend] = useState(false);
   const [resending, setResending] = useState(false);
 
-  if (status === "authenticated") return router.push("/");
+  // Session di-refresh tiap 500ms (lihat SessionProvider) — begitu login
+  // berhasil, ini bisa ke-render duluan sebelum router.push di onSubmit
+  // sempat jalan. Kalau sama-sama push ke "/" (landing page) daripada ikut
+  // role, user harus klik menu Dashboard manual lagi. Samakan tujuannya
+  // dengan onSubmit supaya siapapun yang menang "balapan", hasilnya tetap
+  // ke /admin atau /dashboard, bukan landing page.
+  if (status === "authenticated") {
+    return router.push(session?.user?.role === "ADMIN" ? "/admin" : "/dashboard");
+  }
 
   const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     const toastId = toast.loading("Logging in....");

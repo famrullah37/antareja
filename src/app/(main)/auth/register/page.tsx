@@ -26,9 +26,14 @@ async function submit(data: FormData) {
 
 export default function Register() {
   const [isShown, setIsShown] = useState(false);
-  const { status } = useSession();
+  const { data: session, status } = useSession();
 
-  if (status === "authenticated") return redirect("/");
+  // Konsisten dengan fix di halaman login — kalau sudah authenticated
+  // (mis. buka /auth/register padahal sudah login), arahkan ke tujuan
+  // sesuai role, bukan ke landing page.
+  if (status === "authenticated") {
+    return redirect(session?.user?.role === "ADMIN" ? "/admin" : "/dashboard");
+  }
 
   return (
     <form
