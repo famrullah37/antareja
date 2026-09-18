@@ -1,47 +1,23 @@
-import { google } from "googleapis";
-import MailComposer from "nodemailer/lib/mail-composer";
+import nodemailer from "nodemailer";
 
-const clientId = process.env.GOOGLE_CLIENT_ID;
-const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-const redirectUri = process.env.GOOGLE_REDIRECT_URI;
-const refreshToken = process.env.GOOGLE_REFRESH_TOKEN;
+// SMTP biasa (bukan Gmail API/OAuth2) — jauh lebih simpel setup-nya untuk
+// akun Google Workspace: aktifkan 2-Step Verification di akun pengirim,
+// lalu buat App Password di myaccount.google.com/apppasswords, pakai itu
+// sebagai SMTP_PASS. Tidak perlu Google Cloud Console/OAuth Client/redirect
+// URI sama sekali.
+const smtpHost = process.env.SMTP_HOST || "smtp.gmail.com";
+const smtpPort = parseInt(process.env.SMTP_PORT || "465", 10);
+const smtpUser = process.env.SMTP_USER;
+const smtpPass = process.env.SMTP_PASS;
 
-const getGmailService = () => {
-  const oAuth2Client = new google.auth.OAuth2(
-    clientId,
-    clientSecret,
-    redirectUri
-  );
-  oAuth2Client.setCredentials({ refresh_token: refreshToken });
-  const gmail = google.gmail({ version: "v1", auth: oAuth2Client });
-  return gmail;
-};
-
-const encodeMessage = (message: Buffer) => {
-  return Buffer.from(message.toString())
-    .toString("base64")
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/, "");
-};
-
-const createMail = async (options: any) => {
-  const mailComposer = new MailComposer(options);
-  const message = await mailComposer.compile().build();
-  return encodeMessage(message);
-};
-
-export const sendMail = async (options: any) => {
-  const gmail = getGmailService();
-  const rawMessage = await createMail(options);
-  const data = await gmail.users.messages.send({
-    userId: "me",
-    resource: {
-      raw: rawMessage,
-    },
-  } as any);
-  return data;
-};
+const transporter = nodemailer.createTransport({
+  host: smtpHost,
+  port: smtpPort,
+  // 465 = SSL langsung (secure: true). Port lain (mis. 587) pakai STARTTLS
+  // (secure: false, nodemailer upgrade koneksinya sendiri).
+  secure: smtpPort === 465,
+  auth: { user: smtpUser, pass: smtpPass },
+});
 
 export type mailMetaData = {
   to: string;
@@ -56,22 +32,16 @@ export type mailMetaData = {
 };
 
 export const sendMailTo = async (metadata: mailMetaData) => {
-  const options = {
+  return transporter.sendMail({
+    from: `"LKBB Antareja 2026" <${smtpUser}>`,
     to: metadata.to,
-    from: "LKBB Antareja 2026 <antareja@smktelkom-mlg.sch.id>",
-    // cc: "cc@mail.com",
-    // replyTo: 'amit@labnol.org',
     subject: metadata.subject,
     text: metadata.text,
     html: metadata.html,
     attachments: metadata.fileAttachments,
-    textEncoding: "base64",
-    headers: [
-      { key: "X-Application-Developer", value: "Antareja" },
-      { key: "X-Application-Version", value: "v1" },
-    ],
-  };
-
-  const mail = await sendMail(options);
-  return mail;
+    headers: {
+      "X-Application-Developer": "Antareja",
+      "X-Application-Version": "v1",
+    },
+  });
 };
