@@ -77,6 +77,18 @@ export async function saveKonfigUmum(data: FormData) {
     juklakUrl = upload.data!.url;
   }
 
+  // Tanda tangan bendahara (gambar) — sama pola dengan Juklak, opsional.
+  const bendaharaNama = (data.get("bendaharaNama") as string) || "";
+  const ttdFile = data.get("bendaharaTtd") as File | null;
+  let bendaharaTtdUrl: string | undefined;
+  if (ttdFile && ttdFile.size > 0) {
+    const fileCheck = await validateUploadFile(ttdFile);
+    if (!fileCheck.valid) return { success: false, message: fileCheck.message };
+    const upload = await imageUploader(Buffer.from(await ttdFile.arrayBuffer()));
+    if (upload.error) return { success: false, message: upload.message };
+    bendaharaTtdUrl = upload.data!.url;
+  }
+
   try {
     await upsertKonfigUmum({
       countdownTarget,
@@ -87,7 +99,9 @@ export async function saveKonfigUmum(data: FormData) {
       sdAktif, smpAktif, smaAktif, purnaAktif,
       bankNama, bankNoRek, bankAtasNama,
       timeline,
+      bendaharaNama,
       ...(juklakUrl ? { juklakUrl } : {}),
+      ...(bendaharaTtdUrl ? { bendaharaTtdUrl } : {}),
     });
     revalidatePath("/", "layout");
     return { success: true };

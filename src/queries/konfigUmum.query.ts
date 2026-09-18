@@ -37,6 +37,8 @@ export async function upsertKonfigUmum(data: {
   bankAtasNama?: string;
   timeline?: TimelineItem[] | Prisma.NullTypes.JsonNull;
   juklakUrl?: string;
+  bendaharaNama?: string;
+  bendaharaTtdUrl?: string;
 }) {
   return prisma.konfigUmum.upsert({
     where: { id: SINGLETON_ID },

@@ -1,10 +1,11 @@
 "use client";
 
-import konfirmasiPembayaran from "@/actions/pembayaran";
+import konfirmasiPembayaran, { generateKuitansiManual } from "@/actions/pembayaran";
 import { H1, P } from "@/app/components/global/Text";
 import { TimWithPembayaran } from "@/types/entityRelations";
 import Image from "next/image";
 import { redirect } from "next/navigation";
+import { useState } from "react";
 import Select from "react-select";
 import { toast } from "sonner";
 import SubmitButton from "./parts/Button";
@@ -16,6 +17,18 @@ export default function PembayaranForm({
   data?: TimWithPembayaran;
   id?: string;
 }) {
+  const [generating, setGenerating] = useState(false);
+
+  async function handleGenerateKuitansi() {
+    if (!data?.id) return;
+    setGenerating(true);
+    const toastId = toast.loading("Membuat kuitansi & mengirim email...");
+    const result = await generateKuitansiManual(data.id);
+    setGenerating(false);
+    if (result.success) toast.success("Kuitansi berhasil dibuat & dikirim!", { id: toastId });
+    else toast.error(result.message ?? "Gagal generate kuitansi", { id: toastId });
+  }
+
   const options = [
     { label: "Terkonfirmasi", value: true },
     { label: "Belum Terkonfirmasi", value: false },
@@ -68,7 +81,44 @@ export default function PembayaranForm({
             <span className="font-normal">Bank Pengirim: </span>
             {data?.pembayaran?.bank}
           </P>
+          {data?.pembayaran?.kodeUnik && data?.pembayaran?.totalBayar && (
+            <P className="font-bold text-black">
+              <span className="font-normal">Kode Unik / Total Transfer: </span>
+              #{data.pembayaran.kodeUnik} — Rp {data.pembayaran.totalBayar.toLocaleString("id-ID")}
+            </P>
+          )}
         </div>
+
+        {data?.confirmed && (
+          <div className="flex flex-col gap-2 bg-neutral-50 border border-neutral-200 rounded-xl p-4">
+            <P className="font-bold text-black">Kuitansi</P>
+            {data?.pembayaran?.kuitansiUrl ? (
+              <a
+                href={data.pembayaran.kuitansiUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="text-primary-600 hover:underline text-sm w-fit"
+              >
+                Lihat kuitansi saat ini
+              </a>
+            ) : (
+              <P className="text-sm text-gray-400">Belum ada kuitansi.</P>
+            )}
+            <button
+              type="button"
+              onClick={handleGenerateKuitansi}
+              disabled={generating}
+              className="self-start bg-primary-500 hover:bg-primary-600 disabled:opacity-50 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors w-fit"
+            >
+              {generating ? "Memproses..." : "Generate Ulang Kuitansi"}
+            </button>
+            <P className="text-xs text-gray-400">
+              Pakai ini setelah ubah Status Pembayaran (mis. DP → Lunas untuk pelunasan) supaya kuitansi &
+              email terbaru terkirim ulang dengan nominal yang sudah sesuai. Simpan dulu perubahan Status
+              Pembayaran di bawah sebelum generate ulang.
+            </P>
+          </div>
+        )}
 
         <div className="flex flex-col gap-2">
           <label htmlFor={"confirm"} className="text-[16px]">

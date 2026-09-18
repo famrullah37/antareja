@@ -455,6 +455,10 @@ model KonfigUmum {
   // Counter kode unik pembayaran pendaftaran tim (0-999, siklus ulang) —
   // sama pola dengan KonfigVoting.counterUrut.
   counterUrutPendaftaran Int  @default(0)
+  // Ditampilkan di kuitansi PDF pendaftaran — nama bendahara & scan tanda
+  // tangannya, diupload admin lewat Pengaturan.
+  bendaharaNama          String?
+  bendaharaTtdUrl        String?
 }
 
 // ─── Sponsor ─────────────────────────────────────────────────────────────────
