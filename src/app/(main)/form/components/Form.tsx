@@ -1,11 +1,11 @@
 "use client";
 
-import submitFormRegistrasi from "@/actions/registrationForm";
+import submitFormRegistrasi, { reserveKodePendaftaran } from "@/actions/registrationForm";
 import TextField from "@/app/components/global/Input";
 import SubmitButton from "@/app/components/global/SubmitButton";
 import { H2, H3, P } from "@/app/components/global/Text";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Select from "react-select";
 import { toast } from "sonner";
 
@@ -57,21 +57,6 @@ function formatRupiah(n: number) {
   }).format(n);
 }
 
-// Biaya per jenjang & tipe pembayaran diambil dari KonfigUmum (diatur admin di
-// /admin/pengaturan) — jangan hardcode di sini, supaya nominal yang ditampilkan
-// selalu sama dengan yang dicatat sistem saat admin memverifikasi pembayaran.
-function hitungBiaya(jenjang: string | null, isDP: boolean, konfig: KonfigUmum) {
-  if (!jenjang) return null;
-  const table: Record<string, { full: number; dp: number }> = {
-    SD: { full: konfig.biayaSD, dp: konfig.biayaSDDP },
-    SMP: { full: konfig.biayaSMP, dp: konfig.biayaSMPDP },
-    SMA: { full: konfig.biayaSMA, dp: konfig.biayaSMADP },
-    PURNA: { full: konfig.biayaPurna, dp: konfig.biayaPurnaDP },
-  };
-  const entry = table[jenjang];
-  return entry ? (isDP ? entry.dp : entry.full) : null;
-}
-
 export default function FormComponent({
   konfigUmum,
   daftarSekolah,
@@ -79,14 +64,41 @@ export default function FormComponent({
   konfigUmum: KonfigUmum;
   daftarSekolah: string[];
 }) {
-  const [isDP, setIsDP] = useState(false);
+  const [tipeValue, setTipeValue] = useState<"TRUE" | "FALSE" | null>(null);
   const [selectedJenjang, setSelectedJenjang] = useState<string | null>(null);
+  const [reserved, setReserved] = useState<{ kodeUnik: string; hargaDasar: number; totalBayar: number } | null>(null);
+  const [loadingReserve, setLoadingReserve] = useState(false);
   const router = useRouter();
 
   const jenjangOptions = ALL_JENJANG.filter((j) => konfigUmum[j.aktifKey]).map((j) => ({
     label: j.label,
     value: j.value,
   }));
+
+  // Kode unik dicadangkan begitu jenjang & tipe pembayaran sudah dipilih
+  // keduanya — supaya nominal (biaya + kode unik) sudah pasti SEBELUM user
+  // transfer, konsisten dengan pola reserveKodeVoting di halaman Vote.
+  useEffect(() => {
+    if (!selectedJenjang || !tipeValue) {
+      setReserved(null);
+      return;
+    }
+    let cancelled = false;
+    setLoadingReserve(true);
+    reserveKodePendaftaran(selectedJenjang as any, tipeValue === "TRUE").then((result) => {
+      if (cancelled) return;
+      setLoadingReserve(false);
+      if (result.success) {
+        setReserved({ kodeUnik: result.kodeUnik!, hargaDasar: result.hargaDasar!, totalBayar: result.totalBayar! });
+      } else {
+        toast.error(result.message ?? "Gagal menyiapkan kode pembayaran");
+        setReserved(null);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedJenjang, tipeValue]);
 
   async function submitForm(data: FormData) {
     const toastId = toast.loading("Membuat tim....");
@@ -97,6 +109,7 @@ export default function FormComponent({
       router.refresh();
     } else {
       toast.error(result.message, { id: toastId });
+      if (result.message?.includes("pilih ulang jenjang")) setReserved(null);
     }
   }
 
@@ -113,8 +126,6 @@ export default function FormComponent({
       "hover:bg-neutral-300 hover:cursor-pointer transition-all duration-500 rounded-lg p-2",
     input: () => "focus:bg-[#F1F6F9]",
   };
-
-  const biaya = hitungBiaya(selectedJenjang, isDP, konfigUmum);
 
   return (
     <form className="mx-6 sm:mx-[100px] my-[24px]" action={submitForm}>
@@ -202,25 +213,38 @@ export default function FormComponent({
             name="tipe-pembayaran"
             unstyled
             required
-            onChange={(e) =>
-              e?.value === "TRUE" ? setIsDP(true) : setIsDP(false)
-            }
+            onChange={(e) => setTipeValue((e?.value as "TRUE" | "FALSE") ?? null)}
             options={paymentType}
             id="tipe"
             placeholder="Pilih Tipe Pembayaran"
             classNames={selectClassNames}
           />
         </div>
+        <input type="hidden" name="kodeUnik" value={reserved?.kodeUnik ?? ""} />
         <div>
           <div>
             <H3>Pembayaran</H3>
-            <P>
-              Lakukan pembayaran dengan nominal{" "}
-              <span className="text-black font-bold">
-                {biaya !== null ? formatRupiah(biaya) : "sesuai jenjang & tipe pembayaran yang dipilih"}
-              </span>{" "}
-              ke:
-            </P>
+            {!selectedJenjang || !tipeValue ? (
+              <P>Pilih jenjang & tipe pembayaran dulu untuk melihat nominal yang harus ditransfer.</P>
+            ) : loadingReserve ? (
+              <P>Menyiapkan kode pembayaran...</P>
+            ) : reserved ? (
+              <div className="bg-neutral-50 border border-neutral-200 rounded-xl p-4 my-2">
+                <P>
+                  Transfer <span className="text-black font-bold">tepat</span> sejumlah:
+                </P>
+                <p className="text-black font-extrabold text-2xl mt-1">{formatRupiah(reserved.totalBayar)}</p>
+                <P className="text-xs text-gray-400 mt-1">
+                  {formatRupiah(reserved.hargaDasar)} biaya pendaftaran + kode unik {reserved.kodeUnik}
+                </P>
+                <P className="text-xs text-gray-400">
+                  Nominal harus persis (termasuk 3 digit kode unik) supaya pembayaran gampang dicocokkan bendahara.
+                </P>
+              </div>
+            ) : (
+              <P className="text-red-500">Gagal menyiapkan kode pembayaran, coba pilih ulang jenjang/tipe pembayaran.</P>
+            )}
+            <P>ke:</P>
             {konfigUmum.bankNoRek || konfigUmum.bankNama || konfigUmum.bankAtasNama ? (
               <P className="text-black">
                 {konfigUmum.bankNoRek} <br />

@@ -81,6 +81,14 @@ model Pembayaran {
   bank     String
   nama_rek String
   isDP     Boolean
+  // Kode unik 3 digit ditempel di nominal (biaya + kodeUnik) — dicadangkan
+  // saat user pilih jenjang & tipe pembayaran, sebelum transfer. Sama pola
+  // dengan TransaksiVoting/TransaksiTiket.
+  kodeUnik    String?
+  totalBayar  Int?
+  // Kuitansi PDF, dibuat otomatis begitu bendahara/admin approve pembayaran
+  // (lihat setStatusPembayaran di pembayaran.ts) dan dikirim via email.
+  kuitansiUrl String?
   tim      Tim     @relation(fields: [tim_id], references: [id], onDelete: Cascade)
 }
 
@@ -444,6 +452,9 @@ model KonfigUmum {
   // Link download Juklak (petunjuk pelaksanaan), diupload admin lewat
   // Pengaturan — muncul sebagai tombol download di Hero halaman utama.
   juklakUrl           String?
+  // Counter kode unik pembayaran pendaftaran tim (0-999, siklus ulang) —
+  // sama pola dengan KonfigVoting.counterUrut.
+  counterUrutPendaftaran Int  @default(0)
 }
 
 // ─── Sponsor ─────────────────────────────────────────────────────────────────

@@ -171,6 +171,20 @@ export default function ProfileTim({ tim, penilaian }: { tim: TimWithRelations; 
           <P>{tim.nama_tim}</P>
         </div>
 
+        {tim.pembayaran?.kuitansiUrl && (
+          <div className="flex flex-col gap-1 mb-4">
+            <H3>Kuitansi Pembayaran</H3>
+            <a
+              href={tim.pembayaran.kuitansiUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="text-primary-600 hover:underline text-sm w-fit"
+            >
+              Download Kuitansi (PDF)
+            </a>
+          </div>
+        )}
+
         {tim.confirmed ? (
           <form action={submitForm} className="mb-4">
             <H3 className="mb-4">Foto Tim</H3>

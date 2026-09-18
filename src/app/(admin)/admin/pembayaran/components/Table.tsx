@@ -6,6 +6,10 @@ import { useEffect, useState } from "react";
 import DataTable, { TableColumn } from "react-data-table-component";
 import { toast } from "sonner";
 
+function formatRupiah(n: number) {
+  return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(n);
+}
+
 export default function TimTable({ data }: { data: TimWithRelations[] }) {
   const [loader, setLoader] = useState(true);
   const router = useRouter();
@@ -45,6 +49,21 @@ export default function TimTable({ data }: { data: TimWithRelations[] }) {
           <span className="bg-green-500 text-white rounded-2xl py-2 px-3 text-center text-sm">
             Full
           </span>
+        ),
+      sortable: false,
+    },
+    {
+      name: "Kode / Total",
+      cell: (row) =>
+        row.pembayaran?.kodeUnik && row.pembayaran?.totalBayar ? (
+          <div className="text-xs">
+            <div className="font-mono font-bold text-primary-600 tracking-widest">
+              #{row.pembayaran.kodeUnik}
+            </div>
+            <div className="text-gray-500">{formatRupiah(row.pembayaran.totalBayar)}</div>
+          </div>
+        ) : (
+          <span className="text-gray-300 text-xs">-</span>
         ),
       sortable: false,
     },

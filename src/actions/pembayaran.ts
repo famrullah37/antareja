@@ -7,6 +7,9 @@ import { revalidatePath } from "next/cache";
 import prisma from "@/lib/prisma";
 import { getServerSession } from "@/lib/next-auth";
 import { Jenjang } from "@prisma/client";
+import { buildKuitansiPdf } from "@/lib/kuitansi";
+import { imageUploader } from "./fileUploader";
+import { sendMailTo } from "@/lib/mailer";
 
 // Halaman /admin/pembayaran juga bisa diakses role BENDAHARA (lihat middleware),
 // jadi aksi konfirmasinya harus mengizinkan BENDAHARA juga — bukan cuma ADMIN.
@@ -33,7 +36,7 @@ async function assignNoUrutIfNeeded(timId: string) {
 // Biaya pendaftaran per jenjang & tipe pembayaran diambil dari KonfigUmum (bisa
 // diubah admin lewat /admin/pengaturan) — jangan hardcode di sini, supaya kas
 // selalu mencatat nominal yang sesungguhnya berlaku, termasuk untuk jenjang SD.
-async function biayaPendaftaran(jenjang: Jenjang, isDP: boolean) {
+export async function biayaPendaftaran(jenjang: Jenjang, isDP: boolean) {
   const konfig = await getKonfigUmum();
   const table: Record<Jenjang, { full: number; dp: number }> = {
     SD: { full: konfig.biayaSD, dp: konfig.biayaSDDP },
@@ -42,6 +45,58 @@ async function biayaPendaftaran(jenjang: Jenjang, isDP: boolean) {
     PURNA: { full: konfig.biayaPurna, dp: konfig.biayaPurnaDP },
   };
   return isDP ? table[jenjang].dp : table[jenjang].full;
+}
+
+// Generate kuitansi PDF, upload ke Cloudinary, simpan link-nya, dan kirim ke
+// email pendaftar — dipanggil sekali begitu pembayaran pertama kali confirmed
+// (kalau kuitansiUrl sudah ada, tidak diulang lagi supaya tidak kirim email
+// dobel kalau admin toggle confirm/batal/confirm lagi).
+async function kirimKuitansiJikaBelum(timId: string, hargaDasar: number) {
+  const tim = await prisma.tim.findUnique({
+    where: { id: timId },
+    include: { pembayaran: true, user: true },
+  });
+  if (!tim?.pembayaran || tim.pembayaran.kuitansiUrl) return;
+  if (!tim.pembayaran.kodeUnik || !tim.pembayaran.totalBayar) return; // tim lama sebelum fitur ini ada
+
+  try {
+    const pdfBuffer = await buildKuitansiPdf({
+      namaTim: tim.nama_tim,
+      asalSekolah: tim.asal_sekolah,
+      jenjang: tim.jenjang,
+      isDP: tim.pembayaran.isDP,
+      hargaDasar,
+      kodeUnik: tim.pembayaran.kodeUnik,
+      totalBayar: tim.pembayaran.totalBayar,
+      tanggal: new Date(),
+    });
+
+    const upload = await imageUploader(pdfBuffer);
+    if (upload.error) {
+      console.error("Upload kuitansi gagal:", upload.message);
+      return;
+    }
+
+    await prisma.pembayaran.update({
+      where: { tim_id: timId },
+      data: { kuitansiUrl: upload.data!.url },
+    });
+
+    if (tim.user?.email) {
+      const namaFile = `Kuitansi-${tim.asal_sekolah.replace(/[^a-z0-9]+/gi, "-")}.pdf`;
+      await sendMailTo({
+        to: tim.user.email,
+        subject: "Kuitansi Pembayaran Pendaftaran - LKBB Antareja 2026",
+        html: `<p>Halo ${tim.pelatih},</p><p>Pembayaran pendaftaran tim <b>${tim.nama_tim}</b> (${tim.asal_sekolah}) sudah terverifikasi. Kuitansi terlampir sebagai bukti resmi.</p><p>Terima kasih.</p>`,
+        fileAttachments: [{ filename: namaFile, path: upload.data!.url }],
+      });
+    }
+  } catch (e) {
+    // Gagal generate/kirim kuitansi tidak boleh menggagalkan konfirmasi
+    // pembayaran itu sendiri — cukup dicatat, admin masih bisa lihat status
+    // confirmed=true dan generate ulang/kirim manual kalau perlu nanti.
+    console.error("kirimKuitansiJikaBelum error:", e);
+  }
 }
 
 // Logika inti dipakai baik dari toggle cepat di daftar pembayaran (approvePayment)
@@ -58,22 +113,25 @@ async function setStatusPembayaran(timId: string, confirmed: boolean, isDP: bool
 
   await assignNoUrutIfNeeded(timId);
 
+  const jumlah = await biayaPendaftaran(tim.jenjang, isDP);
+
   const existing = await prisma.kasTransaksi.findFirst({
     where: { sumber: "PENDAFTARAN", referensiId: timId },
   });
-  if (existing) return;
+  if (!existing) {
+    await prisma.kasTransaksi.create({
+      data: {
+        tipe: "PEMASUKAN",
+        keterangan: `Pendaftaran Tim ${tim.nama_tim} — ${tim.asal_sekolah}`,
+        jumlah,
+        kategori: "PENDAFTARAN_TIM",
+        sumber: "PENDAFTARAN",
+        referensiId: timId,
+      },
+    });
+  }
 
-  const jumlah = await biayaPendaftaran(tim.jenjang, isDP);
-  await prisma.kasTransaksi.create({
-    data: {
-      tipe: "PEMASUKAN",
-      keterangan: `Pendaftaran Tim ${tim.nama_tim} — ${tim.asal_sekolah}`,
-      jumlah,
-      kategori: "PENDAFTARAN_TIM",
-      sumber: "PENDAFTARAN",
-      referensiId: timId,
-    },
-  });
+  await kirimKuitansiJikaBelum(timId, jumlah);
 }
 
 export async function approvePayment(timId: string, isDP: boolean) {

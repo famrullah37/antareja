@@ -4,9 +4,30 @@ import { imageUploader, validateUploadFile } from "./fileUploader";
 import { revalidatePath } from "next/cache";
 import { getServerSession } from "@/lib/next-auth";
 import prisma from "@/lib/prisma";
+import { biayaPendaftaran } from "./pembayaran";
 
 const VALID_JENJANG: Jenjang[] = ["SD", "SMP", "SMA", "PURNA"];
 const VALID_TIPE: Tipe[] = ["SMALL", "NORMAL"];
+
+// Cadangkan kode unik 3 digit sebelum user transfer — dipanggil dari form
+// begitu jenjang & tipe pembayaran dipilih, supaya nominal yang ditampilkan
+// (biaya + kode unik) sudah pasti sebelum uang benar-benar ditransfer.
+export async function reserveKodePendaftaran(jenjang: Jenjang, isDP: boolean) {
+  if (!VALID_JENJANG.includes(jenjang)) return { success: false, message: "Jenjang tidak valid" };
+  try {
+    const updated = await prisma.konfigUmum.update({
+      where: { id: "singleton" },
+      data: { counterUrutPendaftaran: { increment: 1 } },
+    });
+    const kodeUnik = String(updated.counterUrutPendaftaran % 1000).padStart(3, "0");
+    const hargaDasar = await biayaPendaftaran(jenjang, isDP);
+    const totalBayar = hargaDasar + parseInt(kodeUnik);
+    return { success: true, kodeUnik, hargaDasar, totalBayar };
+  } catch (e) {
+    console.error("reserveKodePendaftaran error:", e);
+    return { success: false, message: "Gagal menyiapkan kode pembayaran" };
+  }
+}
 
 export default async function submitFormRegistrasi(data: FormData) {
   const session = await getServerSession();
@@ -23,11 +44,26 @@ export default async function submitFormRegistrasi(data: FormData) {
   const nama_rek = data.get("namarek") as string;
   const tipe_pembayaran = data.get("tipe-pembayaran") as string;
   const no_pelatih = data.get("no-pelatih") as string;
+  const kodeUnik = data.get("kodeUnik") as string;
+  const isDP = tipe_pembayaran === "TRUE";
 
   if (!nama_tim || !pelatih || !asal_sekolah || !no_pelatih || !bank || !nama_rek)
     return { success: false, message: "Mohon lengkapi semua data" };
   if (!VALID_JENJANG.includes(jenjang)) return { success: false, message: "Jenjang tidak valid" };
   if (!VALID_TIPE.includes(tipe_tim)) return { success: false, message: "Jumlah pasukan tidak valid" };
+  if (!kodeUnik || !/^\d{3}$/.test(kodeUnik)) {
+    return { success: false, message: "Kode pembayaran tidak valid, silakan pilih ulang jenjang & tipe pembayaran" };
+  }
+
+  // Pastikan kode unik ini belum pernah dipakai tim lain — nominal transfer
+  // harus presisi unik supaya bendahara gampang cocokkan mutasi.
+  const kodeDipakai = await prisma.pembayaran.findFirst({ where: { kodeUnik } });
+  if (kodeDipakai) {
+    return { success: false, message: "Kode pembayaran sudah terpakai, silakan pilih ulang jenjang & tipe pembayaran untuk dapat kode baru" };
+  }
+
+  const hargaDasar = await biayaPendaftaran(jenjang, isDP);
+  const totalBayar = hargaDasar + parseInt(kodeUnik);
 
   const fileCheck = await validateUploadFile(bukti);
   if (!fileCheck.valid) return { success: false, message: fileCheck.message };
@@ -63,7 +99,9 @@ export default async function submitFormRegistrasi(data: FormData) {
               bank,
               bukti_tf: tryUploadImage.data!.url,
               nama_rek,
-              isDP: tipe_pembayaran === "TRUE",
+              isDP,
+              kodeUnik,
+              totalBayar,
             },
           },
         },
