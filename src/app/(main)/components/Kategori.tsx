@@ -7,16 +7,22 @@ function formatRupiah(n: number) {
 
 const JENJANG_META = [
   {
-    color: "from-primary-500 to-primary-600",
-    badge: "bg-red-50 text-primary-500 border-red-200",
-    accent: "text-primary-500",
-    dpBg: "bg-red-50",
+    color: "from-blue-500 to-blue-600",
+    badge: "bg-blue-50 text-blue-600 border-blue-200",
+    accent: "text-blue-600",
+    dpBg: "bg-blue-50",
   },
   {
     color: "from-violet-500 to-violet-600",
     badge: "bg-violet-50 text-violet-600 border-violet-200",
     accent: "text-violet-600",
     dpBg: "bg-violet-50",
+  },
+  {
+    color: "from-primary-500 to-primary-600",
+    badge: "bg-red-50 text-primary-500 border-red-200",
+    accent: "text-primary-500",
+    dpBg: "bg-red-50",
   },
   {
     color: "from-emerald-500 to-emerald-600",
@@ -29,11 +35,19 @@ const JENJANG_META = [
 export default async function Kategori() {
   const konfig = await getKonfigUmum();
 
+  // Urutan & warna tetap (SD-SMP-SMA-Purna) supaya kartu tidak loncat-loncat
+  // posisi/warna cuma karena admin toggle jenjang lain — jenjang yang mati
+  // difilter belakangan, bukan dihapus dari susunan dasarnya.
   const jenjangList = [
-    { label: "SMP", full: "Jenjang SMP", harga: konfig.biayaSMP, dp: konfig.biayaSMPDP },
-    { label: "SMA", full: "Jenjang SMA", harga: konfig.biayaSMA, dp: konfig.biayaSMADP },
-    { label: "Purna", full: "Jenjang Purna", harga: konfig.biayaPurna, dp: konfig.biayaPurnaDP },
-  ];
+    { label: "SD", full: "Jenjang SD", harga: konfig.biayaSD, dp: konfig.biayaSDDP, aktif: konfig.sdAktif },
+    { label: "SMP", full: "Jenjang SMP", harga: konfig.biayaSMP, dp: konfig.biayaSMPDP, aktif: konfig.smpAktif },
+    { label: "SMA", full: "Jenjang SMA", harga: konfig.biayaSMA, dp: konfig.biayaSMADP, aktif: konfig.smaAktif },
+    { label: "Purna", full: "Jenjang Purna", harga: konfig.biayaPurna, dp: konfig.biayaPurnaDP, aktif: konfig.purnaAktif },
+  ]
+    .map((j, i) => ({ ...j, meta: JENJANG_META[i] }))
+    .filter((j) => j.aktif);
+
+  if (jenjangList.length === 0) return null;
 
   return (
     <SectionWrapper id="Kategori" className="mt-16">
@@ -49,14 +63,14 @@ export default async function Kategori() {
             <span className="text-primary-500">Antareja 2026</span>
           </h2>
           <p className="text-gray-500 max-w-md">
-            Antareja hadir untuk 3 jenjang perlombaan. Daftarkan tim terbaik Anda sekarang.
+            Antareja hadir untuk {jenjangList.length} jenjang perlombaan. Daftarkan tim terbaik Anda sekarang.
           </p>
         </div>
 
         {/* Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {jenjangList.map((j, i) => {
-            const meta = JENJANG_META[i];
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
+          {jenjangList.map((j) => {
+            const meta = j.meta;
             return (
               <div
                 key={j.label}

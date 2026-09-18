@@ -27,6 +27,10 @@ export async function saveKonfigUmum(data: FormData) {
   const bankNama = (data.get("bankNama") as string) || "";
   const bankNoRek = (data.get("bankNoRek") as string) || "";
   const bankAtasNama = (data.get("bankAtasNama") as string) || "";
+  const sdAktif = data.get("sdAktif") === "on";
+  const smpAktif = data.get("smpAktif") === "on";
+  const smaAktif = data.get("smaAktif") === "on";
+  const purnaAktif = data.get("purnaAktif") === "on";
 
   // Semua section di PengaturanForm berbagi satu <form>, jadi field timeline
   // selalu ikut terkirim apa pun tombol "Simpan" yang diklik.
@@ -80,6 +84,7 @@ export async function saveKonfigUmum(data: FormData) {
       pendaftaranDeadline,
       biayaSD, biayaSDDP, biayaSMP, biayaSMPDP, biayaSMA, biayaSMADP,
       biayaPurna, biayaPurnaDP,
+      sdAktif, smpAktif, smaAktif, purnaAktif,
       bankNama, bankNoRek, bankAtasNama,
       timeline,
       ...(juklakUrl ? { juklakUrl } : {}),

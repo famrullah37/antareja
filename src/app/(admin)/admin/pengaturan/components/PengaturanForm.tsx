@@ -16,6 +16,10 @@ type Konfig = {
   biayaSMADP: number;
   biayaPurna: number;
   biayaPurnaDP: number;
+  sdAktif: boolean;
+  smpAktif: boolean;
+  smaAktif: boolean;
+  purnaAktif: boolean;
   bankNama: string | null;
   bankNoRek: string | null;
   bankAtasNama: string | null;
@@ -234,6 +238,38 @@ export default function PengaturanForm({ konfig }: { konfig: Konfig }) {
             placeholder="Nama Pemilik Rekening"
             className="border border-neutral-300 rounded-lg px-3 py-2 text-sm"
           />
+        </div>
+        <button
+          type="submit"
+          className="self-start bg-primary-500 text-white rounded-lg py-2 px-6 text-sm font-semibold hover:bg-primary-600 transition-colors"
+        >
+          Simpan
+        </button>
+      </div>
+
+      {/* Jenjang Aktif */}
+      <div className="bg-white border border-neutral-200 rounded-xl p-6 flex flex-col gap-4">
+        <h2 className="font-semibold text-lg">Jenjang Aktif</h2>
+        <p className="text-sm text-gray-500">
+          Jenjang yang dimatikan disembunyikan dari kartu kategori di halaman utama & pilihan di
+          form pendaftaran. Tim yang sudah terlanjur terdaftar di jenjang itu tidak terpengaruh —
+          tetap tampil normal di semua halaman admin, penilaian, sertifikat, dan vote.
+        </p>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {[
+            { label: "SD", name: "sdAktif", checked: konfig.sdAktif },
+            { label: "SMP", name: "smpAktif", checked: konfig.smpAktif },
+            { label: "SMA", name: "smaAktif", checked: konfig.smaAktif },
+            { label: "Purna", name: "purnaAktif", checked: konfig.purnaAktif },
+          ].map(({ label, name, checked }) => (
+            <label
+              key={name}
+              className="flex items-center gap-2 text-sm font-medium border border-neutral-200 rounded-lg px-3 py-2"
+            >
+              <input type="checkbox" name={name} defaultChecked={checked} className="w-4 h-4" />
+              {label}
+            </label>
+          ))}
         </div>
         <button
           type="submit"

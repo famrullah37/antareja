@@ -9,14 +9,15 @@ import { useState } from "react";
 import Select from "react-select";
 import { toast } from "sonner";
 
-// SD disembunyikan dari pendaftaran, konsisten dengan landing page (lihat
-// Kategori.tsx) — konfigurasi biayanya tetap ada di KonfigUmum kalau suatu saat
-// mau diaktifkan lagi, tinggal tambahkan opsinya kembali di sini.
-const jenjangOptions = [
-  { label: "SMA/Sederajat", value: "SMA" },
-  { label: "SMP/Sederajat", value: "SMP" },
-  { label: "Purna", value: "PURNA" },
-];
+// Jenjang mana yang ditampilkan diatur admin lewat toggle "Jenjang Aktif" di
+// /admin/pengaturan (KonfigUmum.sdAktif/smpAktif/smaAktif/purnaAktif) —
+// konsisten dengan Kategori.tsx di landing page.
+const ALL_JENJANG = [
+  { label: "SD/Sederajat", value: "SD", aktifKey: "sdAktif" },
+  { label: "SMP/Sederajat", value: "SMP", aktifKey: "smpAktif" },
+  { label: "SMA/Sederajat", value: "SMA", aktifKey: "smaAktif" },
+  { label: "Purna", value: "PURNA", aktifKey: "purnaAktif" },
+] as const;
 
 const size = [
   { label: "12 Pasukan", value: "SMALL" },
@@ -37,6 +38,10 @@ type KonfigUmum = {
   biayaSMADP: number;
   biayaPurna: number;
   biayaPurnaDP: number;
+  sdAktif: boolean;
+  smpAktif: boolean;
+  smaAktif: boolean;
+  purnaAktif: boolean;
   bankNama: string | null;
   bankNoRek: string | null;
   bankAtasNama: string | null;
@@ -77,6 +82,11 @@ export default function FormComponent({
   const [isDP, setIsDP] = useState(false);
   const [selectedJenjang, setSelectedJenjang] = useState<string | null>(null);
   const router = useRouter();
+
+  const jenjangOptions = ALL_JENJANG.filter((j) => konfigUmum[j.aktifKey]).map((j) => ({
+    label: j.label,
+    value: j.value,
+  }));
 
   async function submitForm(data: FormData) {
     const toastId = toast.loading("Membuat tim....");

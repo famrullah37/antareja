@@ -422,6 +422,14 @@ model KonfigUmum {
   biayaSMADP          Int       @default(200000)
   biayaPurna          Int       @default(400000)
   biayaPurnaDP        Int       @default(200000)
+  // Toggle per jenjang — kalau false, jenjang itu disembunyikan dari kartu
+  // kategori di landing page & pilihan di form pendaftaran (tim yang sudah
+  // terlanjur terdaftar di jenjang itu tidak terpengaruh, tetap tampil
+  // normal di semua halaman admin/penilaian/sertifikat/vote).
+  sdAktif             Boolean   @default(false)
+  smpAktif            Boolean   @default(true)
+  smaAktif            Boolean   @default(true)
+  purnaAktif          Boolean   @default(false)
   // Rekening pendaftaran tim — dulu form pendaftaran ikut memakai KonfigTiket
   // (halaman /admin/tiket, biasanya baru dikonfigurasi belakangan setelah
   // pendaftaran dibuka), jadi bisa memblokir pendaftaran baru kalau admin
