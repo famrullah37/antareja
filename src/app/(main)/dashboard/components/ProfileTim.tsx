@@ -14,6 +14,7 @@ import Field from "../components/parts/input";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import SubmitButton from "@/app/components/global/SubmitButton";
+import { downloadFormulir } from "./parts/downloadFormulir";
 
 const rowsMapNormal = [
   ["b1s1", "b1s2", "b1s3"],
@@ -150,6 +151,15 @@ export default function ProfileTim({
   biayaDasar?: number;
 }) {
   const router = useRouter();
+  const [downloading, setDownloading] = useState(false);
+  const jumlahAnggotaLengkap = sizeMap[tim.tipe_tim] + 3;
+  const dataLengkap = tim.anggotas.length === jumlahAnggotaLengkap;
+
+  async function handleDownloadBerkas() {
+    setDownloading(true);
+    await downloadFormulir();
+    setDownloading(false);
+  }
   // Tim lama (daftar sebelum fitur kode unik) tidak punya totalBayar — mereka
   // transfer biaya dasar tanpa kode unik, jadi itu yang ditampilkan.
   const nominalTransfer = tim.pembayaran?.totalBayar ?? biayaDasar ?? null;
@@ -250,6 +260,31 @@ export default function ProfileTim({
             </div>
           </form>
         ) : null}
+
+        {tim.confirmed && (
+          <div className="flex flex-col gap-2 mb-4">
+            <H3>Berkas Registrasi (PDF)</H3>
+            <P className="text-sm text-gray-500">
+              Berkas formulir registrasi peserta (kop surat, data tim, foto Danton & pasukan, tanda tangan
+              Pelatih/Official) terisi otomatis dari data anggota — tidak perlu diisi manual di PDF/Word.
+            </P>
+            {dataLengkap ? (
+              <button
+                type="button"
+                onClick={handleDownloadBerkas}
+                disabled={downloading}
+                className="self-start bg-primary-500 hover:bg-primary-600 disabled:opacity-60 text-white text-sm font-semibold px-5 py-2.5 rounded-lg transition-colors"
+              >
+                {downloading ? "Menyiapkan..." : "Cetak / Unduh Berkas PDF"}
+              </button>
+            ) : (
+              <P className="text-yellow-600 text-sm">
+                Lengkapi dulu data semua anggota tim ({tim.anggotas.length}/{jumlahAnggotaLengkap} terisi)
+                supaya berkas bisa dicetak.
+              </P>
+            )}
+          </div>
+        )}
 
         {/* hasil penilaian (legacy) */}
         {penilaian?.published === true && (

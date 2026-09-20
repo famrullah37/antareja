@@ -1,22 +1,48 @@
 import PDFDocument from "pdfkit";
+import sharp from "sharp";
+import fs from "fs/promises";
+import path from "path";
 import { Anggota, Tim } from "@prisma/client";
-import { getLogoPng } from "./kuitansi";
 
-async function fetchImageBuffer(url: string): Promise<Buffer | null> {
+const PAGE_MARGIN_X = 40;
+const BOX_W = 92;
+const BOX_H = 123; // rasio 3x4 seperti pas foto
+const COL_GAP = 60;
+const ROW_PITCH = BOX_H + 36; // kotak + nama (maks. 2 baris) + jarak antar baris
+
+// Kop surat resmi (logo Paskibra + SMK Telkom Malang + Telkom Schools) diambil
+// dari template DOCX lama, disimpan sebagai gambar utuh di public/.
+let kopCache: Buffer | null = null;
+async function getKop(): Promise<Buffer | null> {
+  if (kopCache) return kopCache;
+  try {
+    kopCache = await fs.readFile(path.join(process.cwd(), "public", "image", "kop-formulir.png"));
+    return kopCache;
+  } catch (e) {
+    console.error("Gagal muat kop formulir:", e);
+    return null;
+  }
+}
+
+// Foto anggota di Cloudinary bisa besar (sampai 1200px) — kecilkan & potong
+// ke rasio 3x4 persis ukuran kotak supaya PDF tetap ringan (16+ foto).
+async function fetchFotoBox(url: string): Promise<Buffer | null> {
   try {
     const res = await fetch(url);
     if (!res.ok) return null;
-    return Buffer.from(await res.arrayBuffer());
+    const raw = Buffer.from(await res.arrayBuffer());
+    return await sharp(raw)
+      .rotate()
+      .resize(BOX_W * 3, BOX_H * 3, { fit: "cover" })
+      .jpeg({ quality: 80 })
+      .toBuffer();
   } catch (e) {
     console.error("Gagal ambil foto anggota untuk formulir:", url, e);
     return null;
   }
 }
 
-const posisiOrder = [
-  "PELATIH",
-  "OFFICIAL",
-  "DANTON",
+const POSISI_PASUKAN = [
   "B1S1", "B1S2", "B1S3",
   "B2S1", "B2S2", "B2S3",
   "B3S1", "B3S2", "B3S3",
@@ -24,148 +50,144 @@ const posisiOrder = [
   "B5S1", "B5S2", "B5S3",
 ];
 
-const tipeTimLabel: Record<string, string> = {
-  SMALL: "12 Anggota",
-  NORMAL: "15 Anggota",
-};
-
-// Formulir registrasi otomatis-terisi, menggantikan template DOCX kosong yang
-// sebelumnya harus diisi manual oleh tim — data langsung diambil dari sistem
-// begitu seluruh data tim & anggota sudah lengkap (lihat isTimDataLengkap).
-export async function buildFormulirPdf(
-  tim: Tim,
-  anggotas: Anggota[]
-): Promise<Buffer> {
-  const sortedAnggota = [...anggotas].sort(
-    (a, b) => posisiOrder.indexOf(a.posisi) - posisiOrder.indexOf(b.posisi)
+// Berkas registrasi peserta otomatis-terisi (format sama dengan template DOCX
+// lama: kop surat, isian tim, kotak foto Danton & pasukan, tanda tangan
+// Pelatih/Official). Dipanggil hanya kalau data tim & anggota sudah lengkap
+// (lihat downloadFormulirPdf di actions/Tim.ts).
+export async function buildFormulirPdf(tim: Tim, anggotas: Anggota[]): Promise<Buffer> {
+  const danton = anggotas.find((a) => a.posisi === "DANTON");
+  const official = anggotas.find((a) => a.posisi === "OFFICIAL");
+  const pasukan = POSISI_PASUKAN.map((p) => anggotas.find((a) => a.posisi === p)).filter(
+    (a): a is Anggota => !!a
   );
 
-  const [logo, fotoBuffers] = await Promise.all([
-    getLogoPng(),
-    Promise.all(
-      sortedAnggota.map((a) => (a.foto ? fetchImageBuffer(a.foto) : Promise.resolve(null)))
-    ),
+  const [kop, fotoDanton, fotoPasukan] = await Promise.all([
+    getKop(),
+    danton?.foto ? fetchFotoBox(danton.foto) : Promise.resolve(null),
+    Promise.all(pasukan.map((a) => (a.foto ? fetchFotoBox(a.foto) : Promise.resolve(null)))),
   ]);
 
-  const official = sortedAnggota.find((a) => a.posisi === "OFFICIAL");
-  const danton = sortedAnggota.find((a) => a.posisi === "DANTON");
-
   return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ size: "A4", margin: 40 });
+    const doc = new PDFDocument({
+      size: "A4",
+      margins: { top: 30, bottom: 20, left: PAGE_MARGIN_X, right: PAGE_MARGIN_X },
+    });
     const chunks: Buffer[] = [];
     doc.on("data", (c) => chunks.push(c));
     doc.on("end", () => resolve(Buffer.concat(chunks)));
     doc.on("error", reject);
 
-    if (logo) {
+    const contentW = doc.page.width - PAGE_MARGIN_X * 2;
+    const startX = PAGE_MARGIN_X + (contentW - (3 * BOX_W + 2 * COL_GAP)) / 2;
+    const colX = (i: number) => startX + i * (BOX_W + COL_GAP);
+
+    let y = 30;
+    if (kop) {
       try {
-        doc.image(logo, doc.page.width / 2 - 25, 40, { width: 50 });
-        doc.moveDown(3.5);
+        doc.image(kop, PAGE_MARGIN_X, y, { width: contentW });
+        y += Math.round((contentW * 200) / 975) + 22;
       } catch {
-        // Logo korup/gagal ditempel bukan alasan gagalkan seluruh formulir.
+        y += 22;
       }
     } else {
-      doc.moveDown(1);
+      y += 22;
     }
 
-    doc.fontSize(16).font("Helvetica-Bold").text("FORMULIR REGISTRASI PESERTA", { align: "center" });
-    doc.fontSize(12).font("Helvetica").text("ANTAREJA SEASON 4", { align: "center" });
-    doc.moveDown(1.5);
-
-    doc.fontSize(13).font("Helvetica-Bold").text("Data Tim");
-    doc.moveDown(0.3);
-
-    const rows: [string, string][] = [
-      ["Asal Sekolah", tim.asal_sekolah],
-      ["Nama Tim", tim.nama_tim],
-      ["Jenjang", tim.jenjang],
-      ["Tipe Tim", tipeTimLabel[tim.tipe_tim] ?? tim.tipe_tim],
-      ["Nama Pelatih", tim.pelatih],
-      ["No. Telp Pelatih", tim.no_pelatih],
-      ["Nama Official", official?.nama ?? "-"],
-      ["Nama Danton", danton?.nama ?? "-"],
-      ["Link Video Tiktok + Foto Pasukan", tim.link_video || "-"],
-    ];
-
-    doc.fontSize(10.5);
-    for (const [label, value] of rows) {
-      doc.font("Helvetica-Bold").text(label, { continued: true, width: 200 });
-      doc.font("Helvetica").text(`: ${value}`);
-      doc.moveDown(0.25);
-    }
-
-    doc.moveDown(1);
-    doc.fontSize(13).font("Helvetica-Bold").text("Daftar Anggota");
-    doc.moveDown(0.5);
-
-    const colX = { no: 40, posisi: 70, nama: 150, kelasNisn: 320, telp: 420 };
-    const headerY = doc.y;
-    doc.fontSize(9.5).font("Helvetica-Bold");
-    doc.text("No", colX.no, headerY, { width: 25 });
-    doc.text("Posisi", colX.posisi, headerY, { width: 75 });
-    doc.text("Nama", colX.nama, headerY, { width: 165 });
-    doc.text("Kelas/NISN", colX.kelasNisn, headerY, { width: 95 });
-    doc.text("No. Telp", colX.telp, headerY, { width: 100 });
-    doc.moveDown(0.5);
-    doc.moveTo(40, doc.y).lineTo(doc.page.width - 40, doc.y).strokeColor("#cccccc").stroke();
-    doc.moveDown(0.3);
-
-    doc.font("Helvetica").fontSize(9.5);
-    sortedAnggota.forEach((a, i) => {
-      if (doc.y > doc.page.height - 80) doc.addPage();
-      const rowY = doc.y;
-      doc.text(String(i + 1), colX.no, rowY, { width: 25 });
-      doc.text(a.posisi, colX.posisi, rowY, { width: 75 });
-      doc.text(a.nama, colX.nama, rowY, { width: 165 });
-      doc.text(a.kelas ?? a.nisn ?? "-", colX.kelasNisn, rowY, { width: 95 });
-      doc.text(a.telp, colX.telp, rowY, { width: 100 });
-      doc.moveDown(0.5);
+    doc.font("Helvetica-Bold").fontSize(18).text("ANTAREJA SEASON 4", PAGE_MARGIN_X, y, {
+      width: contentW,
+      align: "center",
     });
+    y += 26;
+    doc.fontSize(9.5).text("FORMULIR REGISTRASI PESERTA", PAGE_MARGIN_X, y, {
+      width: contentW,
+      align: "center",
+    });
+    y += 32;
 
-    doc.addPage();
-    doc.fontSize(13).font("Helvetica-Bold").text("Dokumen Foto Pasukan dan Danton");
-    doc.moveDown(0.8);
+    const fields: [string, string][] = [
+      ["Asal Sekolah", tim.asal_sekolah],
+      ["Jumlah Tim", `${pasukan.length} Pasukan`],
+      ["Nama Pelatih", tim.pelatih],
+      ["Nama Official", official?.nama ?? "-"],
+    ];
+    for (const [label, value] of fields) {
+      doc.font("Helvetica-Bold").fontSize(10.5).text(label, 85, y, { width: 90 });
+      doc.text(":", 178, y);
+      doc.font("Helvetica").text(value, 190, y, { width: contentW - 150 });
+      y += 17;
+    }
+    y += 10;
 
-    const thumbSize = 90;
-    const gap = 15;
-    const perRow = 4;
-    const startX = doc.x;
-    let col = 0;
-    let rowTop = doc.y;
+    doc.font("Helvetica-Bold").fontSize(11).text("Dokumen Foto Pasukan dan Danton", PAGE_MARGIN_X, y, {
+      width: contentW,
+      align: "center",
+    });
+    y += 20;
+    doc.moveTo(PAGE_MARGIN_X + 20, y).lineTo(PAGE_MARGIN_X + contentW - 20, y).lineWidth(0.5).strokeColor("#888888").stroke();
+    y += 14;
 
-    sortedAnggota.forEach((a, i) => {
-      const foto = fotoBuffers[i];
-      if (rowTop + thumbSize + 30 > doc.page.height - 40) {
-        doc.addPage();
-        rowTop = doc.y;
-        col = 0;
-      }
-      const x = startX + col * (thumbSize + gap);
+    const drawBox = (x: number, top: number, foto: Buffer | null, nama: string, label?: string) => {
       if (foto) {
         try {
-          doc.image(foto, x, rowTop, { width: thumbSize, height: thumbSize, fit: [thumbSize, thumbSize] });
+          doc.image(foto, x, top, { width: BOX_W, height: BOX_H });
         } catch {
-          doc.rect(x, rowTop, thumbSize, thumbSize).stroke();
+          // Foto korup: kotak kosong tetap tercetak supaya bisa ditempel manual.
         }
-      } else {
-        doc.rect(x, rowTop, thumbSize, thumbSize).stroke();
       }
-      doc.fontSize(8).font("Helvetica").text(a.nama, x, rowTop + thumbSize + 3, { width: thumbSize, align: "center" });
-      doc.fontSize(8).text(a.posisi, x, rowTop + thumbSize + 14, { width: thumbSize, align: "center" });
+      doc.lineWidth(0.8).strokeColor("#000000").rect(x, top, BOX_W, BOX_H).stroke();
 
-      col++;
-      if (col >= perRow) {
-        col = 0;
-        rowTop += thumbSize + 35;
+      // Nama lengkap di bawah foto, boleh 2 baris (nama panjang tidak dipotong).
+      const capX = x - 25;
+      const capW = BOX_W + 50;
+      const nameY = top + BOX_H + 5;
+      doc.font("Helvetica-Bold").fontSize(8.5).fillColor("#000000");
+      const nameH = Math.min(doc.heightOfString(nama, { width: capW }), 22);
+      doc.text(nama, capX, nameY, { width: capW, height: 22, align: "center", ellipsis: true });
+      if (label) {
+        doc.font("Helvetica").fontSize(7.5).fillColor("#555555");
+        doc.text(label, capX, nameY + nameH + 1, { width: capW, height: 10, align: "center", lineBreak: false });
       }
+    };
+
+    // Halaman 1: Danton di tengah + satu baris pasukan pertama (sama seperti template).
+    drawBox(colX(1), y, fotoDanton, danton?.nama ?? "-", "Danton");
+    y += ROW_PITCH + 12; // nama Danton bisa 2 baris + label, butuh ruang ekstra
+
+    const rows: number[][] = [];
+    for (let i = 0; i < pasukan.length; i += 3) {
+      rows.push([i, i + 1, i + 2].filter((n) => n < pasukan.length));
+    }
+    rows.forEach((row, rowIdx) => {
+      if (rowIdx === 1) {
+        doc.addPage();
+        y = 50;
+      }
+      row.forEach((n, col) => drawBox(colX(col), y, fotoPasukan[n], pasukan[n].nama));
+      y += ROW_PITCH;
     });
 
-    doc.moveDown(2);
-    doc.fontSize(8).font("Helvetica-Oblique").text(
-      `Formulir ini dibuat otomatis oleh sistem berdasarkan data pendaftaran tim pada ${new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}.`,
-      40,
-      doc.page.height - 60,
-      { align: "left" }
+    // Blok tanda tangan Pelatih & Official.
+    if (y + 110 > doc.page.height - 30) {
+      doc.addPage();
+      y = 50;
+    }
+    y += 10;
+    const sigW = 190;
+    const leftX = PAGE_MARGIN_X + 20;
+    const rightX = PAGE_MARGIN_X + contentW - 20 - sigW;
+    doc.font("Helvetica-Bold").fontSize(10);
+    doc.text("Pelatih", leftX, y, { width: sigW, align: "center" });
+    doc.text("Official", rightX, y, { width: sigW, align: "center" });
+    y += 62;
+    doc.font("Helvetica");
+    doc.text(`( ${tim.pelatih} )`, leftX, y, { width: sigW, align: "center" });
+    doc.text(`( ${official?.nama ?? "..................."} )`, rightX, y, { width: sigW, align: "center" });
+
+    doc.font("Helvetica-Oblique").fontSize(7.5).fillColor("#666666").text(
+      `Dicetak otomatis dari sistem pendaftaran Antareja pada ${new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}.`,
+      PAGE_MARGIN_X,
+      doc.page.height - 28,
+      { width: contentW, height: 10, lineBreak: false }
     );
 
     doc.end();

@@ -3,8 +3,7 @@ import { PrimaryButton } from '@/app/components/global/Button';
 import { H3, P } from '@/app/components/global/Text';
 import React, { useState } from 'react';
 import { FaDownload } from 'react-icons/fa';
-import { toast } from 'sonner';
-import { downloadFormulirPdf } from '@/actions/Tim';
+import { downloadFormulir } from './downloadFormulir';
 
 const CloseIcon = ({ className = 'w-5 h-5' }: { className?: string }) => (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512" fill="currentColor" className={className}>
@@ -24,35 +23,9 @@ export default function RegistrationModal({ isOpen, onClose }: RegistrationModal
 
     const handleDownload = async () => {
         setIsDownloading(true);
-        const toastId = toast.loading("Menyiapkan formulir...");
-        try {
-            const result = await downloadFormulirPdf();
-            if (!result.success || !result.base64) {
-                toast.error(result.message ?? "Gagal membuat formulir", { id: toastId });
-                return;
-            }
-
-            const byteChars = atob(result.base64);
-            const byteNumbers = new Array(byteChars.length);
-            for (let i = 0; i < byteChars.length; i++) byteNumbers[i] = byteChars.charCodeAt(i);
-            const blob = new Blob([new Uint8Array(byteNumbers)], { type: "application/pdf" });
-            const url = URL.createObjectURL(blob);
-
-            const link = document.createElement('a');
-            link.href = url;
-            link.setAttribute('download', 'Formulir_Pendaftaran.pdf');
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            URL.revokeObjectURL(url);
-
-            toast.success("Formulir berhasil diunduh", { id: toastId });
-            onClose();
-        } catch {
-            toast.error("Gagal mengunduh formulir", { id: toastId });
-        } finally {
-            setIsDownloading(false);
-        }
+        const ok = await downloadFormulir();
+        setIsDownloading(false);
+        if (ok) onClose();
     };
 
     return (
@@ -79,7 +52,7 @@ export default function RegistrationModal({ isOpen, onClose }: RegistrationModal
 
                 <div className="p-5 space-y-4 max-h-96 overflow-y-auto">
                     <P className="text-sm text-gray-600">
-                        Formulir ini otomatis terisi dari data tim dan anggota yang sudah kamu masukkan di dashboard. Sebelum mengunduh, pastikan kamu membaca ketentuan berikut:
+                        Berkas registrasi ini otomatis terisi dari data tim dan anggota yang sudah kamu masukkan di dashboard. Sebelum mengunduh, pastikan kamu membaca ketentuan berikut:
                     </P>
 
                     <ul className="list-decimal list-inside text-gray-700 space-y-2 text-sm ml-4">

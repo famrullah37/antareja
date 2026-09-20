@@ -111,7 +111,12 @@ export async function downloadFormulirPdf() {
 
   try {
     const pdf = await buildFormulirPdf(tim, tim.anggotas);
-    return { success: true, base64: pdf.toString("base64") };
+    const slug = tim.nama_tim.replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "") || "Tim";
+    return {
+      success: true,
+      base64: pdf.toString("base64"),
+      filename: `Berkas-Registrasi-${slug}.pdf`,
+    };
   } catch {
     return { success: false, message: "Gagal membuat formulir" };
   }
