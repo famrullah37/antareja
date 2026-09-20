@@ -46,8 +46,6 @@ export type KuitansiData = {
   jenjang: string;
   isDP: boolean;
   hargaDasar: number;
-  kodeUnik: string;
-  totalBayar: number;
   tanggal: Date;
   bendaharaNama?: string | null;
   bendaharaTtdUrl?: string | null;
@@ -93,7 +91,6 @@ export async function buildKuitansiPdf(data: KuitansiData): Promise<Buffer> {
       ["Jenjang", data.jenjang],
       ["Jenis Pembayaran", data.isDP ? "DP 50%" : "Lunas"],
       ["Biaya Pendaftaran", formatRupiah(data.hargaDasar)],
-      ["Kode Unik", data.kodeUnik],
       ["Tanggal", data.tanggal.toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })],
     ];
 
@@ -105,7 +102,7 @@ export async function buildKuitansiPdf(data: KuitansiData): Promise<Buffer> {
     }
 
     doc.moveDown(1);
-    doc.font("Helvetica-Bold").fontSize(13).text(`Total Dibayar: ${formatRupiah(data.totalBayar)}`);
+    doc.font("Helvetica-Bold").fontSize(13).text(`Total Dibayar: ${formatRupiah(data.hargaDasar)}`);
     doc.moveDown(3);
 
     // Blok tanda tangan bendahara, rata kanan.

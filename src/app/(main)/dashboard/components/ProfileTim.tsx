@@ -140,8 +140,19 @@ function TimLayout({ tim }: Readonly<{ tim: TimWithRelations }>) {
   );
 }
 
-export default function ProfileTim({ tim, penilaian }: { tim: TimWithRelations; penilaian?: any }) {
+export default function ProfileTim({
+  tim,
+  penilaian,
+  biayaDasar,
+}: {
+  tim: TimWithRelations;
+  penilaian?: any;
+  biayaDasar?: number;
+}) {
   const router = useRouter();
+  // Tim lama (daftar sebelum fitur kode unik) tidak punya totalBayar — mereka
+  // transfer biaya dasar tanpa kode unik, jadi itu yang ditampilkan.
+  const nominalTransfer = tim.pembayaran?.totalBayar ?? biayaDasar ?? null;
 
   async function submitForm(formData: FormData) {
     const toastId = toast.loading(
@@ -171,17 +182,30 @@ export default function ProfileTim({ tim, penilaian }: { tim: TimWithRelations; 
           <P>{tim.nama_tim}</P>
         </div>
 
-        {tim.pembayaran?.kuitansiUrl && (
+        {tim.pembayaran && (
           <div className="flex flex-col gap-1 mb-4">
             <H3>Kuitansi Pembayaran</H3>
-            <a
-              href={tim.pembayaran.kuitansiUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="text-primary-600 hover:underline text-sm w-fit"
-            >
-              Download Kuitansi (PDF)
-            </a>
+            {nominalTransfer !== null && (
+              <P>
+                Total Transfer: <span className="font-bold">Rp {nominalTransfer.toLocaleString("id-ID")}</span>
+                {tim.pembayaran.kodeUnik && (
+                  <>
+                    {" "}(kode unik <span className="font-bold font-mono tracking-widest">#{tim.pembayaran.kodeUnik}</span>)
+                  </>
+                )}
+                {` — ${tim.pembayaran.isDP ? "DP 50%" : "Lunas"}`}
+              </P>
+            )}
+            {tim.pembayaran.kuitansiUrl && (
+              <a
+                href={tim.pembayaran.kuitansiUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="text-primary-600 hover:underline text-sm w-fit"
+              >
+                Download Kuitansi (PDF)
+              </a>
+            )}
           </div>
         )}
 

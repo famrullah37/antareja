@@ -12,6 +12,7 @@ import { findSertifikatByTim } from "@/queries/sertifikat.query";
 import TiketSayaSection from "./components/TiketSayaSection";
 import NilaiAkhirSection from "./components/NilaiAkhirSection";
 import SertifikatSection from "./components/SertifikatSection";
+import { biayaPendaftaran } from "@/actions/pembayaran";
 
 export default async function TimDashboard() {
   const session = await getServerSession();
@@ -26,16 +27,17 @@ export default async function TimDashboard() {
 
   const tim = tims[0] as TimWithRelations;
 
-  const [transaksiTikets, penilaianBaru, sertifikat] = await Promise.all([
+  const [transaksiTikets, penilaianBaru, sertifikat, biayaDasar] = await Promise.all([
     findTransaksiTikets({ userId: session.user!.id }),
     findPenilaianBaru({ timId: tim.id }),
     findSertifikatByTim(tim.id),
+    biayaPendaftaran(tim.jenjang, tim.pembayaran?.isDP ?? false),
   ]);
 
   return (
     <>
       <Heading />
-      <ProfileTim tim={tim} penilaian={tim.penilaian ?? null} />
+      <ProfileTim tim={tim} penilaian={tim.penilaian ?? null} biayaDasar={biayaDasar} />
       <NilaiAkhirSection penilaianBaru={penilaianBaru as any} />
       <SertifikatSection sertifikat={sertifikat as any} />
       <TiketSayaSection transaksis={transaksiTikets as any} />

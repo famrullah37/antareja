@@ -88,8 +88,12 @@ async function generateDanKirimKuitansi(timId: string, hargaDasar: number) {
   });
   if (!tim?.pembayaran) return { success: false, message: "Data pembayaran tidak ditemukan" };
 
-  const kode = await ensureKodeUnikDanTotal(timId, hargaDasar);
-  if (!kode) return { success: false, message: "Gagal menyiapkan kode unik pembayaran" };
+  // Kuitansi hanya menampilkan nominal biaya (tanpa kode unik), tapi tim lama
+  // tetap di-backfill kode uniknya supaya tampil di dashboard tim & admin.
+  // Gagal backfill tidak boleh menggagalkan kuitansi.
+  await ensureKodeUnikDanTotal(timId, hargaDasar).catch((e) =>
+    console.error("ensureKodeUnikDanTotal error:", e)
+  );
 
   const konfig = await getKonfigUmum();
 
@@ -99,8 +103,6 @@ async function generateDanKirimKuitansi(timId: string, hargaDasar: number) {
     jenjang: tim.jenjang,
     isDP: tim.pembayaran.isDP,
     hargaDasar,
-    kodeUnik: kode.kodeUnik,
-    totalBayar: kode.totalBayar,
     tanggal: new Date(),
     bendaharaNama: konfig.bendaharaNama,
     bendaharaTtdUrl: konfig.bendaharaTtdUrl,
