@@ -41,6 +41,7 @@ export async function upsertKonfigUmum(data: {
   bankAtasNama?: string;
   timeline?: TimelineItem[] | Prisma.NullTypes.JsonNull;
   juklakUrl?: string;
+  videoUrl?: string | null;
   bendaharaNama?: string;
   bendaharaTtdUrl?: string;
 }) {

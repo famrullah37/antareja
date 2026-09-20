@@ -469,6 +469,8 @@ model KonfigUmum {
   // Link download Juklak (petunjuk pelaksanaan), diupload admin lewat
   // Pengaturan — muncul sebagai tombol download di Hero halaman utama.
   juklakUrl           String?
+  // Video Antareja di halaman utama (bagian Alur Pendaftaran): YouTube, Google Drive, atau file video langsung.
+  videoUrl            String?
   // Counter kode unik pembayaran pendaftaran tim (0-999, siklus ulang) —
   // sama pola dengan KonfigVoting.counterUrut.
   counterUrutPendaftaran Int  @default(0)

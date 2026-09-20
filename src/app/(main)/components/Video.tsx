@@ -4,6 +4,8 @@ import PendaftaranCard from "./parts/PendaftaranCard";
 import Image from "next/image";
 import { PrimaryLinkButton } from "@/app/components/global/LinkButton";
 import { FaDownload } from "react-icons/fa";
+import { getKonfigUmum } from "@/queries/konfigUmum.query";
+import VideoPlayer from "./parts/VideoPlayer";
 
 const cards = [
   { number: "2", step: "Pilih Kategori", detail: "Pilih kategori tim anda" },
@@ -17,7 +19,8 @@ const cards = [
   },
 ];
 
-export default function Video() {
+export default async function Video() {
+  const konfig = await getKonfigUmum();
   return (
     <SectionWrapper id="video" className="overflow-hidden">
       <div className="w-full relative flex gap-20 items-center md:items-end justify-center xl:justify-between xl:flex-row flex-col">
@@ -49,13 +52,9 @@ export default function Video() {
           >
             Unduh buku panduan <FaDownload />
           </PrimaryLinkButton>
-          <iframe
-            src=""
-            title="YouTube video player"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-            referrerPolicy="strict-origin-when-cross-origin"
-            allowFullScreen
-            className="object-cover rounded-[20px] sm:w-[500px] h-[250px] sm:h-[276px] w-full bg-gray-700"
+          <VideoPlayer
+            url={konfig.videoUrl}
+            className="rounded-[20px] sm:w-[500px] h-[250px] sm:h-[276px] w-full"
           />
         </div>
         <div className="max-w-full xl:max-w-[738px] flex flex-wrap gap-6 gap-y-6 xl:gap-y0 md:gap-9 mt-[10px] justify-center sm:justify-center md:justify-center items-center xl:justify-normal">
@@ -100,15 +99,9 @@ export default function Video() {
           >
             Unduh buku panduan <FaDownload />
           </PrimaryLinkButton>
-          <iframe
-            width="500"
-            height="276"
-            src=""
-            title="YouTube video player"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-            referrerPolicy="strict-origin-when-cross-origin"
-            allowFullScreen
-            className="object-cover rounded-[20px] sm:w-[500px] h-[276px] w-full bg-gray-700"
+          <VideoPlayer
+            url={konfig.videoUrl}
+            className="rounded-[20px] sm:w-[500px] h-[276px] w-full"
           />
         </div>
       </div>

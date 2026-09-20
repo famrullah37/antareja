@@ -4,6 +4,7 @@ import { getServerSession } from "@/lib/next-auth";
 import { upsertKonfigUmum, type TimelineItem } from "@/queries/konfigUmum.query";
 import { revalidatePath } from "next/cache";
 import { parseWibDatetimeLocal } from "@/lib/datetime";
+import { parseVideoUrl } from "@/lib/videoUrl";
 import { imageUploader, validateUploadFile } from "./fileUploader";
 
 async function requireAdmin() {
@@ -42,6 +43,16 @@ export async function saveKonfigUmum(data: FormData) {
   const kuotaSMP = parseKuota(data.get("kuotaSMP") as string | null);
   const kuotaSMA = parseKuota(data.get("kuotaSMA") as string | null);
   const kuotaPurna = parseKuota(data.get("kuotaPurna") as string | null);
+
+  // Video Antareja — kosong = tidak ada video; kalau diisi harus YouTube / Google Drive / file video langsung.
+  const videoUrlRaw = ((data.get("videoUrl") as string) || "").trim();
+  if (videoUrlRaw && !parseVideoUrl(videoUrlRaw)) {
+    return {
+      success: false,
+      message: "Link video tidak dikenali. Gunakan link YouTube, Google Drive (file video), atau file .mp4/.webm langsung.",
+    };
+  }
+  const videoUrl = videoUrlRaw || null;
 
   // Semua section di PengaturanForm berbagi satu <form>, jadi field timeline
   // selalu ikut terkirim apa pun tombol "Simpan" yang diklik.
@@ -109,6 +120,7 @@ export async function saveKonfigUmum(data: FormData) {
       biayaPurna, biayaPurnaDP,
       sdAktif, smpAktif, smaAktif, purnaAktif,
       kuotaSD, kuotaSMP, kuotaSMA, kuotaPurna,
+      videoUrl,
       bankNama, bankNoRek, bankAtasNama,
       timeline,
       bendaharaNama,

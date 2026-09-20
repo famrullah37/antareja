@@ -29,6 +29,7 @@ type Konfig = {
   bankAtasNama: string | null;
   timeline: TimelineItem[] | null;
   juklakUrl: string | null;
+  videoUrl: string | null;
   bendaharaNama: string | null;
   bendaharaTtdUrl: string | null;
 };
@@ -203,6 +204,36 @@ export default function PengaturanForm({ konfig }: { konfig: Konfig }) {
             className="text-sm text-gray-500 file:mr-3 file:py-1.5 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary-50 file:text-primary-600 hover:file:bg-primary-100"
           />
           <span className="text-xs text-gray-400">Kosongkan jika tidak ingin mengubah file</span>
+        </div>
+        <button
+          type="submit"
+          className="self-start bg-primary-500 text-white rounded-lg py-2 px-6 text-sm font-semibold hover:bg-primary-600 transition-colors"
+        >
+          Simpan
+        </button>
+      </div>
+
+      {/* Video Antareja */}
+      <div className="bg-white border border-neutral-200 rounded-xl p-6 flex flex-col gap-4">
+        <h2 className="font-semibold text-lg">Video Antareja</h2>
+        <p className="text-sm text-gray-500">
+          Video yang tampil di halaman utama (bagian Alur Pendaftaran). Bisa berupa link YouTube (biasa, youtu.be,
+          atau Shorts), link berbagi file video Google Drive, atau link file video langsung (.mp4/.webm).
+          Kosongkan untuk menyembunyikan video.
+        </p>
+        <div className="flex flex-col gap-1">
+          <label htmlFor="videoUrl" className="text-sm font-medium">Link Video</label>
+          <input
+            id="videoUrl"
+            type="url"
+            name="videoUrl"
+            defaultValue={konfig.videoUrl ?? ""}
+            placeholder="https://www.youtube.com/watch?v=..."
+            className="border border-neutral-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-primary-400"
+          />
+          <span className="text-xs text-gray-400">
+            Untuk Google Drive, pastikan file dibagikan &ldquo;Siapa saja yang memiliki link&rdquo; agar bisa diputar pengunjung.
+          </span>
         </div>
         <button
           type="submit"
