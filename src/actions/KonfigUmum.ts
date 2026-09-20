@@ -32,6 +32,17 @@ export async function saveKonfigUmum(data: FormData) {
   const smaAktif = data.get("smaAktif") === "on";
   const purnaAktif = data.get("purnaAktif") === "on";
 
+  // Kuota per jenjang — kosong berarti tidak dibatasi (null), bukan 0.
+  const parseKuota = (raw: string | null): number | null => {
+    if (!raw || !raw.trim()) return null;
+    const n = parseInt(raw, 10);
+    return Number.isFinite(n) && n >= 0 ? n : null;
+  };
+  const kuotaSD = parseKuota(data.get("kuotaSD") as string | null);
+  const kuotaSMP = parseKuota(data.get("kuotaSMP") as string | null);
+  const kuotaSMA = parseKuota(data.get("kuotaSMA") as string | null);
+  const kuotaPurna = parseKuota(data.get("kuotaPurna") as string | null);
+
   // Semua section di PengaturanForm berbagi satu <form>, jadi field timeline
   // selalu ikut terkirim apa pun tombol "Simpan" yang diklik.
   const timeline: TimelineItem[] = [];
@@ -97,6 +108,7 @@ export async function saveKonfigUmum(data: FormData) {
       biayaSD, biayaSDDP, biayaSMP, biayaSMPDP, biayaSMA, biayaSMADP,
       biayaPurna, biayaPurnaDP,
       sdAktif, smpAktif, smaAktif, purnaAktif,
+      kuotaSD, kuotaSMP, kuotaSMA, kuotaPurna,
       bankNama, bankNoRek, bankAtasNama,
       timeline,
       bendaharaNama,

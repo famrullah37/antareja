@@ -18,7 +18,7 @@ export default function TimTable({ data }: { data: TimWithRelations[] }) {
     e.stopPropagation();
     const toastId = toast.loading("Mengkonfirmasi...");
     const result = await approvePayment(timId, isDP);
-    if (result.success) toast.success("Pembayaran terkonfirmasi!", { id: toastId });
+    if (result.success) toast.success(result.message ?? "Pembayaran terkonfirmasi!", { id: toastId, duration: result.message ? 6000 : 4000 });
     else toast.error("Gagal konfirmasi", { id: toastId });
   }
 

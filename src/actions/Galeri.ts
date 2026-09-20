@@ -12,6 +12,7 @@ import {
   updateTransaksiFoto,
 } from "@/queries/galeri.query";
 import { imageUploader, validateUploadFile } from "./fileUploader";
+import { addWatermark } from "@/lib/watermark";
 import { sendMailTo } from "@/lib/mailer";
 import prisma from "@/lib/prisma";
 
@@ -76,10 +77,17 @@ export async function uploadFoto(data: FormData) {
       const buffer = Buffer.from(await file.arrayBuffer());
       const uploaded = await imageUploader(buffer);
       if (!uploaded.data?.url) throw new Error("Upload gagal");
+
+      // Preview publik album berbayar pakai versi watermark ini (lihat
+      // GaleriClient/GaleriSection: isGratis ? pathAsli : pathWatermark) —
+      // kalau gagal digenerate, fallback ke foto asli daripada gagal total.
+      const watermarkedBuffer = await addWatermark(buffer);
+      const uploadedWatermark = await imageUploader(watermarkedBuffer);
+
       await createFoto({
         album: { connect: { id: albumId } },
         pathAsli: uploaded.data.url,
-        pathWatermark: uploaded.data.url,
+        pathWatermark: uploadedWatermark.data?.url ?? uploaded.data.url,
         tagTim: tagTim || undefined,
         statusPublish: true,
       });

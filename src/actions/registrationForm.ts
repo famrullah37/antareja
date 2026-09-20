@@ -1,5 +1,5 @@
 "use server";
-import { Jenjang, Tipe } from "@prisma/client";
+import { Jenjang, PrismaClient, Tipe } from "@prisma/client";
 import { imageUploader, validateUploadFile } from "./fileUploader";
 import { revalidatePath } from "next/cache";
 import { getServerSession } from "@/lib/next-auth";
@@ -9,11 +9,36 @@ import { biayaPendaftaran } from "./pembayaran";
 const VALID_JENJANG: Jenjang[] = ["SD", "SMP", "SMA", "PURNA"];
 const VALID_TIPE: Tipe[] = ["SMALL", "NORMAL"];
 
+// Batas maksimal tim per jenjang, dikonfigurasi admin lewat /admin/pengaturan
+// (KonfigUmum.kuotaSD/SMP/SMA/Purna). null berarti tidak dibatasi. Menerima
+// client Prisma biasa ATAU transaksi (tx) supaya bisa dipakai atomic di
+// submitFormRegistrasi.
+async function getKuotaJenjang(
+  client: Pick<PrismaClient, "konfigUmum">,
+  jenjang: Jenjang
+): Promise<number | null> {
+  const konfig = await client.konfigUmum.findUnique({ where: { id: "singleton" } });
+  const map: Record<Jenjang, number | null> = {
+    SD: konfig?.kuotaSD ?? null,
+    SMP: konfig?.kuotaSMP ?? null,
+    SMA: konfig?.kuotaSMA ?? null,
+    PURNA: konfig?.kuotaPurna ?? null,
+  };
+  return map[jenjang];
+}
+
 // Cadangkan kode unik 3 digit sebelum user transfer — dipanggil dari form
 // begitu jenjang & tipe pembayaran dipilih, supaya nominal yang ditampilkan
 // (biaya + kode unik) sudah pasti sebelum uang benar-benar ditransfer.
 export async function reserveKodePendaftaran(jenjang: Jenjang, isDP: boolean) {
   if (!VALID_JENJANG.includes(jenjang)) return { success: false, message: "Jenjang tidak valid" };
+
+  const kuota = await getKuotaJenjang(prisma, jenjang);
+  if (kuota !== null) {
+    const timCount = await prisma.tim.count({ where: { jenjang, confirmed: true } });
+    if (timCount >= kuota) return { success: false, message: `Kuota jenjang ${jenjang} telah penuh!` };
+  }
+
   try {
     const updated = await prisma.konfigUmum.update({
       where: { id: "singleton" },
@@ -82,8 +107,11 @@ export default async function submitFormRegistrasi(data: FormData) {
   try {
     // Atomic: cek kuota + buat tim dalam satu transaksi
     await prisma.$transaction(async (tx) => {
-      const timCount = await tx.tim.count({ where: { jenjang, confirmed: true } });
-      if (timCount >= 30) throw new Error("KUOTA_PENUH");
+      const kuota = await getKuotaJenjang(tx, jenjang);
+      if (kuota !== null) {
+        const timCount = await tx.tim.count({ where: { jenjang, confirmed: true } });
+        if (timCount >= kuota) throw new Error("KUOTA_PENUH");
+      }
 
       await tx.tim.create({
         data: {

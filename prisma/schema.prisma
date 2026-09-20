@@ -442,6 +442,13 @@ model KonfigUmum {
   smpAktif            Boolean   @default(true)
   smaAktif            Boolean   @default(true)
   purnaAktif          Boolean   @default(false)
+  // Batas maksimal jumlah tim yang boleh mendaftar per jenjang — null berarti
+  // tidak dibatasi. Dicek saat reservasi kode unik & submit form pendaftaran
+  // (lihat reserveKodePendaftaran/submitFormRegistrasi di registrationForm.ts).
+  kuotaSD             Int?
+  kuotaSMP            Int?
+  kuotaSMA            Int?
+  kuotaPurna          Int?
   // Rekening pendaftaran tim — dulu form pendaftaran ikut memakai KonfigTiket
   // (halaman /admin/tiket, biasanya baru dikonfigurasi belakangan setelah
   // pendaftaran dibuka), jadi bisa memblokir pendaftaran baru kalau admin

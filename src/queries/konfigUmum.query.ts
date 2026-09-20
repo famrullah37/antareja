@@ -32,6 +32,10 @@ export async function upsertKonfigUmum(data: {
   smpAktif?: boolean;
   smaAktif?: boolean;
   purnaAktif?: boolean;
+  kuotaSD?: number | null;
+  kuotaSMP?: number | null;
+  kuotaSMA?: number | null;
+  kuotaPurna?: number | null;
   bankNama?: string;
   bankNoRek?: string;
   bankAtasNama?: string;

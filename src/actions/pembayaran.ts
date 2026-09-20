@@ -47,6 +47,35 @@ export async function biayaPendaftaran(jenjang: Jenjang, isDP: boolean) {
   return isDP ? table[jenjang].dp : table[jenjang].full;
 }
 
+// Tim yang terdaftar sebelum fitur kode unik ada punya pembayaran.kodeUnik/
+// totalBayar kosong — dulu ini bikin generateDanKirimKuitansi nyerah diam-diam
+// (lihat riwayat: guard "tidak bisa generate otomatis"). Sekarang di-assign
+// kode unik baru di sini pakai counter yang sama dengan pendaftaran normal,
+// supaya tim lama tetap bisa dapat kuitansi lewat "Generate Ulang Kuitansi".
+async function ensureKodeUnikDanTotal(timId: string, hargaDasar: number) {
+  const pembayaran = await prisma.pembayaran.findUnique({ where: { tim_id: timId } });
+  if (!pembayaran) return null;
+  if (pembayaran.kodeUnik && pembayaran.totalBayar) {
+    return { kodeUnik: pembayaran.kodeUnik, totalBayar: pembayaran.totalBayar };
+  }
+
+  for (let i = 0; i < 20; i++) {
+    const updated = await prisma.konfigUmum.update({
+      where: { id: "singleton" },
+      data: { counterUrutPendaftaran: { increment: 1 } },
+    });
+    const kodeUnik = String(updated.counterUrutPendaftaran % 1000).padStart(3, "0");
+    const dipakai = await prisma.pembayaran.findFirst({
+      where: { kodeUnik, tim_id: { not: timId } },
+    });
+    if (dipakai) continue;
+    const totalBayar = hargaDasar + parseInt(kodeUnik);
+    await prisma.pembayaran.update({ where: { tim_id: timId }, data: { kodeUnik, totalBayar } });
+    return { kodeUnik, totalBayar };
+  }
+  return null;
+}
+
 // Generate kuitansi PDF, upload ke Cloudinary, simpan link-nya (menimpa yang
 // lama kalau ada), dan kirim ke email pendaftar. SELALU generate ulang —
 // pemanggil yang menentukan kapan ini boleh dipanggil (lihat
@@ -58,9 +87,9 @@ async function generateDanKirimKuitansi(timId: string, hargaDasar: number) {
     include: { pembayaran: true, user: true },
   });
   if (!tim?.pembayaran) return { success: false, message: "Data pembayaran tidak ditemukan" };
-  if (!tim.pembayaran.kodeUnik || !tim.pembayaran.totalBayar) {
-    return { success: false, message: "Tim ini terdaftar sebelum fitur kode unik/kuitansi ada, tidak bisa generate otomatis" };
-  }
+
+  const kode = await ensureKodeUnikDanTotal(timId, hargaDasar);
+  if (!kode) return { success: false, message: "Gagal menyiapkan kode unik pembayaran" };
 
   const konfig = await getKonfigUmum();
 
@@ -70,8 +99,8 @@ async function generateDanKirimKuitansi(timId: string, hargaDasar: number) {
     jenjang: tim.jenjang,
     isDP: tim.pembayaran.isDP,
     hargaDasar,
-    kodeUnik: tim.pembayaran.kodeUnik,
-    totalBayar: tim.pembayaran.totalBayar,
+    kodeUnik: kode.kodeUnik,
+    totalBayar: kode.totalBayar,
     tanggal: new Date(),
     bendaharaNama: konfig.bendaharaNama,
     bendaharaTtdUrl: konfig.bendaharaTtdUrl,
@@ -103,14 +132,17 @@ async function generateDanKirimKuitansi(timId: string, hargaDasar: number) {
 // perlu kirim ulang, pakai generateKuitansiManual di bawah.
 async function kirimKuitansiJikaBelum(timId: string, hargaDasar: number) {
   const pembayaran = await prisma.pembayaran.findUnique({ where: { tim_id: timId } });
-  if (!pembayaran || pembayaran.kuitansiUrl) return;
+  if (!pembayaran || pembayaran.kuitansiUrl) return null;
   try {
-    await generateDanKirimKuitansi(timId, hargaDasar);
-  } catch (e) {
+    const result = await generateDanKirimKuitansi(timId, hargaDasar);
     // Gagal generate/kirim kuitansi tidak boleh menggagalkan konfirmasi
-    // pembayaran itu sendiri — cukup dicatat, admin masih bisa generate
-    // ulang/kirim manual kalau perlu nanti.
+    // pembayaran itu sendiri — tapi HARUS dikembalikan ke pemanggil (bukan
+    // ditelan diam-diam) supaya admin lihat pesannya, bukan cuma di log server.
+    if (!result.success) console.error("kirimKuitansiJikaBelum gagal:", result.message);
+    return result;
+  } catch (e) {
     console.error("kirimKuitansiJikaBelum error:", e);
+    return { success: false, message: "Gagal membuat/mengirim kuitansi" };
   }
 }
 
@@ -146,7 +178,7 @@ async function setStatusPembayaran(timId: string, confirmed: boolean, isDP: bool
     updateTim({ id: timId }, { confirmed }),
     updatePembayaran({ tim_id: timId }, { isDP }),
   ]);
-  if (!confirmed) return;
+  if (!confirmed) return null;
 
   await assignNoUrutIfNeeded(timId);
 
@@ -168,15 +200,18 @@ async function setStatusPembayaran(timId: string, confirmed: boolean, isDP: bool
     });
   }
 
-  await kirimKuitansiJikaBelum(timId, jumlah);
+  return kirimKuitansiJikaBelum(timId, jumlah);
 }
 
 export async function approvePayment(timId: string, isDP: boolean) {
   try {
     await requireAdmin();
-    await setStatusPembayaran(timId, true, isDP);
+    const kuitansi = await setStatusPembayaran(timId, true, isDP);
     revalidatePath("/", "layout");
     revalidatePath("/admin/kas");
+    if (kuitansi && !kuitansi.success) {
+      return { success: true, message: `Pembayaran terkonfirmasi, tapi kuitansi gagal dibuat: ${kuitansi.message}` };
+    }
     return { success: true };
   } catch (e) {
     console.error(e);
@@ -205,9 +240,15 @@ export default async function konfirmasiPembayaran(
   const statusPembayaran = data.get("isDP") === "true";
 
   try {
-    await setStatusPembayaran(idTim, status, statusPembayaran);
+    const kuitansi = await setStatusPembayaran(idTim, status, statusPembayaran);
     revalidatePath("/", "layout");
     revalidatePath("/admin/kas");
+    if (kuitansi && !kuitansi.success) {
+      return {
+        success: true,
+        message: `Berhasil mengupdate status pembayaran, tapi kuitansi gagal dibuat: ${kuitansi.message}`,
+      };
+    }
     return { success: true, message: "Berhasil mengupdate status pembayaran!" };
   } catch {
     return {

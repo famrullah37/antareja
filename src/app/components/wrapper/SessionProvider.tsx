@@ -14,7 +14,7 @@ export default function SessionProvider({
   return (
     <NextAuthSessionProvider
       refetchOnWindowFocus
-      refetchInterval={500}
+      refetchInterval={60}
       basePath="/api/auth"
     >
       <IdleLogout />
