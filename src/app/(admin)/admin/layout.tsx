@@ -42,16 +42,33 @@ export default function AdminLayout({
               className="w-8 h-8"
             />
           </Link>
-          <button onClick={() => setIsExpanded(!isExpanded)}>
+          <button
+            type="button"
+            aria-label={isExpanded ? "Tutup menu" : "Buka menu"}
+            aria-expanded={isExpanded}
+            onClick={() => setIsExpanded(!isExpanded)}
+          >
             <HamburgerIcon />
           </button>
         </div>
+        {/* Ketuk di luar menu untuk menutup */}
+        {isExpanded && (
+          <div
+            className="fixed inset-0 z-[700] bg-black/30 lg:hidden"
+            onClick={() => setIsExpanded(false)}
+            aria-hidden="true"
+          />
+        )}
+        {/* Menu admin bisa belasan item: tinggi dibatasi layar & bisa di-scroll,
+            tertutup = benar-benar tersembunyi (bukan sekadar digeser ke atas). */}
         <div
-          className={`block absolute lg:hidden w-full z-[800] bg-neutral-500 transition-all duration-500 py-6 px-6 ${
-            isExpanded ? "mt-12" : " -mt-[570px]"
+          className={`absolute left-0 top-[55px] lg:hidden w-full z-[800] bg-neutral-500 overflow-y-auto transition-all duration-300 px-6 ${
+            isExpanded
+              ? "max-h-[calc(100vh-55px)] py-6 opacity-100"
+              : "max-h-0 py-0 opacity-0 invisible pointer-events-none"
           }`}
         >
-          <div className="flex flex-col gap-8 justify-center items-center w-full text-center">
+          <div className="flex flex-col gap-6 justify-center items-center w-full text-center">
             {allowedRoutes.map((navOption) => (
               <Link
                 key={navOption.title}

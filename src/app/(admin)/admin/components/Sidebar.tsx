@@ -16,7 +16,7 @@ interface Sidenavprops {
 
 export default function Sidebar({ active, session }: Readonly<Sidenavprops>) {
   const pathname = usePathname();
-  const { signingOut, handleSignOut } = useSignOut("/");
+  const { signingOut, handleSignOut } = useSignOut();
   const allowedRoutes = protectedRoutes.filter((item) =>
     item.roles.includes(session?.user?.role!)
   );
