@@ -8,7 +8,10 @@ import { toast } from "sonner";
 import SubmitButton from "./parts/Button";
 import TextField from "./parts/Input";
 import { H1 } from "@/app/components/global/Text";
-import { ExternalLinkButton } from "@/app/components/global/LinkButton";
+import Image from "next/image";
+import ExportDataTimButton from "../../components/ExportDataTimButton";
+import GenerateKuitansiButton from "../../components/GenerateKuitansiButton";
+import { toDownloadUrl } from "@/lib/downloadUrl";
 
 
 export default function TimForm({
@@ -48,6 +51,10 @@ export default function TimForm({
   return (
     <form action={Update}>
       <H1>Profile Tim</H1>
+      <div className="flex flex-wrap items-center gap-3 mt-2 mb-5">
+        <ExportDataTimButton timId={id} label="Unduh Data Tim (Excel)" />
+        {data?.confirmed && id && <GenerateKuitansiButton timId={id} />}
+      </div>
       <div className="flex flex-col gap-5">
         <TextField
           id="nama_tim"
@@ -67,6 +74,8 @@ export default function TimForm({
           placeholder="Belum di-assign — otomatis saat pembayaran dikonfirmasi"
           value={data?.noUrut != null ? String(data.noUrut) : ""}
           required={false}
+          min={1}
+          step={1}
         />
         <TextField
           id="asal_sekolah"
@@ -97,39 +106,29 @@ export default function TimForm({
           required={edit ? false : true}
           disabled={true}
         />
-        <TextField
-          id="link_berkas"
-          type="url"
-          label="Link Berkas"
-          name="link_berkas"
-          placeholder="Link Berkas"
-          value={data?.link_berkas ?? ''}
-          required={edit ? false : true}
-          disabled={true}
-        />
-
-        {data?.link_berkas ? (
-          <ExternalLinkButton href={data.link_berkas ?? ''}>
-            Go to Link
-          </ExternalLinkButton>
-        ) : null}
-
-        <TextField
-          id="link_video"
-          type="url"
-          label="Link Video Tiktok + Foto Pasukan"
-          name="link_video"
-          placeholder="Link Video Tiktok + Foto Pasukan"
-          value={data?.link_video ?? ''}
-          required={edit ? false : true}
-          disabled={true}
-        />
-
-        {data?.link_video ? (
-          <ExternalLinkButton href={data.link_video ?? ''}>
-            Go to Link
-          </ExternalLinkButton>
-        ) : null}
+        <div className="flex flex-col gap-2">
+          <span className="text-[16px]">Foto Tim</span>
+          {data?.foto ? (
+            <div className="flex flex-wrap items-center gap-4">
+              <Image
+                src={data.foto}
+                alt={`Foto ${data.nama_tim}`}
+                width={112}
+                height={112}
+                unoptimized
+                className="w-28 h-28 rounded-full object-cover border border-neutral-200"
+              />
+              <a
+                href={toDownloadUrl(data.foto, `Foto-Tim-${data.nama_tim}`)}
+                className="bg-primary-500 hover:bg-primary-600 text-white text-sm font-semibold px-5 py-2.5 rounded-lg transition-colors"
+              >
+                Unduh Foto Tim
+              </a>
+            </div>
+          ) : (
+            <p className="text-sm text-gray-400">Tim belum mengunggah foto.</p>
+          )}
+        </div>
 
         <div className="flex flex-col gap-2">
           <label htmlFor={"jenjang"} className="text-[16px]">

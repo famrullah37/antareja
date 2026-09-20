@@ -7,6 +7,8 @@ import { Tipe } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { compressPhoto, imageUploader, validateUploadFile } from "./fileUploader";
 import { buildFormulirPdf } from "@/lib/formulir";
+import { buildDataTimWorkbook } from "@/lib/exportTim";
+import { timSlug } from "@/lib/timSlug";
 
 // Jumlah pasukan per tipe tim (di luar danton/official/pelatih) — dipakai
 // untuk mengecek kelengkapan data sebelum formulir registrasi bisa diunduh.
@@ -62,7 +64,15 @@ export async function updateTimFormAdmin(data: FormData, id: string) {
   const asal_sekolah = data.get("asal_sekolah") as string;
   const tipe_tim = data.get("tipe_tim") as Tipe;
   const noUrutRaw = data.get("noUrut") as string;
-  const noUrut = noUrutRaw?.trim() ? parseInt(noUrutRaw) : null;
+  // No. urut kosong = belum diberi nomor; kalau diisi harus bilangan bulat positif.
+  let noUrut: number | null = null;
+  if (noUrutRaw?.trim()) {
+    const n = Number(noUrutRaw);
+    if (!Number.isInteger(n) || n < 1 || n > 9999) {
+      return { success: false, message: "No. urut harus bilangan bulat antara 1 dan 9999 (tidak boleh minus/nol)" };
+    }
+    noUrut = n;
+  }
 
   try {
     await updateTim({ id }, { asal_sekolah, tipe_tim, noUrut });
@@ -118,6 +128,33 @@ export async function downloadFormulirPdf() {
   }
 }
 
+// Data tim & anggota dalam Excel TANPA foto, untuk admin. timId kosong = semua tim.
+export async function exportDataTim(timId?: string) {
+  try {
+    await requireAdmin();
+  } catch {
+    return { success: false, message: "Forbidden" };
+  }
+
+  const tims = await prisma.tim.findMany({
+    where: timId ? { id: timId } : undefined,
+    include: { anggotas: true, pembayaran: true, user: { select: { email: true } } },
+    orderBy: [{ jenjang: "asc" }, { noUrut: "asc" }, { nama_tim: "asc" }],
+  });
+  if (timId && tims.length === 0) return { success: false, message: "Tim tidak ditemukan" };
+
+  try {
+    return {
+      success: true,
+      base64: buildDataTimWorkbook(tims),
+      filename: timId ? `Data-Tim-${timSlug(tims[0])}.xlsx` : "Data-Semua-Tim.xlsx",
+    };
+  } catch (e) {
+    console.error("exportDataTim error:", e);
+    return { success: false, message: "Gagal membuat file Excel" };
+  }
+}
+
 export async function deleteTimForm(id: string) {
   await requireAdmin();
   try {
@@ -128,7 +165,14 @@ export async function deleteTimForm(id: string) {
     });
     revalidatePath("/", "layout");
     return { success: true };
-  } catch {
-    return { success: false };
+  } catch (e: any) {
+    // P2003 = masih ada data yang menunjuk tim ini (mis. TransaksiVoting, tanpa cascade).
+    if (e?.code === "P2003") {
+      return {
+        success: false,
+        message: "Tim tidak bisa dihapus karena masih punya transaksi voting. Selesaikan/hapus transaksi voting tim ini dulu.",
+      };
+    }
+    return { success: false, message: "Gagal menghapus tim" };
   }
 }

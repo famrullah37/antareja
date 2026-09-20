@@ -1,5 +1,6 @@
 import prisma from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
+import { isUuid, shortIdFromSlug } from "@/lib/timSlug";
 
 export async function createTim(data: Prisma.TimCreateInput) {
   const createdTim = await prisma.tim.create({ data });
@@ -54,4 +55,14 @@ export async function updateTim(
 export async function deleteTim(where: Prisma.TimWhereUniqueInput) {
   const deletedTim = await prisma.tim.delete({ where });
   return deletedTim;
+}
+
+// Param URL admin bisa UUID (link/bookmark lama) atau slug "nama-tim-<8 hex id>".
+// Slug ambigu (dua tim berawalan id sama) dianggap tidak ditemukan, bukan ditebak.
+export async function findTimByParam(param: string) {
+  if (isUuid(param)) return prisma.tim.findUnique({ where: { id: param } });
+  const short = shortIdFromSlug(param);
+  if (!short) return null;
+  const found = await prisma.tim.findMany({ where: { id: { startsWith: short } }, take: 2 });
+  return found.length === 1 ? found[0] : null;
 }

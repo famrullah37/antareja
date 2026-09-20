@@ -5,6 +5,9 @@ import { TimWithRelations } from "@/types/entityRelations";
 import { ReactNode, useState } from "react";
 import { AnggotaCard } from "./parts/AnggotaCard";
 import { Posisi } from "@prisma/client";
+import Image from "next/image";
+import { toDownloadUrl } from "@/lib/downloadUrl";
+import { timSlug } from "@/lib/timSlug";
 
 const rowsMapNormal = [
   ["b1s1", "b1s2", "b1s3"],
@@ -44,7 +47,7 @@ function TimLayout({ tim }: Readonly<{ tim: TimWithRelations }>) {
     tim.anggotas.find((value) => value.posisi === "PELATIH")
   );
 
-  const tim_id = tim.id;
+  const tim_id = timSlug(tim);
 
   return (
     <div className="block mt-5">
@@ -143,8 +146,101 @@ function TimLayout({ tim }: Readonly<{ tim: TimWithRelations }>) {
   );
 }
 
+const posisiOrder = [
+  "PELATIH", "OFFICIAL", "DANTON",
+  "B1S1", "B1S2", "B1S3", "B2S1", "B2S2", "B2S3", "B3S1", "B3S2", "B3S3",
+  "B4S1", "B4S2", "B4S3", "B5S1", "B5S2", "B5S3",
+];
+
+// Foto tim & anggota yang bisa diunduh panitia untuk keperluan lain (publikasi,
+// sertifikat, dst). Yang tersimpan adalah versi terkompres (maks. 1200px), bukan
+// file asli dari kamera.
+function FotoUnduh({ tim }: Readonly<{ tim: TimWithRelations }>) {
+  const [downloading, setDownloading] = useState(false);
+
+  const items = [
+    ...(tim.foto
+      ? [{ key: "tim", src: tim.foto, label: "Foto Tim", sub: tim.nama_tim, filename: `Foto-Tim-${tim.nama_tim}` }]
+      : []),
+    ...[...tim.anggotas]
+      .filter((a) => a.foto)
+      .sort((a, b) => posisiOrder.indexOf(a.posisi) - posisiOrder.indexOf(b.posisi))
+      .map((a) => ({
+        key: a.id,
+        src: a.foto,
+        label: a.nama,
+        sub: a.posisi,
+        filename: `${a.posisi}-${a.nama}`,
+      })),
+  ];
+
+  async function unduhSemua() {
+    setDownloading(true);
+    for (const item of items) {
+      const a = document.createElement("a");
+      a.href = toDownloadUrl(item.src, item.filename);
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      // Jeda antar unduhan supaya browser tidak menggabung/menolaknya.
+      await new Promise((r) => setTimeout(r, 600));
+    }
+    setDownloading(false);
+  }
+
+  if (items.length === 0) return null;
+
+  return (
+    <div className="mb-10">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+        <H3>Unduh Foto ({items.length})</H3>
+        <button
+          type="button"
+          onClick={unduhSemua}
+          disabled={downloading}
+          className="bg-primary-500 hover:bg-primary-600 disabled:opacity-60 text-white text-sm font-semibold px-5 py-2.5 rounded-lg transition-colors"
+        >
+          {downloading ? "Mengunduh..." : "Unduh Semua Foto"}
+        </button>
+      </div>
+      <P className="text-xs text-gray-400 mb-4">
+        Kalau browser menanyakan izin unduh banyak file, pilih Izinkan. Foto tersimpan dalam ukuran terkompres (maks. 1200px).
+      </P>
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+        {items.map((item) => (
+          <div key={item.key} className="bg-white rounded-xl border border-neutral-200 p-3 flex flex-col gap-2">
+            <Image
+              src={item.src}
+              alt={item.label}
+              width={150}
+              height={200}
+              unoptimized
+              className="w-full aspect-[3/4] object-cover rounded-lg"
+            />
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-black truncate">{item.label}</p>
+              <p className="text-xs text-gray-400 truncate">{item.sub}</p>
+            </div>
+            <a
+              href={toDownloadUrl(item.src, item.filename)}
+              className="text-center text-xs font-semibold text-primary-600 border border-primary-200 hover:bg-primary-50 rounded-lg py-1.5 transition-colors"
+            >
+              Unduh
+            </a>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function ProfileTim({
   tim,
 }: Readonly<{ tim: TimWithRelations }>) {
-  return <TimLayout tim={tim} />;
+  return (
+    <>
+      <FotoUnduh tim={tim} />
+      <TimLayout tim={tim} />
+    </>
+  );
 }

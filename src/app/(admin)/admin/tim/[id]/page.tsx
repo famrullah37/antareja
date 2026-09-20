@@ -1,51 +1,27 @@
 import { findAnggotas } from "@/queries/anggota.query";
-import { findTim } from "@/queries/tim.query";
-import { Anggota, Tim } from "@prisma/client";
-import { notFound } from "next/navigation";
+import { findTim, findTimByParam } from "@/queries/tim.query";
+import { notFound, redirect } from "next/navigation";
 import TimForm from "./components/Form";
 import ProfileTim from "./components/ProfileTim";
 import { TimWithRelations } from "@/types/entityRelations";
+import { isUuid, timSlug } from "@/lib/timSlug";
 
 export default async function TimEdit({ params }: { params: { id: string } }) {
-  const trygetAnggotas = await findAnggotas({ timId: params.id });
+  const tim = await findTimByParam(params.id);
+  if (!tim) return notFound();
 
-  let anggotas: Anggota[] = [];
+  // URL kanonis = slug; UUID mentah dari link/bookmark lama dirapikan otomatis.
+  if (isUuid(params.id)) redirect(`/admin/tim/${timSlug(tim)}`);
 
-  const timByUser = (await findTim(
-    { id: params.id },
-    { anggotas: true, pembayaran: true, penilaian: true, user: true }
-  )) as TimWithRelations;
+  const [anggotas, timLengkap] = await Promise.all([
+    findAnggotas({ timId: tim.id }),
+    findTim({ id: tim.id }, { anggotas: true, pembayaran: true, penilaian: true, user: true }),
+  ]);
 
-  let tim: Tim = {
-    id: "",
-    nama_tim: "",
-    asal_sekolah: "",
-    pelatih: "",
-    no_pelatih: "",
-    jenjang: "SMA",
-    confirmed: false,
-    userId: "",
-    updated_at: new Date(),
-    tipe_tim: "NORMAL",
-    link_berkas: "",
-    link_video: "",
-    foto: null,
-    has_cc: false,
-    has_maskot: false,
-    totalVote: 0,
-    noUrut: null,
-  };
-
-  const trygetTim = await findTim({ id: params.id });
-
-  if (trygetTim && trygetAnggotas) {
-    tim = trygetTim;
-    anggotas = trygetAnggotas;
-    return (
-      <>
-        <TimForm data={tim} edit={true} id={params.id} dataAnggota={anggotas} />
-        <ProfileTim tim={timByUser} />
-      </>
-    );
-  } else return notFound();
+  return (
+    <>
+      <TimForm data={tim} edit={true} id={tim.id} dataAnggota={anggotas} />
+      <ProfileTim tim={timLengkap as TimWithRelations} />
+    </>
+  );
 }

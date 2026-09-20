@@ -1,7 +1,8 @@
 import { findAnggota } from "@/queries/anggota.query";
-import { findTim } from "@/queries/tim.query";
-import { Anggota, Posisi, Tim } from "@prisma/client";
-import { redirect } from "next/navigation";
+import { findTimByParam } from "@/queries/tim.query";
+import { Anggota, Posisi } from "@prisma/client";
+import { notFound, redirect } from "next/navigation";
+import { isUuid, timSlug } from "@/lib/timSlug";
 import DisplayAnggota from "./components/Form";
 
 export default async function EditAnggota({
@@ -10,11 +11,15 @@ export default async function EditAnggota({
   if (Object.keys(Posisi).indexOf(params.posisi.toUpperCase()) === -1)
     return redirect("/dashboard");
 
+  const tim = await findTimByParam(params.id);
+  if (!tim) return notFound();
+  if (isUuid(params.id)) redirect(`/admin/tim/${timSlug(tim)}/${params.posisi}`);
+
   const anggota =
     (await findAnggota({
       posisi_timId: {
         posisi: params.posisi.toUpperCase() as Posisi,
-        timId: params?.id,
+        timId: tim.id,
       },
     })) ??
     ({

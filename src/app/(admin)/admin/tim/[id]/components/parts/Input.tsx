@@ -8,7 +8,9 @@ export default function TextField({
   name,
   placeholder,
   value,
-  disabled
+  disabled,
+  min,
+  step,
 }: {
   type: HTMLInputTypeAttribute;
   id: string;
@@ -18,6 +20,8 @@ export default function TextField({
   placeholder: string;
   value?: string;
   disabled?: boolean;
+  min?: number;
+  step?: number;
 }) {
   return (
     <div className="flex flex-col gap-2">
@@ -33,6 +37,8 @@ export default function TextField({
         placeholder={placeholder}
         defaultValue={value}
         disabled={disabled}
+        min={min}
+        step={step}
       />
       {required ? (
         <p className="ms-5 text-[#DC3545] text-sm">

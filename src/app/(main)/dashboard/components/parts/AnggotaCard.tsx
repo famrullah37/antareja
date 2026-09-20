@@ -1,6 +1,4 @@
-import { Person } from "@/app/components/global/Icons";
-import { P } from "@/app/components/global/Text";
-import Image from "next/image";
+import MemberCardBody from "@/app/components/global/MemberCardBody";
 import Link from "next/link";
 
 interface AnggotaCardProps {
@@ -19,25 +17,9 @@ export function AnggotaCard({
   return (
     <Link
       href={href}
-      className="relative flex w-full sm:w-[40%] xl:w-1/6 items-center justify-center hover:scale-105 transition-all duration-300"
+      className="relative block mb-6 w-full sm:w-[40%] xl:w-1/6 hover:scale-105 transition-all duration-300"
     >
-      <Image
-        src={image}
-        alt={`${name}'s Photo`}
-        width={150}
-        height={200}
-        className="w-full h-[320px] object-cover rounded-3xl"
-        unoptimized
-      />
-      <div className="absolute rounded-3xl p-5 bg-white drop-shadow-md flex items-center gap-6 -bottom-4 w-[110%]">
-        <div className="p-[14px] rounded-2xl bg-primary-500 drop-shadow-glow">
-          <Person />
-        </div>
-        <div className="block text-start">
-          <P className="font-bold text-black mb-1 line-clamp-1">{name}</P>
-          <P>{posisi.toUpperCase()}</P>
-        </div>
-      </div>
+      <MemberCardBody image={image} name={name} posisi={posisi} />
     </Link>
   );
 }

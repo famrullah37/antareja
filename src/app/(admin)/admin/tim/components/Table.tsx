@@ -6,6 +6,7 @@ import DataTable, { TableColumn } from "react-data-table-component";
 import { FaRegTrashCan } from "react-icons/fa6";
 import { toast } from "sonner";
 import { deleteTimForm } from "@/actions/Tim"; 
+import { timSlug } from "@/lib/timSlug";
 
 export default function TimTable({ data }: { data: TimWithRelations[] }) {
   const [loader, setLoader] = useState(true);
@@ -39,9 +40,15 @@ export default function TimTable({ data }: { data: TimWithRelations[] }) {
     },
     {
       name: "Total Anggota",
-      cell: (row: TimWithRelations) => (
-        <span className={"bg-[#]"}>{row.anggotas.length}</span>
-      ),
+      cell: (row: TimWithRelations) => {
+        const total = (row.tipe_tim === "SMALL" ? 12 : 15) + 3;
+        const lengkap = row.anggotas.length === total;
+        return (
+          <span className={lengkap ? "text-green-700 font-semibold" : "text-yellow-700"}>
+            {row.anggotas.length}/{total}
+          </span>
+        );
+      },
       selector: (row: TimWithRelations) => row.anggotas.length,
       sortable: true,
     },
@@ -53,13 +60,15 @@ export default function TimTable({ data }: { data: TimWithRelations[] }) {
             aria-label="Hapus"
             onClick={async () => {
               const confirmDelete = confirm(
-                "Apakah anda yakin ingin menghapus tim?"
+                `Hapus tim "${row.nama_tim}" (${row.asal_sekolah})?\n\n` +
+                  "Ikut terhapus PERMANEN: semua anggota, data pembayaran & kuitansi, nilai penilaian, sertifikat, dan perolehan voting tim ini.\n" +
+                  "Catatan kas pemasukan pendaftaran TIDAK ikut terhapus. Tim lain tidak terpengaruh."
               );
               if (confirmDelete) {
                 const toastId = toast.loading("Loading...");
                 const result = await deleteTimForm(row.id);
                 if (!result.success) {
-                  toast.error("Gagal menghapus tim!", { id: toastId });
+                  toast.error(result.message ?? "Gagal menghapus tim!", { id: toastId, duration: 6000 });
                 } else {
                   toast.success("Berhasil menghapus tim!", { id: toastId });
                 }
@@ -97,7 +106,7 @@ export default function TimTable({ data }: { data: TimWithRelations[] }) {
           },
         }}
         onRowClicked={(row: TimWithRelations) =>
-          router.push(`/admin/tim/${row.id}`)
+          router.push(`/admin/tim/${timSlug(row)}`)
         }
       />
     </div>
