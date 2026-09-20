@@ -8,6 +8,7 @@ import prisma from "@/lib/prisma";
 import { getServerSession } from "@/lib/next-auth";
 import { Jenjang } from "@prisma/client";
 import { buildKuitansiPdf } from "@/lib/kuitansi";
+import { ensureNomorKuitansi } from "@/lib/nomorKuitansi";
 import { imageUploader } from "./fileUploader";
 import { sendMailTo } from "@/lib/mailer";
 
@@ -104,14 +105,17 @@ async function generateDanKirimKuitansi(timId: string, hargaDasar: number) {
   );
 
   const konfig = await getKonfigUmum();
+  const terbit = await ensureNomorKuitansi(timId);
+  if (!terbit) return { success: false, message: "Gagal menerbitkan nomor kuitansi" };
 
   const pdfBuffer = await buildKuitansiPdf({
+    nomor: terbit.nomor,
     namaTim: tim.nama_tim,
     asalSekolah: tim.asal_sekolah,
     jenjang: tim.jenjang,
     isDP: tim.pembayaran.isDP,
     hargaDasar,
-    tanggal: new Date(),
+    tanggal: terbit.tanggal,
     bendaharaNama: konfig.bendaharaNama,
     bendaharaTtdUrl: konfig.bendaharaTtdUrl,
   });
@@ -135,12 +139,12 @@ async function generateDanKirimKuitansi(timId: string, hargaDasar: number) {
   if (!tim.user?.email) {
     masalah.push("akun tim tidak punya alamat email");
   } else {
-    const namaFile = `Kuitansi-${tim.asal_sekolah.replace(/[^a-z0-9]+/gi, "-")}.pdf`;
+    const namaFile = `Kuitansi-${terbit.nomor.replace(/[^A-Za-z0-9]+/g, "-")}.pdf`;
     try {
       await sendMailTo({
         to: tim.user.email,
-        subject: "Kuitansi Pembayaran Pendaftaran - LKBB Antareja 2026",
-        html: `<p>Halo ${tim.pelatih},</p><p>Pembayaran pendaftaran tim <b>${tim.nama_tim}</b> (${tim.asal_sekolah}) sudah terverifikasi${tim.pembayaran.isDP ? " (DP 50%)" : " (Lunas)"}. Kuitansi terlampir sebagai bukti resmi.</p><p>Terima kasih.</p>`,
+        subject: `${tim.pembayaran.isDP ? "Kuitansi Sementara (DP)" : "Kuitansi Pembayaran"} Pendaftaran - LKBB Antareja 2026 (${terbit.nomor})`,
+        html: `<p>Halo ${tim.pelatih},</p><p>Pembayaran pendaftaran tim <b>${tim.nama_tim}</b> (${tim.asal_sekolah}) sudah terverifikasi${tim.pembayaran.isDP ? " (DP 50%)" : " (Lunas)"}. ${tim.pembayaran.isDP ? "Kuitansi <b>sementara</b> (DP) terlampir; akan digantikan kuitansi resmi setelah pelunasan." : "Kuitansi terlampir sebagai bukti resmi."}</p><p>No. Kuitansi: <b>${terbit.nomor}</b></p><p>Terima kasih.</p>`,
         fileAttachments: [{ filename: namaFile, content: pdfBuffer, contentType: "application/pdf" }],
       });
       emailTerkirim = true;
@@ -176,7 +180,7 @@ async function kirimKuitansiJikaBelum(timId: string, hargaDasar: number) {
 
 // Unduh kuitansi langsung dari dashboard tim: PDF dibuat saat itu juga, jadi tidak
 // tergantung kuitansiUrl (upload Cloudinary/email bisa gagal atau belum pernah
-// jalan untuk tim tertentu). Tanggal di PDF = tanggal unduh.
+// jalan untuk tim tertentu). Nomor & tanggal terbit tetap sama tiap unduh (ensureNomorKuitansi).
 export async function downloadKuitansiPdf() {
   const session = await getServerSession();
   if (!session?.user?.id) return { success: false, message: "Unauthorized" };
@@ -195,18 +199,20 @@ export async function downloadKuitansiPdf() {
       biayaPendaftaran(tim.jenjang, tim.pembayaran.isDP),
       getKonfigUmum(),
     ]);
+    const terbit = await ensureNomorKuitansi(tim.id);
+    if (!terbit) return { success: false, message: "Gagal menerbitkan nomor kuitansi" };
     const pdf = await buildKuitansiPdf({
+      nomor: terbit.nomor,
       namaTim: tim.nama_tim,
       asalSekolah: tim.asal_sekolah,
       jenjang: tim.jenjang,
       isDP: tim.pembayaran.isDP,
       hargaDasar,
-      tanggal: new Date(),
+      tanggal: terbit.tanggal,
       bendaharaNama: konfig.bendaharaNama,
       bendaharaTtdUrl: konfig.bendaharaTtdUrl,
     });
-    const slug = tim.asal_sekolah.replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "") || "Tim";
-    return { success: true, base64: pdf.toString("base64"), filename: `Kuitansi-${slug}.pdf` };
+    return { success: true, base64: pdf.toString("base64"), filename: `Kuitansi-${terbit.nomor.replace(/[^A-Za-z0-9]+/g, "-")}.pdf` };
   } catch (e) {
     console.error("downloadKuitansiPdf error:", e);
     return { success: false, message: "Gagal membuat kuitansi" };

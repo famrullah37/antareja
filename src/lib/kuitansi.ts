@@ -12,16 +12,22 @@ function formatRupiah(n: number) {
   }).format(n);
 }
 
-// Logo di public/ berformat SVG (pdfkit cuma terima raster) — konversi ke PNG
-// sekali lalu simpan di memori, tidak perlu baca+konversi ulang tiap kuitansi.
-let logoPngCache: Buffer | null = null;
-export async function getLogoPng(): Promise<Buffer | null> {
-  if (logoPngCache) return logoPngCache;
+// Nomor kuitansi: KW/ANTAREJA/<tahun terbit>/<urutan 4 digit>, mis. KW/ANTAREJA/2026/0001.
+export function formatNomorKuitansi(urutan: number, tanggal: Date) {
+  return `KW/ANTAREJA/${tanggal.getFullYear()}/${String(urutan).padStart(4, "0")}`;
+}
+
+// Lambang Antareja SAJA (icon-colored.svg, tanpa tulisan "ANTAREJA" seperti logo.svg).
+// pdfkit cuma terima raster — konversi ke PNG sekali per ukuran lalu simpan di memori.
+const logoCache = new Map<number, Buffer>();
+export async function getLogoPng(width = 160): Promise<Buffer | null> {
+  const cached = logoCache.get(width);
+  if (cached) return cached;
   try {
-    const svgPath = path.join(process.cwd(), "public", "logo.svg");
-    const svg = await fs.readFile(svgPath);
-    logoPngCache = await sharp(svg).resize(160).png().toBuffer();
-    return logoPngCache;
+    const svg = await fs.readFile(path.join(process.cwd(), "public", "icon-colored.svg"));
+    const png = await sharp(svg).resize(width).png().toBuffer();
+    logoCache.set(width, png);
+    return png;
   } catch (e) {
     console.error("Gagal muat logo untuk kuitansi:", e);
     return null;
@@ -42,6 +48,7 @@ async function fetchImageBuffer(url: string): Promise<Buffer | null> {
 }
 
 export type KuitansiData = {
+  nomor: string;
   namaTim: string;
   asalSekolah: string;
   jenjang: string;
@@ -52,14 +59,45 @@ export type KuitansiData = {
   bendaharaTtdUrl?: string | null;
 };
 
+// Watermark di belakang isi (digambar paling awal): lambang besar samar di tengah +
+// teks "LKBB ANTAREJA" berulang diagonal supaya kuitansi tampak asli & sulit ditiru.
+// Kuitansi DP ditambah cap besar "SEMENTARA".
+function drawWatermark(doc: PDFKit.PDFDocument, logoBesar: Buffer | null, isDP: boolean) {
+  const W = doc.page.width;
+  const H = doc.page.height;
+
+  doc.save();
+  if (logoBesar) {
+    try {
+      doc.opacity(0.07).image(logoBesar, W / 2 - 135, H / 2 - 135, { width: 270 });
+    } catch {
+      // Watermark gagal bukan alasan menggagalkan kuitansi.
+    }
+  }
+
+  doc.rotate(-30, { origin: [W / 2, H / 2] });
+  doc.opacity(0.055).fillColor("#000000").font("Helvetica-Bold").fontSize(14);
+  for (let y = -H, row = 0; y < H * 2; y += 56, row++) {
+    for (let x = -W; x < W * 2; x += 150) {
+      doc.text("LKBB ANTAREJA", x + (row % 2 ? 75 : 0), y, { lineBreak: false });
+    }
+  }
+
+  if (isDP) {
+    doc.opacity(0.14).fillColor("#D9001B").fontSize(58);
+    doc.text("SEMENTARA", 0, H / 2 - 30, { width: W, align: "center", lineBreak: false });
+  }
+  doc.restore();
+}
+
 // Generate kuitansi PDF ke Buffer, dipanggil setelah bendahara/admin approve
-// pembayaran (otomatis) atau lewat tombol "Generate Ulang Kuitansi" (manual,
-// mis. untuk pelunasan setelah sebelumnya DP). Bukan template resmi ber-KOP
-// surat — cukup bukti tertulis nominal & tanda tangan yang bisa diunduh/
-// dilampirkan email.
+// pembayaran (otomatis), lewat tombol "Generate Ulang Kuitansi", atau unduh
+// langsung dari dashboard tim. Kuitansi DP bersifat SEMENTARA (diganti kuitansi
+// lunas). Bukan template resmi ber-KOP surat.
 export async function buildKuitansiPdf(data: KuitansiData): Promise<Buffer> {
-  const [logo, ttd] = await Promise.all([
-    getLogoPng(),
+  const [logo, logoBesar, ttd] = await Promise.all([
+    getLogoPng(160),
+    getLogoPng(600),
     data.bendaharaTtdUrl ? fetchImageBuffer(data.bendaharaTtdUrl) : Promise.resolve(null),
   ]);
 
@@ -70,10 +108,13 @@ export async function buildKuitansiPdf(data: KuitansiData): Promise<Buffer> {
     doc.on("end", () => resolve(Buffer.concat(chunks)));
     doc.on("error", reject);
 
+    drawWatermark(doc, logoBesar, data.isDP);
+
+    let y = 36;
     if (logo) {
       try {
-        doc.image(logo, doc.page.width / 2 - 25, 40, { width: 50 });
-        doc.moveDown(3.5);
+        doc.image(logo, doc.page.width / 2 - 24, y, { width: 48 });
+        y += 48 + 10;
       } catch {
         // Logo korup/gagal ditempel bukan alasan gagalkan seluruh kuitansi.
       }
@@ -82,15 +123,23 @@ export async function buildKuitansiPdf(data: KuitansiData): Promise<Buffer> {
     doc
       .fontSize(16)
       .font("Helvetica-Bold")
-      .text("KUITANSI PEMBAYARAN PENDAFTARAN", { align: "center" });
+      .fillColor("#000000")
+      .text(data.isDP ? "KUITANSI SEMENTARA" : "KUITANSI PEMBAYARAN PENDAFTARAN", 40, y, {
+        width: doc.page.width - 80,
+        align: "center",
+      });
+    if (data.isDP) {
+      doc.fontSize(11).text("Pembayaran Uang Muka (DP 50%)", { align: "center" });
+    }
     doc.fontSize(11).font("Helvetica").text("LKBB Antareja 2026 - SMK Telkom Malang", { align: "center" });
     doc.moveDown(1.5);
 
     const rows: [string, string][] = [
+      ["No. Kuitansi", data.nomor],
       ["Diterima dari", data.asalSekolah],
       ["Nama Tim", data.namaTim],
       ["Jenjang", data.jenjang],
-      ["Jenis Pembayaran", data.isDP ? "DP 50%" : "Lunas"],
+      ["Jenis Pembayaran", data.isDP ? "DP 50% (sementara)" : "Lunas"],
       ["Tanggal", data.tanggal.toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })],
     ];
 
@@ -103,7 +152,7 @@ export async function buildKuitansiPdf(data: KuitansiData): Promise<Buffer> {
     for (const [label, value] of rows) {
       const rowY = doc.y;
       doc.font("Helvetica-Bold").text(label, labelX, rowY, { width: 120 });
-      doc.font("Helvetica").text(`: ${value}`, valueX, rowY, { width: valueW });
+      doc.font(label === "No. Kuitansi" ? "Helvetica-Bold" : "Helvetica").text(`: ${value}`, valueX, rowY, { width: valueW });
       doc.moveDown(0.3);
     }
     doc.x = labelX;
@@ -142,13 +191,12 @@ export async function buildKuitansiPdf(data: KuitansiData): Promise<Buffer> {
     });
 
     doc.moveDown(2);
-    doc.fontSize(9).font("Helvetica-Oblique").text(
-      "Kuitansi ini digenerate otomatis oleh sistem setelah pembayaran diverifikasi. " +
-      "Simpan sebagai bukti pendaftaran resmi.",
-      40,
-      doc.y,
-      { align: "left" }
-    );
+    const catatan = data.isDP
+      ? "Kuitansi ini bersifat SEMENTARA sebagai bukti pembayaran uang muka (DP 50%) dan akan " +
+        "digantikan dengan kuitansi resmi (lunas) setelah pelunasan. Simpan sampai kuitansi lunas diterbitkan."
+      : "Kuitansi ini digenerate otomatis oleh sistem setelah pembayaran diverifikasi. " +
+        "Simpan sebagai bukti pendaftaran resmi.";
+    doc.fontSize(9).font("Helvetica-Oblique").text(catatan, 40, doc.y, { width: contentW, align: "left" });
 
     doc.end();
   });

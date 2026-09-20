@@ -89,6 +89,12 @@ model Pembayaran {
   // Kuitansi PDF, dibuat otomatis begitu bendahara/admin approve pembayaran
   // (lihat setStatusPembayaran di pembayaran.ts) dan dikirim via email.
   kuitansiUrl String?
+  // Nomor kuitansi unik (mis. KW/ANTAREJA/2026/0001). Satu nomor per kuitansi yang DITERBITKAN:
+  // generate ulang untuk status yang sama memakai nomor & tanggal yang sama; kalau status
+  // berubah (DP → Lunas) terbit kuitansi baru dengan nomor baru (kuitansiIsDP = status saat terbit).
+  nomorKuitansi   String?  @unique
+  kuitansiTanggal DateTime?
+  kuitansiIsDP    Boolean?
   tim      Tim     @relation(fields: [tim_id], references: [id], onDelete: Cascade)
 }
 
@@ -466,6 +472,8 @@ model KonfigUmum {
   // Counter kode unik pembayaran pendaftaran tim (0-999, siklus ulang) —
   // sama pola dengan KonfigVoting.counterUrut.
   counterUrutPendaftaran Int  @default(0)
+  // Penghitung nomor kuitansi (urutan terbit, tidak pernah dipakai ulang).
+  counterKuitansi        Int  @default(0)
   // Ditampilkan di kuitansi PDF pendaftaran — nama bendahara & scan tanda
   // tangannya, diupload admin lewat Pengaturan.
   bendaharaNama          String?

@@ -229,6 +229,12 @@ export default function ProfileTim({
                 {` — ${tim.pembayaran.isDP ? "DP 50%" : "Lunas"}`}
               </P>
             )}
+            {tim.pembayaran.nomorKuitansi && (
+              <P className="text-sm">
+                No. Kuitansi: <span className="font-bold text-black">{tim.pembayaran.nomorKuitansi}</span>
+                {tim.pembayaran.kuitansiIsDP ? " — kuitansi sementara (DP), akan diganti setelah pelunasan" : ""}
+              </P>
+            )}
             {tim.confirmed && (
               <div className="flex flex-wrap items-center gap-3 mt-1">
                 <button

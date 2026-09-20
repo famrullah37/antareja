@@ -106,6 +106,12 @@ export default function PembayaranForm({
         {data?.confirmed && (
           <div className="flex flex-col gap-2 bg-neutral-50 border border-neutral-200 rounded-xl p-4">
             <P className="font-bold text-black">Kuitansi</P>
+            {data?.pembayaran?.nomorKuitansi && (
+              <P className="text-sm text-black">
+                No. Kuitansi: <span className="font-bold">{data.pembayaran.nomorKuitansi}</span>
+                {data.pembayaran.kuitansiIsDP ? " (sementara — DP)" : ""}
+              </P>
+            )}
             {data?.pembayaran?.kuitansiUrl ? (
               <a
                 href={data.pembayaran.kuitansiUrl}
