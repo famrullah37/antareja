@@ -1,28 +1,18 @@
 import { findUser } from "@/queries/user.query";
-import { User } from "@prisma/client";
-import { notFound } from "next/navigation";
+import { resolveUserId } from "@/queries/slug.query";
+import { makeSlug, isUuid } from "@/lib/timSlug";
+import { notFound, redirect } from "next/navigation";
 import UserForm from "./components/Form";
 
 export default async function UserEdit({ params }: { params: { id: string } }) {
-  let user: User = {
-    id: "",
-    email: "",
-    nama: "",
-    password: "",
-    role: "USER",
-    token: "",
-    verified: false,
-    verifyTokenSentAt: null,
-  };
+  if (params.id === "new") return <UserForm />;
 
-  if (params.id !== "new") {
-    const trygetUser = await findUser({ id: params.id });
+  const id = await resolveUserId(params.id);
+  const user = id ? await findUser({ id }) : null;
+  if (!user) return notFound();
 
-    if (trygetUser) {
-      user = trygetUser;
-      return <UserForm data={user} edit={true} id={params.id} />;
-    } else return notFound();
-  } else {
-    return <UserForm />;
-  }
+  // URL kanonis = slug; UUID mentah dari link/bookmark lama dirapikan otomatis.
+  if (isUuid(params.id)) redirect(`/admin/user/${makeSlug(user.nama, user.id, "user")}`);
+
+  return <UserForm data={user} edit={true} id={user.id} />;
 }

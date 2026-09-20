@@ -3,6 +3,7 @@ import { PenilaianWithRelations } from "@/types/entityRelations";
 import { useRouter } from "next-nprogress-bar";
 import { useEffect, useState } from "react";
 import DataTable, { TableColumn } from "react-data-table-component";
+import { makeSlug } from "@/lib/timSlug";
 
 export default function PenilaianTable({
   data,
@@ -78,7 +79,7 @@ export default function PenilaianTable({
           },
         }}
         onRowClicked={(row: PenilaianWithRelations) =>
-          router.push(`/admin/penilaian/${row.id}`)
+          router.push(`/admin/penilaian/${makeSlug(row.tim.nama_tim, row.id, "penilaian")}`)
         }
       />
     </div>

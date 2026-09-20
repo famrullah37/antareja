@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { deleteUserForm, updateRoleUser } from "@/actions/User";
 import { User } from "@prisma/client";
@@ -6,6 +6,7 @@ import { useRouter } from "next-nprogress-bar";
 import { useState } from "react";
 import { FaRegTrashCan } from "react-icons/fa6";
 import { toast } from "sonner";
+import { makeSlug } from "@/lib/timSlug";
 
 const ROLE_COLORS: Record<string, string> = {
   USER: "bg-blue-100 text-blue-700",
@@ -89,7 +90,7 @@ export default function TimTable({ data }: { data: User[] }) {
               <tr
                 key={user.id}
                 className="bg-white hover:bg-neutral-50 cursor-pointer transition-colors"
-                onClick={() => router.push(`/admin/user/${user.id}`)}
+                onClick={() => router.push(`/admin/user/${makeSlug(user.nama, user.id, "user")}`)}
               >
                 <td className="px-4 py-3 font-medium">{user.nama}</td>
                 <td className="px-4 py-3 text-gray-500">{user.email}</td>

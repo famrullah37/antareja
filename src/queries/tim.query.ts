@@ -1,6 +1,6 @@
 import prisma from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
-import { isUuid, shortIdFromSlug } from "@/lib/timSlug";
+import { isUuid, parseNoUrutSlug, shortIdFromSlug } from "@/lib/timSlug";
 
 export async function createTim(data: Prisma.TimCreateInput) {
   const createdTim = await prisma.tim.create({ data });
@@ -62,7 +62,22 @@ export async function deleteTim(where: Prisma.TimWhereUniqueInput) {
 export async function findTimByParam(param: string) {
   if (isUuid(param)) return prisma.tim.findUnique({ where: { id: param } });
   const short = shortIdFromSlug(param);
-  if (!short) return null;
+  if (!short) return prisma.tim.findUnique({ where: { id: param } });
+  const found = await prisma.tim.findMany({ where: { id: { startsWith: short } }, take: 2 });
+  return found.length === 1 ? found[0] : null;
+}
+
+// Param URL halaman input nilai: UUID (lama), "sma-03" (jenjang-no.urut), atau "tim-<8 hex id>".
+export async function findTimByNoUrutParam(param: string) {
+  if (isUuid(param)) return prisma.tim.findUnique({ where: { id: param } });
+  const parsed = parseNoUrutSlug(param);
+  if (parsed) {
+    return prisma.tim.findFirst({
+      where: { jenjang: parsed.jenjang as Prisma.TimWhereInput["jenjang"], noUrut: parsed.noUrut },
+    });
+  }
+  const short = shortIdFromSlug(param);
+  if (!short) return prisma.tim.findUnique({ where: { id: param } });
   const found = await prisma.tim.findMany({ where: { id: { startsWith: short } }, take: 2 });
   return found.length === 1 ? found[0] : null;
 }

@@ -7,6 +7,7 @@ import { useRouter } from "next-nprogress-bar";
 import { useEffect, useState } from "react";
 import DataTable, { TableColumn } from "react-data-table-component";
 import { toast } from "sonner";
+import { makeSlug } from "@/lib/timSlug";
 
 export default function JuriTable({ data }: { data: Juri[] }) {
   const [loader, setLoader] = useState(true);
@@ -84,7 +85,7 @@ export default function JuriTable({ data }: { data: Juri[] }) {
         customStyles={{
           cells: { style: { "&:hover": { cursor: "pointer" } } },
         }}
-        onRowClicked={(row: Juri) => router.push(`/admin/juri/${row.id}`)}
+        onRowClicked={(row: Juri) => router.push(`/admin/juri/${makeSlug(row.nama, row.id, "juri")}`)}
       />
     </div>
   );

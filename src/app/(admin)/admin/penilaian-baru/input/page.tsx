@@ -1,14 +1,15 @@
-﻿export const dynamic = "force-dynamic";
+export const dynamic = "force-dynamic";
 import { findTims } from "@/queries/tim.query";
 import { findJuris } from "@/queries/juri.query";
 import { findJuriKategoris, findKategoriLombas } from "@/queries/penilaianBaru.query";
 import Link from "next/link";
+import { makeSlug, noUrutSlug } from "@/lib/timSlug";
 import InputNilaiFilter from "./InputNilaiFilter";
 
 export default async function InputNilaiIndexPage({
   searchParams,
 }: {
-  searchParams?: { jenjang?: string; sekolah?: string; juriId?: string; kategori?: string };
+  searchParams?: { jenjang?: string; sekolah?: string; juri?: string; juriId?: string; kategori?: string };
 }) {
   const [tims, juris, juriKategoris, kategoriLombas] = await Promise.all([
     findTims({ confirmed: true }),
@@ -17,13 +18,19 @@ export default async function InputNilaiIndexPage({
     findKategoriLombas(),
   ]);
 
+  // Filter juri di URL memakai slug "nama-<8 hex id>" (?juri=), bukan UUID; ?juriId= (lama) tetap dikenali.
+  const juriParam = searchParams?.juri ?? searchParams?.juriId;
+  const juriIdDipilih = juriParam
+    ? juris.find((j) => j.id === juriParam || makeSlug(j.nama, j.id, "juri") === juriParam)?.id
+    : undefined;
+
   const jenjangList = [...new Set((tims as any[]).map((t) => t.jenjang))].sort();
 
   const filtered = (tims as any[]).filter((t) => {
     if (searchParams?.jenjang && t.jenjang !== searchParams.jenjang) return false;
     if (searchParams?.sekolah && !t.asal_sekolah.toLowerCase().includes(searchParams.sekolah.toLowerCase())) return false;
-    if (searchParams?.juriId) {
-      const kats = juriKategoris.filter((jk) => jk.juriId === searchParams.juriId).map((jk) => jk.kategori);
+    if (juriIdDipilih) {
+      const kats = juriKategoris.filter((jk) => jk.juriId === juriIdDipilih).map((jk) => jk.kategori);
       if (searchParams?.kategori && !kats.includes(searchParams.kategori)) return false;
     }
     if (searchParams?.kategori && !searchParams?.juriId) {
@@ -43,25 +50,21 @@ export default async function InputNilaiIndexPage({
         juris={juris as any[]}
         juriKategoris={juriKategoris as any[]}
         kategoriLombas={kategoriLombas}
-        defaultValues={searchParams ?? {}}
+        defaultValues={{ ...searchParams, juriId: juriIdDipilih }}
       />
 
       <div>
         <p className="text-sm text-gray-500 mb-3">
           {filtered.length} tim ditemukan
-          {searchParams?.juriId && ` · Juri: ${juris.find((j) => j.id === searchParams.juriId)?.nama ?? ""}`}
+          {juriIdDipilih && ` · Juri: ${juris.find((j) => j.id === juriIdDipilih)?.nama ?? ""}`}
           {searchParams?.kategori && ` · Kategori: ${searchParams.kategori}`}
         </p>
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {filtered.map((tim) => {
-            const params = new URLSearchParams();
-            if (searchParams?.juriId) params.set("juriId", searchParams.juriId);
-            if (searchParams?.kategori) params.set("kategori", searchParams.kategori);
-            const qs = params.toString();
             return (
               <Link
                 key={tim.id}
-                href={`/admin/penilaian-baru/input/${tim.id}${qs ? `?${qs}` : ""}`}
+                href={`/admin/penilaian-baru/input/${noUrutSlug(tim)}`}
                 className="bg-white border border-neutral-200 rounded-xl p-4 hover:border-primary-400 transition-colors"
               >
                 <div className="font-bold text-lg">

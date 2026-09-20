@@ -1,4 +1,5 @@
-import { findTim } from "@/queries/tim.query";
+import { findTim, findTimByNoUrutParam } from "@/queries/tim.query";
+import { isUuid, noUrutSlug } from "@/lib/timSlug";
 import { findJuris } from "@/queries/juri.query";
 import {
   findNilaiDiskritMasters,
@@ -7,7 +8,7 @@ import {
   findSubKategoriMasters,
   findJuriKategoris,
 } from "@/queries/penilaianBaru.query";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import InputNilaiForm from "./InputNilaiForm";
 
 export default async function InputNilaiPage({
@@ -15,9 +16,15 @@ export default async function InputNilaiPage({
 }: {
   params: { timId: string };
 }) {
+  const timParam = await findTimByNoUrutParam(params.timId);
+  if (!timParam) return notFound();
+
+  // URL kanonis = "sma-03" (jenjang-no.urut, tanpa nama tim); UUID lama di-redirect.
+  if (isUuid(params.timId)) redirect(`/admin/penilaian-baru/input/${noUrutSlug(timParam)}`);
+
   const [tim, juris, subKategoris, nilaiMasters, pelanggarans, juriKategoris] =
     await Promise.all([
-      findTim({ id: params.timId }, {}),
+      findTim({ id: timParam.id }, {}),
       findJuris(),
       findSubKategoriMasters({ aktif: true }),
       findNilaiDiskritMasters(),
@@ -27,7 +34,7 @@ export default async function InputNilaiPage({
 
   if (!tim) return notFound();
 
-  const existing = await findPenilaianBaru({ timId: params.timId });
+  const existing = await findPenilaianBaru({ timId: timParam.id });
 
   return (
     <div className="max-w-4xl mx-auto py-6">

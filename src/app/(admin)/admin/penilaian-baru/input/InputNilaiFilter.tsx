@@ -1,5 +1,6 @@
-﻿"use client";
+"use client";
 
+import { makeSlug } from "@/lib/timSlug";
 import { useRouter } from "next-nprogress-bar";
 import { useState } from "react";
 
@@ -34,9 +35,11 @@ export default function InputNilaiFilter({
     const params = new URLSearchParams();
     if (jenjang) params.set("jenjang", jenjang);
     if (sekolah) params.set("sekolah", sekolah);
-    if (juriId) params.set("juriId", juriId);
+    const juriDipilih = juris.find((j) => j.id === juriId);
+    if (juriDipilih) params.set("juri", makeSlug(juriDipilih.nama, juriDipilih.id, "juri"));
     if (kategori) params.set("kategori", kategori);
-    router.push(`/admin/penilaian-baru/input?${params.toString()}`);
+    const qs = params.toString();
+    router.push(qs ? `/admin/penilaian-baru/input?${qs}` : "/admin/penilaian-baru/input");
   }
 
   function handleReset() {

@@ -8,11 +8,12 @@ import DisplayAnggota from "./components/Form";
 export default async function EditAnggota({
   params,
 }: Readonly<{ params: { posisi: string; id: string } }>) {
-  if (Object.keys(Posisi).indexOf(params.posisi.toUpperCase()) === -1)
-    return redirect("/dashboard");
-
   const tim = await findTimByParam(params.id);
   if (!tim) return notFound();
+
+  // Posisi tidak dikenal: kembali ke halaman tim ini (bukan ke /dashboard peserta).
+  if (Object.keys(Posisi).indexOf(params.posisi.toUpperCase()) === -1)
+    return redirect(`/admin/tim/${timSlug(tim)}`);
   if (isUuid(params.id)) redirect(`/admin/tim/${timSlug(tim)}/${params.posisi}`);
 
   const anggota =
