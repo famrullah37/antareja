@@ -25,7 +25,11 @@ export default function PembayaranForm({
     const toastId = toast.loading("Membuat kuitansi & mengirim email...");
     const result = await generateKuitansiManual(data.id);
     setGenerating(false);
-    if (result.success) toast.success("Kuitansi berhasil dibuat & dikirim!", { id: toastId });
+    if (result.success)
+      toast.success(
+        result.message ? `Kuitansi terkirim ke email. Catatan: ${result.message}` : "Kuitansi berhasil dibuat & dikirim!",
+        { id: toastId, duration: result.message ? 8000 : 4000 }
+      );
     else toast.error(result.message ?? "Gagal generate kuitansi", { id: toastId });
   }
 

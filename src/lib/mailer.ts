@@ -17,6 +17,11 @@ const transporter = nodemailer.createTransport({
   // (secure: false, nodemailer upgrade koneksinya sendiri).
   secure: smtpPort === 465,
   auth: { user: smtpUser, pass: smtpPass },
+  // Tanpa batas, SMTP yang menggantung bikin aksi admin (konfirmasi pembayaran)
+  // ikut menggantung sampai menit-an.
+  connectionTimeout: 15000,
+  greetingTimeout: 15000,
+  socketTimeout: 30000,
 });
 
 export type mailMetaData = {
@@ -27,12 +32,14 @@ export type mailMetaData = {
   fileAttachments?: Array<{
     filename: string;
     path?: string;
-    content?: string;
+    content?: string | Buffer;
+    contentType?: string;
   }>;
 };
 
 export const sendMailTo = async (metadata: mailMetaData) => {
-  return transporter.sendMail({
+  try {
+    return await transporter.sendMail({
     from: `"LKBB Antareja 2026" <${smtpUser}>`,
     to: metadata.to,
     subject: metadata.subject,
@@ -43,5 +50,11 @@ export const sendMailTo = async (metadata: mailMetaData) => {
       "X-Application-Developer": "Antareja",
       "X-Application-Version": "v1",
     },
-  });
+    });
+  } catch (e) {
+    // Penyebab sebenarnya (auth SMTP salah, koneksi diblokir, dst) harus terlihat
+    // di `docker logs`, bukan hilang di catch pemanggil.
+    console.error(`[mailer] gagal kirim "${metadata.subject}":`, e instanceof Error ? e.message : e);
+    throw e;
+  }
 };

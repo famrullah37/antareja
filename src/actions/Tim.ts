@@ -34,30 +34,26 @@ export async function updateTimForm(id: string, formData: FormData) {
   const session = await getServerSession();
   if (!session?.user?.id) return { success: false, message: "Unauthorized" };
 
-  // Hanya user pemilik tim yang boleh update link
+  // Hanya user pemilik tim yang boleh mengganti foto tim
   const tim = await prisma.tim.findUnique({ where: { id } });
   if (!tim || tim.userId !== session.user.id)
     return { success: false, message: "Forbidden" };
 
-  const link_video = formData.get("link_video") as string;
   const foto = formData.get("foto") as File | null;
+  if (!foto || foto.size === 0) return { success: false, message: "Pilih foto tim terlebih dahulu" };
 
   try {
-    let fotoUrl: string | undefined;
-    if (foto && foto.size > 0) {
-      const fileCheck = await validateUploadFile(foto);
-      if (!fileCheck.valid) return { success: false, message: fileCheck.message };
-      const compressed = await compressPhoto(Buffer.from(await foto.arrayBuffer()));
-      const upload = await imageUploader(compressed);
-      if (upload.error) return { success: false, message: "Gagal upload foto tim" };
-      fotoUrl = upload.data!.url;
-    }
+    const fileCheck = await validateUploadFile(foto);
+    if (!fileCheck.valid) return { success: false, message: fileCheck.message };
+    const compressed = await compressPhoto(Buffer.from(await foto.arrayBuffer()));
+    const upload = await imageUploader(compressed);
+    if (upload.error) return { success: false, message: "Gagal upload foto tim" };
 
-    await updateTim({ id }, { link_video, ...(fotoUrl ? { foto: fotoUrl } : {}) });
+    await updateTim({ id }, { foto: upload.data!.url });
     revalidatePath("/", "layout");
-    return { success: true, message: "Berhasil memperbarui Link" };
+    return { success: true, message: "Foto tim berhasil disimpan" };
   } catch {
-    return { success: false, message: "Gagal memperbarui Link" };
+    return { success: false, message: "Gagal menyimpan foto tim" };
   }
 }
 

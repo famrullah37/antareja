@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { ReactNode, useState } from "react";
+import { ReactNode, useRef, useState } from "react";
 import { H2, H3, P } from "@/app/components/global/Text";
 import SectionWrapper from "@/app/components/global/Wrapper";
 import { TimWithRelations } from "@/types/entityRelations";
@@ -9,12 +9,11 @@ import { AnggotaCard } from "./parts/AnggotaCard";
 import cn from "@/lib/clsx";
 import { initials } from "@/lib/initials";
 import { updateTimForm } from "@/actions/Tim";
-import TextField from "@/app/components/global/Input";
 import Field from "../components/parts/input";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import SubmitButton from "@/app/components/global/SubmitButton";
-import { downloadFormulir } from "./parts/downloadFormulir";
+import { downloadFormulir, downloadKuitansi } from "./parts/downloadFormulir";
 
 const rowsMapNormal = [
   ["b1s1", "b1s2", "b1s3"],
@@ -152,8 +151,15 @@ export default function ProfileTim({
 }) {
   const router = useRouter();
   const [downloading, setDownloading] = useState(false);
+  const [downloadingKuitansi, setDownloadingKuitansi] = useState(false);
   const jumlahAnggotaLengkap = sizeMap[tim.tipe_tim] + 3;
   const dataLengkap = tim.anggotas.length === jumlahAnggotaLengkap;
+
+  async function handleDownloadKuitansi() {
+    setDownloadingKuitansi(true);
+    await downloadKuitansi();
+    setDownloadingKuitansi(false);
+  }
 
   async function handleDownloadBerkas() {
     setDownloading(true);
@@ -164,15 +170,32 @@ export default function ProfileTim({
   // transfer biaya dasar tanpa kode unik, jadi itu yang ditampilkan.
   const nominalTransfer = tim.pembayaran?.totalBayar ?? biayaDasar ?? null;
 
+  // Pratinjau foto yang baru dipilih (belum disimpan) supaya bisa di-review dulu.
+  const [preview, setPreview] = useState<string | null>(null);
+  const formRef = useRef<HTMLFormElement>(null);
+
+  function handleFotoChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (preview) URL.revokeObjectURL(preview);
+    if (!file) return setPreview(null);
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("Ukuran foto maksimal 10MB");
+      e.target.value = "";
+      return setPreview(null);
+    }
+    setPreview(URL.createObjectURL(file));
+  }
+
   async function submitForm(formData: FormData) {
-    const toastId = toast.loading(
-      !tim.link_video ? "Membuat link..." : "Memperbarui link..."
-    );
+    const toastId = toast.loading("Menyimpan foto tim...");
     const result = await updateTimForm(tim.id, formData);
 
     if ("message" in result) {
       if (result.success) {
         toast.success(result.message, { id: toastId });
+        if (preview) URL.revokeObjectURL(preview);
+        setPreview(null);
+        formRef.current?.reset();
         router.refresh();
       } else {
         toast.error(result.message, { id: toastId });
@@ -206,58 +229,79 @@ export default function ProfileTim({
                 {` — ${tim.pembayaran.isDP ? "DP 50%" : "Lunas"}`}
               </P>
             )}
-            {tim.pembayaran.kuitansiUrl && (
-              <a
-                href={tim.pembayaran.kuitansiUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="text-primary-600 hover:underline text-sm w-fit"
-              >
-                Download Kuitansi (PDF)
-              </a>
+            {tim.confirmed && (
+              <div className="flex flex-wrap items-center gap-3 mt-1">
+                <button
+                  type="button"
+                  onClick={handleDownloadKuitansi}
+                  disabled={downloadingKuitansi}
+                  className="bg-primary-500 hover:bg-primary-600 disabled:opacity-60 text-white text-sm font-semibold px-5 py-2.5 rounded-lg transition-colors"
+                >
+                  {downloadingKuitansi ? "Menyiapkan..." : "Unduh Kuitansi (PDF)"}
+                </button>
+                {tim.pembayaran.kuitansiUrl && (
+                  <a
+                    href={tim.pembayaran.kuitansiUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-primary-600 hover:underline text-sm"
+                  >
+                    Lihat kuitansi yang dikirim ke email
+                  </a>
+                )}
+              </div>
+            )}
+            {!tim.confirmed && (
+              <P className="text-sm text-gray-400">Kuitansi tersedia setelah pembayaran dikonfirmasi admin.</P>
             )}
           </div>
         )}
 
         {tim.confirmed ? (
-          <form action={submitForm} className="mb-4">
+          <form ref={formRef} action={submitForm} className="mb-4">
             <H3 className="mb-4">Foto Tim</H3>
             <P className="text-sm text-gray-500 mb-2">
               Ditampilkan di halaman Vote (/vote) supaya pendukung mudah mengenali timmu.
             </P>
-            <div className="flex items-center gap-4 mb-4">
-              {tim.foto ? (
-                <Image
-                  src={tim.foto}
-                  alt={tim.nama_tim}
-                  width={80}
-                  height={80}
-                  className="w-20 h-20 rounded-full object-cover border border-neutral-200"
-                />
-              ) : (
-                <div className="w-20 h-20 rounded-full bg-primary-100 text-primary-600 font-bold flex items-center justify-center border border-neutral-200">
-                  {initials(tim.nama_tim)}
-                </div>
-              )}
+            <div className="flex flex-col sm:flex-row sm:items-center gap-4 mb-4">
+              <div className="flex flex-col items-center gap-1 shrink-0">
+                {preview ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- blob URL pratinjau lokal
+                  <img
+                    src={preview}
+                    alt="Pratinjau foto tim"
+                    className="w-32 h-32 rounded-full object-cover border-2 border-primary-500"
+                  />
+                ) : tim.foto ? (
+                  <Image
+                    src={tim.foto}
+                    alt={tim.nama_tim}
+                    width={128}
+                    height={128}
+                    className="w-32 h-32 rounded-full object-cover border border-neutral-200"
+                  />
+                ) : (
+                  <div className="w-32 h-32 rounded-full bg-primary-100 text-primary-600 text-2xl font-bold flex items-center justify-center border border-neutral-200">
+                    {initials(tim.nama_tim)}
+                  </div>
+                )}
+                <span className={`text-xs ${preview ? "text-primary-600 font-semibold" : "text-gray-400"}`}>
+                  {preview ? "Pratinjau (belum disimpan)" : tim.foto ? "Foto saat ini" : "Belum ada foto"}
+                </span>
+              </div>
               <input
                 name="foto"
                 type="file"
                 accept="image/*"
+                onChange={handleFotoChange}
                 className="text-sm file:bg-primary-500 file:text-white file:rounded-md file:border-none file:py-1.5 file:px-3 file:mr-3 hover:cursor-pointer"
               />
             </div>
-            <H3 className="mb-4">Video Tiktok + Foto Pasukan</H3>
-            <TextField
-              id="link_video"
-              name="link_video"
-              placeholder="Masukkan link drive video tiktok + foto pasukan"
-              type="url"
-              className="w-full"
-              value={tim.link_video ?? ""}
-            />
-            <div className="w-full justify-end flex mt-4">
-              <SubmitButton text={"Submit"} className="float-end mt-4" />
-            </div>
+            {preview && (
+              <div className="w-full justify-end flex">
+                <SubmitButton text={"Simpan Foto"} className="float-end" />
+              </div>
+            )}
           </form>
         ) : null}
 

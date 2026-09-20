@@ -108,24 +108,42 @@ async function generateDanKirimKuitansi(timId: string, hargaDasar: number) {
     bendaharaTtdUrl: konfig.bendaharaTtdUrl,
   });
 
+  // Email = yang terpenting bagi tim, jadi tidak boleh gagal hanya karena arsip
+  // Cloudinary gagal (dan sebaliknya). PDF dilampirkan langsung dari buffer, bukan
+  // diunduh ulang dari URL Cloudinary (pengiriman PDF Cloudinary bisa diblokir).
+  const masalah: string[] = [];
+
   const upload = await imageUploader(pdfBuffer);
-  if (upload.error) return { success: false, message: "Gagal upload kuitansi: " + upload.message };
-
-  await prisma.pembayaran.update({
-    where: { tim_id: timId },
-    data: { kuitansiUrl: upload.data!.url },
-  });
-
-  if (tim.user?.email) {
-    const namaFile = `Kuitansi-${tim.asal_sekolah.replace(/[^a-z0-9]+/gi, "-")}.pdf`;
-    await sendMailTo({
-      to: tim.user.email,
-      subject: "Kuitansi Pembayaran Pendaftaran - LKBB Antareja 2026",
-      html: `<p>Halo ${tim.pelatih},</p><p>Pembayaran pendaftaran tim <b>${tim.nama_tim}</b> (${tim.asal_sekolah}) sudah terverifikasi${tim.pembayaran.isDP ? " (DP 50%)" : " (Lunas)"}. Kuitansi terlampir sebagai bukti resmi.</p><p>Terima kasih.</p>`,
-      fileAttachments: [{ filename: namaFile, path: upload.data!.url }],
+  if (upload.error) {
+    masalah.push(`arsip kuitansi gagal diupload (${upload.message})`);
+  } else {
+    await prisma.pembayaran.update({
+      where: { tim_id: timId },
+      data: { kuitansiUrl: upload.data!.url },
     });
   }
-  return { success: true };
+
+  let emailTerkirim = false;
+  if (!tim.user?.email) {
+    masalah.push("akun tim tidak punya alamat email");
+  } else {
+    const namaFile = `Kuitansi-${tim.asal_sekolah.replace(/[^a-z0-9]+/gi, "-")}.pdf`;
+    try {
+      await sendMailTo({
+        to: tim.user.email,
+        subject: "Kuitansi Pembayaran Pendaftaran - LKBB Antareja 2026",
+        html: `<p>Halo ${tim.pelatih},</p><p>Pembayaran pendaftaran tim <b>${tim.nama_tim}</b> (${tim.asal_sekolah}) sudah terverifikasi${tim.pembayaran.isDP ? " (DP 50%)" : " (Lunas)"}. Kuitansi terlampir sebagai bukti resmi.</p><p>Terima kasih.</p>`,
+        fileAttachments: [{ filename: namaFile, content: pdfBuffer, contentType: "application/pdf" }],
+      });
+      emailTerkirim = true;
+    } catch (e) {
+      masalah.push(`email ke ${tim.user.email} gagal terkirim (${e instanceof Error ? e.message : "SMTP error"})`);
+    }
+  }
+
+  // success = tim benar-benar menerima kuitansi lewat email; masalah lain (mis.
+  // arsip gagal) tetap dilaporkan lewat message supaya admin tahu.
+  return { success: emailTerkirim, message: masalah.length ? masalah.join("; ") : undefined };
 }
 
 // Jalur otomatis — dipanggil sekali begitu pembayaran pertama kali confirmed
@@ -145,6 +163,45 @@ async function kirimKuitansiJikaBelum(timId: string, hargaDasar: number) {
   } catch (e) {
     console.error("kirimKuitansiJikaBelum error:", e);
     return { success: false, message: "Gagal membuat/mengirim kuitansi" };
+  }
+}
+
+// Unduh kuitansi langsung dari dashboard tim: PDF dibuat saat itu juga, jadi tidak
+// tergantung kuitansiUrl (upload Cloudinary/email bisa gagal atau belum pernah
+// jalan untuk tim tertentu). Tanggal di PDF = tanggal unduh.
+export async function downloadKuitansiPdf() {
+  const session = await getServerSession();
+  if (!session?.user?.id) return { success: false, message: "Unauthorized" };
+
+  const tim = await prisma.tim.findFirst({
+    where: { userId: session.user.id },
+    include: { pembayaran: true },
+  });
+  if (!tim) return { success: false, message: "Tim tidak ditemukan" };
+  if (!tim.confirmed || !tim.pembayaran) {
+    return { success: false, message: "Pembayaran belum dikonfirmasi admin, kuitansi belum tersedia" };
+  }
+
+  try {
+    const [hargaDasar, konfig] = await Promise.all([
+      biayaPendaftaran(tim.jenjang, tim.pembayaran.isDP),
+      getKonfigUmum(),
+    ]);
+    const pdf = await buildKuitansiPdf({
+      namaTim: tim.nama_tim,
+      asalSekolah: tim.asal_sekolah,
+      jenjang: tim.jenjang,
+      isDP: tim.pembayaran.isDP,
+      hargaDasar,
+      tanggal: new Date(),
+      bendaharaNama: konfig.bendaharaNama,
+      bendaharaTtdUrl: konfig.bendaharaTtdUrl,
+    });
+    const slug = tim.asal_sekolah.replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "") || "Tim";
+    return { success: true, base64: pdf.toString("base64"), filename: `Kuitansi-${slug}.pdf` };
+  } catch (e) {
+    console.error("downloadKuitansiPdf error:", e);
+    return { success: false, message: "Gagal membuat kuitansi" };
   }
 }
 

@@ -95,11 +95,18 @@ export async function buildKuitansiPdf(data: KuitansiData): Promise<Buffer> {
     ];
 
     doc.fontSize(11);
+    // Label & nilai di kolom tetap supaya nilai panjang wrap di kolomnya sendiri,
+    // bukan menabrak label.
+    const labelX = doc.page.margins.left;
+    const valueX = labelX + 125;
+    const valueW = doc.page.width - doc.page.margins.right - valueX;
     for (const [label, value] of rows) {
-      doc.font("Helvetica-Bold").text(label, { continued: true, width: 150 });
-      doc.font("Helvetica").text(`: ${value}`);
+      const rowY = doc.y;
+      doc.font("Helvetica-Bold").text(label, labelX, rowY, { width: 120 });
+      doc.font("Helvetica").text(`: ${value}`, valueX, rowY, { width: valueW });
       doc.moveDown(0.3);
     }
+    doc.x = labelX;
 
     doc.moveDown(1);
     doc.font("Helvetica-Bold").fontSize(13).text(`Total Dibayar: ${formatRupiah(data.hargaDasar)}`);
