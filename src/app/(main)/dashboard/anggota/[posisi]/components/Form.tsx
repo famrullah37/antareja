@@ -38,7 +38,7 @@ export default function EditAnggotaForm({
 
     if (result.success) {
       toast.success(result.message, { id: toastId });
-      router.push(`/dashboard?timId=${anggota.timId}`);
+      router.push("/dashboard");
     } else {
       toast.error(result.message, { id: toastId });
     }

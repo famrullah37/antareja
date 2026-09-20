@@ -72,21 +72,21 @@ function TimLayout({ tim }: Readonly<{ tim: TimWithRelations }>) {
       <div className="py-16 px-10 bg-neutral-300 rounded-lg flex flex-col gap-12">
         <AnggotaCardsWrapper className="flex flex-wrap gap-10">
           <AnggotaCard
-            href={`/dashboard/anggota/pelatih?timId=${tim.id}`}
+            href={`/dashboard/anggota/pelatih`}
             image={pelatih?.foto ?? "/placeholder-profile-picture.jpg"}
             name={tim.pelatih ?? "Belum diisi"}
             key={"pelatih"}
             posisi={pelatih?.posisi ?? "PELATIH"}
           />
           <AnggotaCard
-            href={`/dashboard/anggota/danton?timId=${tim.id}`}
+            href={`/dashboard/anggota/danton`}
             image={danton?.foto ?? "/placeholder-profile-picture.jpg"}
             name={danton?.nama ?? "Belum diisi"}
             key={"danton"}
             posisi={danton?.posisi ?? "DANTON"}
           />
           <AnggotaCard
-            href={`/dashboard/anggota/official?timId=${tim.id}`}
+            href={`/dashboard/anggota/official`}
             image={official?.foto ?? "/placeholder-profile-picture.jpg"}
             name={official?.nama ?? "Belum diisi"}
             key={"official"}
@@ -105,7 +105,7 @@ function TimLayout({ tim }: Readonly<{ tim: TimWithRelations }>) {
                 );
                 return (
                   <AnggotaCard
-                    href={`/dashboard/anggota/${pos}?timId=${tim.id}`}
+                    href={`/dashboard/anggota/${pos}`}
                     image={anggotaInPos?.foto ?? "/placeholder-profile-picture.jpg"}
                     name={anggotaInPos?.nama ?? "Belum diisi"}
                     posisi={"Posisi " + (anggotaInPos?.posisi ?? pos)}
@@ -126,7 +126,7 @@ function TimLayout({ tim }: Readonly<{ tim: TimWithRelations }>) {
                 );
                 return (
                   <AnggotaCard
-                    href={`/dashboard/anggota/${pos}?timId=${tim.id}`}
+                    href={`/dashboard/anggota/${pos}`}
                     image={anggotaInPos?.foto ?? "/placeholder-profile-picture.jpg"}
                     name={anggotaInPos?.nama ?? "Belum diisi"}
                     posisi={anggotaInPos?.posisi ?? pos}

@@ -7,7 +7,7 @@ import { H1, H3, P } from "@/app/components/global/Text";
 import { getSession, signIn, useSession } from "next-auth/react";
 import Image from "next/image";
 import Link from "next/link";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { FaEyeSlash } from "react-icons/fa";
 import { toast } from "sonner";
 import { resendVerificationEmail } from "@/actions/Signup";
@@ -20,6 +20,13 @@ export default function Login() {
   const [isLoading, setisLoading] = useState(false);
   const [showResend, setShowResend] = useState(false);
   const [resending, setResending] = useState(false);
+
+  // Link lama (bookmark/tab lama) bisa membawa ?callbackUrl=... yang panjang &
+  // bersarang — tujuan setelah login ditentukan dari role, jadi query itu
+  // dibuang supaya alamat tetap /auth/login.
+  useEffect(() => {
+    if (window.location.search) window.history.replaceState(null, "", "/auth/login");
+  }, []);
 
   // Kalau buka /auth/login padahal sudah login (mis. lewat back button),
   // lempar ke tujuan sesuai role. Pakai reload penuh (bukan router.push)

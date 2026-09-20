@@ -1,12 +1,12 @@
 ﻿"use client";
 
-import { signIn, useSession, signOut } from "next-auth/react";
+import { useSession, signOut } from "next-auth/react";
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { SecondaryButton } from "./Button";
 import { TertiaryLinkButton } from "./LinkButton";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { HamburgerIcon } from "./Icons";
 
 interface NavOption {
@@ -36,6 +36,7 @@ export default function Navbar() {
   const [isExpanded, setIsExpanded] = useState(false);
   const { status, data: session } = useSession();
   const pathname = usePathname();
+  const router = useRouter();
 
   useEffect(() => {
     setIsOpened(false);
@@ -132,7 +133,7 @@ export default function Navbar() {
                       {session.user?.role === "ADMIN" ? "Admin Panel" : "Dashboard"}
                     </Link>
                     <button
-                      onClick={() => signOut()}
+                      onClick={() => signOut({ callbackUrl: "/auth/login" })}
                       className="w-full flex items-center px-4 py-3 text-sm text-primary-500 hover:bg-primary-50 transition-colors"
                     >
                       Sign Out
@@ -143,7 +144,7 @@ export default function Navbar() {
             ) : status === "loading" ? null : (
               <>
                 <SecondaryButton
-                  onClick={() => signIn()}
+                  onClick={() => router.push("/auth/login")}
                   type="button"
                   className="font-bold text-sm px-5 py-2"
                 >
@@ -198,7 +199,7 @@ export default function Navbar() {
                   {session?.user?.role === "ADMIN" ? "Admin Panel" : "Dashboard"}
                 </Link>
                 <button
-                  onClick={() => signOut()}
+                  onClick={() => signOut({ callbackUrl: "/auth/login" })}
                   className="text-primary-400 text-base font-medium text-left hover:text-primary-300 transition-colors"
                 >
                   Sign Out

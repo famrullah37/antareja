@@ -106,7 +106,7 @@ export async function buildFormulirPdf(tim: Tim, anggotas: Anggota[]): Promise<B
 
     const fields: [string, string][] = [
       ["Asal Sekolah", tim.asal_sekolah],
-      ["Jumlah Tim", `${pasukan.length} Pasukan`],
+      ["Jumlah Tim", `1 Tim (${pasukan.length + 1} Anggota: ${pasukan.length} Pasukan + 1 Danton)`],
       ["Nama Pelatih", tim.pelatih],
       ["Nama Official", official?.nama ?? "-"],
     ];

@@ -62,7 +62,7 @@ export default function AdminLayout({
             ))}
             <button
               className={`rounded-full text-center text-primary-500 text-[16px] transition-all duration-300 hover:text-primary-400`}
-              onClick={() => signOut()}
+              onClick={() => signOut({ callbackUrl: "/auth/login" })}
             >
               Sign Out
             </button>
