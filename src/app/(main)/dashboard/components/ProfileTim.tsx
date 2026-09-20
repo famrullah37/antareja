@@ -265,8 +265,9 @@ export default function ProfileTim({
           <div className="flex flex-col gap-2 mb-4">
             <H3>Berkas Registrasi (PDF)</H3>
             <P className="text-sm text-gray-500">
-              Berkas formulir registrasi peserta (kop surat, data tim, foto Danton & pasukan, tanda tangan
-              Pelatih/Official) terisi otomatis dari data anggota — tidak perlu diisi manual di PDF/Word.
+              Berkas formulir registrasi peserta (kop surat, data tim, foto Pelatih, Official, Danton & pasukan,
+              tanda tangan Pelatih/Official) terisi otomatis dari data anggota — tidak perlu diisi manual di PDF/Word.
+              Cetak di kertas A4 (portrait) lalu bawa pada hari pelaksanaan untuk diserahkan ke panitia saat registrasi ulang.
             </P>
             {dataLengkap ? (
               <button

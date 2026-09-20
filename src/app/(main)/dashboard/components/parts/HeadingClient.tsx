@@ -1,8 +1,6 @@
 "use client";
 
-import { useState } from "react";
 import { PrimaryLinkButton } from "@/app/components/global/LinkButton";
-import { PrimaryButton } from "@/app/components/global/Button";
 import { H2, H3, P } from "@/app/components/global/Text";
 import { FaDownload } from "react-icons/fa";
 import {
@@ -11,7 +9,6 @@ import {
   stringifyTime,
 } from "@/utils/utilities";
 import { Session } from "next-auth";
-import RegistrationModal from "./RegistrationModal";
 
 // Tipe pengumuman (bisa disesuaikan dengan struktur aslimu)
 interface Pengumuman {
@@ -26,17 +23,9 @@ interface HeadingClientProps {
 }
 
 export default function HeadingClient({ session, pengumumans }: HeadingClientProps) {
-  const [isModalOpen, setIsModalOpen] = useState(false);
-
   const manualDownloadLink =
     "https://drive.google.com/file/d/1SlmV82GvAk9OS0HNVWS-AUYIe6YiuU8C/view?usp=drive_link";
-  
 
-  const handleDownloadFormClick = () => {
-    if (session?.user?.nama) {
-      setIsModalOpen(true);
-    }
-  };
 
   return (
     <>
@@ -51,13 +40,6 @@ export default function HeadingClient({ session, pengumumans }: HeadingClientPro
           >
             Profil Saya
           </PrimaryLinkButton>
-          <PrimaryButton
-            type="button"
-            onClick={handleDownloadFormClick}
-            className="inline-flex gap-2 items-center"
-          >
-            Unduh formulir pendaftaran
-          </PrimaryButton>
           <PrimaryLinkButton
             href={manualDownloadLink}
             className="inline-flex gap-2 items-center"
@@ -91,10 +73,6 @@ export default function HeadingClient({ session, pengumumans }: HeadingClientPro
         </div>
       </div>
 
-      <RegistrationModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-      />
     </>
   );
 }
