@@ -10,13 +10,24 @@ import Select from "react-select";
 import { toast } from "sonner";
 import SubmitButton from "./parts/Button";
 
+function formatRupiah(n: number) {
+  return `Rp ${n.toLocaleString("id-ID")}`;
+}
+
 export default function PembayaranForm({
   data,
   id,
+  biayaDasar,
 }: {
   data?: TimWithPembayaran;
   id?: string;
+  biayaDasar: number;
 }) {
+  // Nominal yang seharusnya masuk = total transfer yang dicadangkan saat daftar
+  // (biaya saat itu + kode unik). Tim lama tanpa total: pakai biaya jenjang saat ini.
+  const kodeUnik = data?.pembayaran?.kodeUnik ?? null;
+  const totalBayar = data?.pembayaran?.totalBayar ?? null;
+  const biayaSaatDaftar = totalBayar != null && kodeUnik ? totalBayar - parseInt(kodeUnik, 10) : biayaDasar;
   const [generating, setGenerating] = useState(false);
 
   async function handleGenerateKuitansi() {
@@ -74,8 +85,13 @@ export default function PembayaranForm({
         </div>
         <div>
           <P className="font-bold text-black">
-            <span className="font-normal">Yang harus dibayarkan: </span>
-            {data?.pembayaran?.isDP ? "Rp. 200.000,00" : "Rp. 400.000,00"}
+            <span className="font-normal">Yang harus dibayarkan ({data?.pembayaran?.isDP ? "DP 50%" : "Lunas"}): </span>
+            {formatRupiah(totalBayar ?? biayaDasar)}
+            {totalBayar != null && kodeUnik && (
+              <span className="font-normal">
+                {" "}(biaya {formatRupiah(biayaSaatDaftar)} + kode unik #{kodeUnik})
+              </span>
+            )}
           </P>
           <P className="font-bold text-black">
             <span className="font-normal">Nama Rekening Pengirim: </span>
@@ -85,12 +101,6 @@ export default function PembayaranForm({
             <span className="font-normal">Bank Pengirim: </span>
             {data?.pembayaran?.bank}
           </P>
-          {data?.pembayaran?.kodeUnik && data?.pembayaran?.totalBayar && (
-            <P className="font-bold text-black">
-              <span className="font-normal">Kode Unik / Total Transfer: </span>
-              #{data.pembayaran.kodeUnik} — Rp {data.pembayaran.totalBayar.toLocaleString("id-ID")}
-            </P>
-          )}
         </div>
 
         {data?.confirmed && (

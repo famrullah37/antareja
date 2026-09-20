@@ -2,6 +2,7 @@ import PDFDocument from "pdfkit";
 import sharp from "sharp";
 import fs from "fs/promises";
 import path from "path";
+import { terbilangRupiah } from "./terbilang";
 
 function formatRupiah(n: number) {
   return new Intl.NumberFormat("id-ID", {
@@ -90,7 +91,6 @@ export async function buildKuitansiPdf(data: KuitansiData): Promise<Buffer> {
       ["Nama Tim", data.namaTim],
       ["Jenjang", data.jenjang],
       ["Jenis Pembayaran", data.isDP ? "DP 50%" : "Lunas"],
-      ["Biaya Pendaftaran", formatRupiah(data.hargaDasar)],
       ["Tanggal", data.tanggal.toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })],
     ];
 
@@ -109,7 +109,10 @@ export async function buildKuitansiPdf(data: KuitansiData): Promise<Buffer> {
     doc.x = labelX;
 
     doc.moveDown(1);
-    doc.font("Helvetica-Bold").fontSize(13).text(`Total Dibayar: ${formatRupiah(data.hargaDasar)}`);
+    const contentW = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+    doc.font("Helvetica-Bold").fontSize(13).text(`Total Dibayar: ${formatRupiah(data.hargaDasar)}`, labelX, doc.y, { width: contentW });
+    doc.moveDown(0.3);
+    doc.font("Helvetica-BoldOblique").fontSize(11).text(`Terbilang: ${terbilangRupiah(data.hargaDasar)}`, labelX, doc.y, { width: contentW });
     doc.moveDown(3);
 
     // Blok tanda tangan bendahara, rata kanan.

@@ -5,6 +5,7 @@ import { useRouter } from "next-nprogress-bar";
 import { useEffect, useState } from "react";
 import DataTable, { TableColumn } from "react-data-table-component";
 import { toast } from "sonner";
+import { timSlug } from "@/lib/timSlug";
 
 function formatRupiah(n: number) {
   return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(n);
@@ -122,7 +123,7 @@ export default function TimTable({ data }: { data: TimWithRelations[] }) {
             style: { "&:hover": { cursor: "pointer" } },
           },
         }}
-        onRowClicked={(row) => router.push(`/admin/pembayaran/${row.id}`)}
+        onRowClicked={(row) => router.push(`/admin/pembayaran/${timSlug(row)}`)}
       />
     </div>
   );

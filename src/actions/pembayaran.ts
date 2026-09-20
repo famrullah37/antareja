@@ -76,6 +76,14 @@ async function ensureKodeUnikDanTotal(timId: string, hargaDasar: number) {
   return null;
 }
 
+// Ringkas pesan galat (baris terakhir, maks. 200 karakter) untuk ditampilkan ke admin —
+// galat Prisma berisi potongan kode berbaris-baris, yang berguna cuma baris terakhirnya.
+function ringkasGalat(e: unknown) {
+  const msg = e instanceof Error ? e.message : String(e);
+  const line = msg.split("\n").map((l) => l.trim()).filter(Boolean).pop() ?? msg;
+  return line.slice(0, 200);
+}
+
 // Generate kuitansi PDF, upload ke Cloudinary, simpan link-nya (menimpa yang
 // lama kalau ada), dan kirim ke email pendaftar. SELALU generate ulang —
 // pemanggil yang menentukan kapan ini boleh dipanggil (lihat
@@ -162,7 +170,7 @@ async function kirimKuitansiJikaBelum(timId: string, hargaDasar: number) {
     return result;
   } catch (e) {
     console.error("kirimKuitansiJikaBelum error:", e);
-    return { success: false, message: "Gagal membuat/mengirim kuitansi" };
+    return { success: false, message: `Gagal membuat/mengirim kuitansi: ${ringkasGalat(e)}` };
   }
 }
 
@@ -218,12 +226,12 @@ export async function generateKuitansiManual(timId: string) {
     const result = await generateDanKirimKuitansi(timId, jumlah);
     if (result.success) {
       revalidatePath("/", "layout");
-      revalidatePath(`/admin/pembayaran/${timId}`);
+      revalidatePath("/admin/pembayaran/[id]", "page");
     }
     return result;
   } catch (e) {
     console.error("generateKuitansiManual error:", e);
-    return { success: false, message: "Gagal generate kuitansi" };
+    return { success: false, message: `Gagal generate kuitansi: ${ringkasGalat(e)}` };
   }
 }
 
