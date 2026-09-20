@@ -32,6 +32,12 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
+# pdfkit di-bundle webpack, tapi font standarnya (#standard-fonts/Helvetica, dst) dimuat lewat
+# createRequire dengan alamat file yang DITANAM saat build: /app/node_modules/pdfkit/js/...
+# Folder itu tidak ikut ter-trace ke image production, sehingga tanpa baris ini semua
+# pembuatan PDF (kuitansi, berkas registrasi) gagal: "Cannot find module '#standard-fonts/Helvetica'".
+# Lokasinya harus sama dengan WORKDIR builder (/app).
+COPY --from=builder /app/node_modules/pdfkit ./node_modules/pdfkit
 COPY --from=builder /app/scripts ./scripts
 COPY --from=builder /app/db ./db
 
