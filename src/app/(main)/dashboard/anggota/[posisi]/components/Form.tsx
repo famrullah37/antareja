@@ -117,7 +117,6 @@ export default function EditAnggotaForm({
             className="w-full"
             value={anggota.link_ig ?? ""}
             label="Link Instagram"
-            required
           />
         )}
 

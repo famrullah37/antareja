@@ -145,7 +145,7 @@ export default function ProfileTim({ tim, penilaian }: { tim: TimWithRelations; 
 
   async function submitForm(formData: FormData) {
     const toastId = toast.loading(
-      tim.link_berkas === "" ? "Membuat link..." : "Memperbarui link..."
+      !tim.link_video ? "Membuat link..." : "Memperbarui link..."
     );
     const result = await updateTimForm(tim.id, formData);
 
@@ -218,17 +218,8 @@ export default function ProfileTim({ tim, penilaian }: { tim: TimWithRelations; 
               name="link_video"
               placeholder="Masukkan link drive video tiktok + foto pasukan"
               type="url"
-              className="w-full mb-4"
-              value={tim.link_video ?? ""}
-            />
-            <H3 className="mb-4">Link Berkas</H3>
-            <TextField
-              id="link_berkas"
-              name="link_berkas"
-              placeholder="Masukkan link drive..."
-              type="url"
               className="w-full"
-              value={tim.link_berkas ?? ""}
+              value={tim.link_video ?? ""}
             />
             <div className="w-full justify-end flex mt-4">
               <SubmitButton text={"Submit"} className="float-end mt-4" />

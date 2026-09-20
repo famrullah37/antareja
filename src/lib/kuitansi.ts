@@ -14,7 +14,7 @@ function formatRupiah(n: number) {
 // Logo di public/ berformat SVG (pdfkit cuma terima raster) — konversi ke PNG
 // sekali lalu simpan di memori, tidak perlu baca+konversi ulang tiap kuitansi.
 let logoPngCache: Buffer | null = null;
-async function getLogoPng(): Promise<Buffer | null> {
+export async function getLogoPng(): Promise<Buffer | null> {
   if (logoPngCache) return logoPngCache;
   try {
     const svgPath = path.join(process.cwd(), "public", "logo.svg");

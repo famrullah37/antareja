@@ -2,6 +2,7 @@
 
 import { v2 as cloudinary } from 'cloudinary';
 import { UploadApiResponse } from 'cloudinary';
+import sharp from 'sharp';
 
 type ValidateOptions = { maxMB?: number; allowPdf?: boolean };
 type ValidateResult = { valid: true } | { valid: false; message: string };
@@ -31,6 +32,26 @@ export async function validateUploadFile(
     }
   }
   return { valid: true };
+}
+
+// Foto profil (anggota/tim) sering langsung dari kamera HP, bisa 5-10MB.
+// Upload sebesar itu apa adanya ke Cloudinary lewat server bikin request lama
+// (double hop: klien->server, server->Cloudinary) dan gampang timeout di
+// koneksi lambat, sampai memicu error.tsx. Kompres dulu ke ukuran wajar untuk
+// foto profil sebelum diupload — dipanggil eksplisit di pemanggil (bukan di
+// dalam imageUploader) karena fungsi itu juga dipakai untuk upload non-foto
+// (PDF kuitansi, juklak, dll) yang tidak bisa diproses sharp.
+export async function compressPhoto(buffer: Buffer): Promise<Buffer> {
+  try {
+    return await sharp(buffer)
+      .rotate()
+      .resize({ width: 1200, height: 1200, fit: 'inside', withoutEnlargement: true })
+      .jpeg({ quality: 80 })
+      .toBuffer();
+  } catch (e) {
+    console.error('Gagal kompres foto, pakai file asli:', e);
+    return buffer;
+  }
 }
 
 export async function imageUploader(file: Buffer) {

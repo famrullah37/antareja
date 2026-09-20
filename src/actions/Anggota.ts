@@ -8,7 +8,7 @@ import {
 } from "@/queries/anggota.query";
 import { findTimsByUser } from "@/queries/tim.query";
 import { Kelas, Posisi } from "@prisma/client";
-import { imageUploader, validateUploadFile } from "./fileUploader";
+import { compressPhoto, imageUploader, validateUploadFile } from "./fileUploader";
 import { revalidatePath } from "next/cache";
 
 export async function upsertAnggotaForm(
@@ -43,9 +43,10 @@ export async function upsertAnggotaForm(
     if (foto.name !== "undefined") {
       const fileCheck = await validateUploadFile(foto, { maxMB: 10 });
       if (!fileCheck.valid) return { success: false, message: fileCheck.message };
-      const fotoBuffer = await foto.arrayBuffer();
-      const uploadedFoto = await imageUploader(Buffer.from(fotoBuffer));
-      fotoUrl = uploadedFoto?.data?.url;
+      const compressed = await compressPhoto(Buffer.from(await foto.arrayBuffer()));
+      const uploadedFoto = await imageUploader(compressed);
+      if (uploadedFoto.error) return { success: false, message: uploadedFoto.message };
+      fotoUrl = uploadedFoto.data?.url;
     }
 
     const anggotaData = { nama, email, telp, nisn, kelas, posisi, link_ig };

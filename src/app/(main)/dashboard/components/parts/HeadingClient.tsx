@@ -28,8 +28,6 @@ interface HeadingClientProps {
 export default function HeadingClient({ session, pengumumans }: HeadingClientProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const formDownloadLink =
-    "https://docs.google.com/document/d/1lPJ3RxCw1BA8M_vlP-MAAjuPPSm1Ickuf7dCLnkSjQw/export?format=docx";
   const manualDownloadLink =
     "https://drive.google.com/file/d/1SlmV82GvAk9OS0HNVWS-AUYIe6YiuU8C/view?usp=drive_link";
   
@@ -96,7 +94,6 @@ export default function HeadingClient({ session, pengumumans }: HeadingClientPro
       <RegistrationModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        formDownloadLink={formDownloadLink}
       />
     </>
   );

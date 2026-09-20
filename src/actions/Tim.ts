@@ -5,7 +5,12 @@ import { revalidatePath } from "next/cache";
 import { updateTim } from "@/queries/tim.query";
 import { Tipe } from "@prisma/client";
 import prisma from "@/lib/prisma";
-import { imageUploader, validateUploadFile } from "./fileUploader";
+import { compressPhoto, imageUploader, validateUploadFile } from "./fileUploader";
+import { buildFormulirPdf } from "@/lib/formulir";
+
+// Jumlah pasukan per tipe tim (di luar danton/official/pelatih) — dipakai
+// untuk mengecek kelengkapan data sebelum formulir registrasi bisa diunduh.
+const jumlahPasukan: Record<Tipe, number> = { SMALL: 12, NORMAL: 15 };
 
 async function requireAdmin() {
   const session = await getServerSession();
@@ -34,7 +39,6 @@ export async function updateTimForm(id: string, formData: FormData) {
   if (!tim || tim.userId !== session.user.id)
     return { success: false, message: "Forbidden" };
 
-  const link_berkas = formData.get("link_berkas") as string;
   const link_video = formData.get("link_video") as string;
   const foto = formData.get("foto") as File | null;
 
@@ -43,12 +47,13 @@ export async function updateTimForm(id: string, formData: FormData) {
     if (foto && foto.size > 0) {
       const fileCheck = await validateUploadFile(foto);
       if (!fileCheck.valid) return { success: false, message: fileCheck.message };
-      const upload = await imageUploader(Buffer.from(await foto.arrayBuffer()));
+      const compressed = await compressPhoto(Buffer.from(await foto.arrayBuffer()));
+      const upload = await imageUploader(compressed);
       if (upload.error) return { success: false, message: "Gagal upload foto tim" };
       fotoUrl = upload.data!.url;
     }
 
-    await updateTim({ id }, { link_berkas, link_video, ...(fotoUrl ? { foto: fotoUrl } : {}) });
+    await updateTim({ id }, { link_video, ...(fotoUrl ? { foto: fotoUrl } : {}) });
     revalidatePath("/", "layout");
     return { success: true, message: "Berhasil memperbarui Link" };
   } catch {
@@ -72,6 +77,43 @@ export async function updateTimFormAdmin(data: FormData, id: string) {
       return { success: false, message: "No. urut sudah dipakai tim lain di jenjang yang sama" };
     }
     return { success: false };
+  }
+}
+
+// Formulir registrasi otomatis-terisi, menggantikan template DOCX kosong
+// yang sebelumnya harus diisi manual — hanya bisa diunduh kalau data tim
+// sudah lengkap (kriteria sama dengan section "Anggota Tim" di dashboard:
+// jumlah anggota harus pas sesuai tipe_tim).
+export async function downloadFormulirPdf() {
+  const session = await getServerSession();
+  if (!session?.user?.id) return { success: false, message: "Unauthorized" };
+
+  const tim = await prisma.tim.findFirst({
+    where: { userId: session.user.id },
+    include: { anggotas: true },
+  });
+  if (!tim) return { success: false, message: "Tim tidak ditemukan" };
+
+  if (!tim.confirmed) {
+    return {
+      success: false,
+      message: "Pembayaran belum dikonfirmasi admin. Formulir belum bisa diunduh.",
+    };
+  }
+
+  const required = jumlahPasukan[tim.tipe_tim] + 3;
+  if (tim.anggotas.length !== required) {
+    return {
+      success: false,
+      message: `Lengkapi dulu data Anggota Tim (${tim.anggotas.length}/${required} terisi) sebelum mengunduh formulir.`,
+    };
+  }
+
+  try {
+    const pdf = await buildFormulirPdf(tim, tim.anggotas);
+    return { success: true, base64: pdf.toString("base64") };
+  } catch {
+    return { success: false, message: "Gagal membuat formulir" };
   }
 }
 

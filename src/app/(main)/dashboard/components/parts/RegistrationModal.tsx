@@ -1,8 +1,10 @@
-'use client'; 
+'use client';
 import { PrimaryButton } from '@/app/components/global/Button';
 import { H3, P } from '@/app/components/global/Text';
-import React from 'react';
+import React, { useState } from 'react';
 import { FaDownload } from 'react-icons/fa';
+import { toast } from 'sonner';
+import { downloadFormulirPdf } from '@/actions/Tim';
 
 const CloseIcon = ({ className = 'w-5 h-5' }: { className?: string }) => (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512" fill="currentColor" className={className}>
@@ -13,24 +15,43 @@ const CloseIcon = ({ className = 'w-5 h-5' }: { className?: string }) => (
 interface RegistrationModalProps {
     isOpen: boolean;
     onClose: () => void;
-    formDownloadLink: string;
 }
 
-export default function RegistrationModal({ isOpen, onClose, formDownloadLink }: RegistrationModalProps) {
+export default function RegistrationModal({ isOpen, onClose }: RegistrationModalProps) {
+    const [isDownloading, setIsDownloading] = useState(false);
+
     if (!isOpen) return null;
 
-    const handleDownload = () => {
-        if (formDownloadLink) {
+    const handleDownload = async () => {
+        setIsDownloading(true);
+        const toastId = toast.loading("Menyiapkan formulir...");
+        try {
+            const result = await downloadFormulirPdf();
+            if (!result.success || !result.base64) {
+                toast.error(result.message ?? "Gagal membuat formulir", { id: toastId });
+                return;
+            }
+
+            const byteChars = atob(result.base64);
+            const byteNumbers = new Array(byteChars.length);
+            for (let i = 0; i < byteChars.length; i++) byteNumbers[i] = byteChars.charCodeAt(i);
+            const blob = new Blob([new Uint8Array(byteNumbers)], { type: "application/pdf" });
+            const url = URL.createObjectURL(blob);
+
             const link = document.createElement('a');
-            link.href = formDownloadLink;
-            link.setAttribute('download', 'Formulir_Pendaftaran.docx');
+            link.href = url;
+            link.setAttribute('download', 'Formulir_Pendaftaran.pdf');
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
-            onClose(); 
-            console.log("Formulir pendaftaran diunduh melalui tombol PrimaryButton.");
-        } else {
-            console.error("Link unduhan formulir tidak tersedia.");
+            URL.revokeObjectURL(url);
+
+            toast.success("Formulir berhasil diunduh", { id: toastId });
+            onClose();
+        } catch {
+            toast.error("Gagal mengunduh formulir", { id: toastId });
+        } finally {
+            setIsDownloading(false);
         }
     };
 
@@ -58,22 +79,24 @@ export default function RegistrationModal({ isOpen, onClose, formDownloadLink }:
 
                 <div className="p-5 space-y-4 max-h-96 overflow-y-auto">
                     <P className="text-sm text-gray-600">
-                        Sebelum mengunduh formulir pendaftaran, pastikan Anda membaca dan memahami ketentuan berikut dengan seksama:
+                        Formulir ini otomatis terisi dari data tim dan anggota yang sudah kamu masukkan di dashboard. Sebelum mengunduh, pastikan kamu membaca ketentuan berikut:
                     </P>
 
                     <ul className="list-decimal list-inside text-gray-700 space-y-2 text-sm ml-4">
                         <li>
-                            <span className="font-semibold">Ukuran dan Format:</span> Formulir harus dicetak menggunakan <strong>kertas ukuran A4</strong> dalam posisi potret (portrait). 
-                            File tersedia dalam format <strong>DOCX</strong> dan dapat diisi secara digital atau manual.
-                        </li>                   
+                            <span className="font-semibold">Data Harus Lengkap:</span> Formulir hanya bisa diunduh apabila seluruh data Anggota Tim (Danton, Official, Pelatih, dan seluruh Pasukan) sudah diisi lengkap.
+                        </li>
                         <li>
-                            <span className="font-semibold">Penyerahan Formulir:</span> Formulir yang telah diisi harus <strong>dibawa langsung pada hari pelaksanaan kegiatan</strong>. 
+                            <span className="font-semibold">Format File:</span> Formulir diunduh dalam bentuk <strong>PDF</strong> berukuran <strong>A4</strong>, berisi data tim yang sudah tersimpan di sistem.
+                        </li>
+                        <li>
+                            <span className="font-semibold">Penyerahan Formulir:</span> Formulir yang sudah diunduh harus <strong>dibawa langsung pada hari pelaksanaan kegiatan</strong>.
                             Peserta wajib menyerahkan formulir kepada panitia saat registrasi ulang.
                         </li>
                     </ul>
 
                     <div className="bg-red-50 p-3 rounded-lg border border-red-200 text-sm text-red-800 font-medium mt-4">
-                        ⚠️ <span className="font-semibold">Perhatian:</span> Pastikan formulir dicetak dengan jelas dan tidak terpotong. Formulir yang tidak lengkap atau rusak dapat menyebabkan pembatalan pendaftaran.
+                        ⚠️ <span className="font-semibold">Perhatian:</span> Kalau ada data yang belum diisi, lengkapi dulu lewat menu Anggota Tim di dashboard sebelum mengunduh formulir.
                     </div>
                 </div>
 
@@ -82,9 +105,10 @@ export default function RegistrationModal({ isOpen, onClose, formDownloadLink }:
                     <PrimaryButton
                         onClick={handleDownload}
                         type="button"
-                        className="inline-flex gap-2 items-center bg-red-600 hover:bg-red-700"
+                        disabled={isDownloading}
+                        className="inline-flex gap-2 items-center bg-red-600 hover:bg-red-700 disabled:opacity-60"
                     >
-                         <FaDownload/> Unduh Formulir Sekarang
+                         <FaDownload/> {isDownloading ? "Menyiapkan..." : "Unduh Formulir Sekarang"}
                     </PrimaryButton>
                 </div>
             </div>
