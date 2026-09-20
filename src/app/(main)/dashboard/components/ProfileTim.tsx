@@ -276,18 +276,18 @@ export default function ProfileTim({
                   <img
                     src={preview}
                     alt="Pratinjau foto tim"
-                    className="w-32 h-32 rounded-full object-cover border-2 border-primary-500"
+                    className="w-40 h-40 rounded-xl object-cover border-2 border-primary-500"
                   />
                 ) : tim.foto ? (
                   <Image
                     src={tim.foto}
                     alt={tim.nama_tim}
-                    width={128}
-                    height={128}
-                    className="w-32 h-32 rounded-full object-cover border border-neutral-200"
+                    width={160}
+                    height={160}
+                    className="w-40 h-40 rounded-xl object-cover border border-neutral-200"
                   />
                 ) : (
-                  <div className="w-32 h-32 rounded-full bg-primary-100 text-primary-600 text-2xl font-bold flex items-center justify-center border border-neutral-200">
+                  <div className="w-40 h-40 rounded-xl bg-primary-100 text-primary-600 text-2xl font-bold flex items-center justify-center border border-neutral-200">
                     {initials(tim.nama_tim)}
                   </div>
                 )}

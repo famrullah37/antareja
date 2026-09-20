@@ -113,10 +113,10 @@ export default function TimForm({
               <Image
                 src={data.foto}
                 alt={`Foto ${data.nama_tim}`}
-                width={112}
-                height={112}
+                width={128}
+                height={128}
                 unoptimized
-                className="w-28 h-28 rounded-full object-cover border border-neutral-200"
+                className="w-32 h-32 rounded-xl object-cover border border-neutral-200"
               />
               <a
                 href={toDownloadUrl(data.foto, `Foto-Tim-${data.nama_tim}`)}
