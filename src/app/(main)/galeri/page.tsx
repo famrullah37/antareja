@@ -5,6 +5,13 @@ import { findKonfigTiket } from "@/queries/tiket.query";
 import { getServerSession } from "@/lib/next-auth";
 import GaleriClient from "./GaleriClient";
 
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Galeri Foto",
+  description: "Galeri foto dokumentasi LKBB Antareja: lihat foto aksi tim peserta dan unduh foto favoritmu.",
+};
+
 export default async function GaleriPage() {
   const [albums, fotos, session, konfig] = await Promise.all([
     findAlbums({ statusPublish: true }),

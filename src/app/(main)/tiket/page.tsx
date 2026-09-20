@@ -2,6 +2,13 @@ import { findTikets, findKonfigTiket } from "@/queries/tiket.query";
 import { getServerSession } from "@/lib/next-auth";
 import BeliTiketForm from "./BeliTiketForm";
 
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Tiket Penonton",
+  description: "Beli tiket penonton LKBB Antareja 2026 dan saksikan langsung aksi tim-tim terbaik se-Jawa Timur.",
+};
+
 export default async function TiketPage() {
   const [tikets, session, konfig] = await Promise.all([
     findTikets(),

@@ -21,7 +21,21 @@ const nextConfig = {
       },
     ],
   },
-  productionBrowserSourceMaps: false, 
+  productionBrowserSourceMaps: false,
+  // Halaman privat tidak boleh masuk indeks mesin pencari (berlapis dengan robots.txt: robots.txt cuma
+  // meminta crawler tidak merayap, header ini melarang mengindeks walau URL-nya ditemukan dari tempat lain).
+  async headers() {
+    const noindex = [{ key: "X-Robots-Tag", value: "noindex, nofollow" }];
+    return [
+      "/admin/:path*",
+      "/dashboard/:path*",
+      "/form",
+      "/confirmation",
+      "/auth/login",
+      "/auth/verify",
+      "/galeri/download/:path*",
+    ].map((source) => ({ source, headers: noindex }));
+  }, 
 };
 
 export default nextConfig;

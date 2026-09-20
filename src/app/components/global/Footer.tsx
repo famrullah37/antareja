@@ -1,39 +1,27 @@
-﻿import Image from "next/image";
+import Image from "next/image";
 import { P } from "./Text";
 import Link from "next/link";
 import { FaTiktok, FaInstagram, FaYoutube } from "react-icons/fa";
+import { siteConfig } from "@/config/site";
 
 interface FootOption {
   label: string;
   href: string;
 }
 
-interface SocialOption {
-  icon: JSX.Element;
-  href: string;
-}
-
 const FootOptions: FootOption[] = [
   { label: "Beranda", href: "/" },
-  { label: "Kategori", href: "#Kategori" },
-  { label: "Video", href: "#video" },
-  { label: "Pendaftaran", href: "#daftar" },
+  { label: "Kategori", href: "/#Kategori" },
+  { label: "Video", href: "/#video" },
+  { label: "Pendaftaran", href: "/#daftar" },
 ];
 
-const SocialOptions: SocialOption[] = [
-  {
-    icon: <FaTiktok />,
-    href: "https://www.tiktok.com/@lpkbb.antareja?_t=8m7ZSCGDxVC&_r=1",
-  },
-  {
-    icon: <FaInstagram />,
-    href: "https://www.instagram.com/lpkbb.antareja?igsh=MWRtamhocHQ1aGt2bg==",
-  },
-  {
-    icon: <FaYoutube />,
-    href: "https://youtube.com/@lkbb.antareja?si=Rg13cGu9_Qyn2k-l",
-  },
-];
+// Akun media sosial resmi: satu sumber di src/config/site.ts.
+const socials = [
+  { icon: <FaTiktok />, href: siteConfig.social.tiktok, label: "TikTok" },
+  { icon: <FaInstagram />, href: siteConfig.social.instagram, label: "Instagram" },
+  { icon: <FaYoutube />, href: siteConfig.social.youtube, label: "YouTube" },
+].filter((s) => !!s.href);
 
 export default function Footer() {
   return (
@@ -63,18 +51,22 @@ export default function Footer() {
                 </Link>
               ))}
             </div>
-            <div className="flex gap-2 sm:gap-3">
-              {SocialOptions.map((soc) => (
-                <Link
-                  href={soc.href}
-                  target="_blank"
-                  key={soc.href}
-                  className="p-[14px] bg-neutral-400 text-primary-500 text-[18px] rounded-2xl"
-                >
-                  {soc.icon}
-                </Link>
-              ))}
-            </div>
+            {socials.length > 0 && (
+              <div className="flex gap-2 sm:gap-3">
+                {socials.map((soc) => (
+                  <Link
+                    href={soc.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label={soc.label}
+                    key={soc.label}
+                    className="p-[14px] bg-neutral-400 text-primary-500 text-[18px] rounded-2xl"
+                  >
+                    {soc.icon}
+                  </Link>
+                ))}
+              </div>
+            )}
           </div>
         </div>
         <div className="w-full">

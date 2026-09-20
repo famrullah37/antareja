@@ -1,11 +1,11 @@
-﻿import { RightArrow } from "@/app/components/global/Icons";
+import { RightArrow } from "@/app/components/global/Icons";
 import { SecondaryLinkButton } from "@/app/components/global/LinkButton";
 import SectionWrapper from "@/app/components/global/Wrapper";
 import Image from "next/image";
 
 export default function Daftar() {
   return (
-    <SectionWrapper>
+    <SectionWrapper id="daftar">
       <div className="relative w-full rounded-3xl overflow-hidden">
         {/* Background image */}
         <Image
