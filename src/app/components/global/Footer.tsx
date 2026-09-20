@@ -15,7 +15,7 @@ interface SocialOption {
 
 const FootOptions: FootOption[] = [
   { label: "Beranda", href: "/" },
-  { label: "Antareja", href: "#antareja" },
+  { label: "Kategori", href: "#Kategori" },
   { label: "Video", href: "#video" },
   { label: "Pendaftaran", href: "#daftar" },
 ];

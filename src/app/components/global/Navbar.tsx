@@ -15,9 +15,10 @@ interface NavOption {
   href: string;
 }
 
-const NavOptions: NavOption[] = [
+// Pengunjung (belum login): menu lengkap ke bagian-bagian halaman utama.
+const PublicNav: NavOption[] = [
   { label: "Beranda", href: "/#hero" },
-  { label: "Antareja", href: "/#antareja" },
+  { label: "Kategori", href: "/#Kategori" },
   { label: "Alur Daftar", href: "/#video" },
   { label: "Timeline", href: "/#timeline" },
   { label: "Juri", href: "/#juri" },
@@ -25,6 +26,18 @@ const NavOptions: NavOption[] = [
   { label: "Galeri", href: "/galeri" },
   { label: "Vote", href: "/vote" },
 ];
+
+// Setelah login: ringkas — buang pintasan promosi halaman utama (Alur Daftar, Timeline, Juri, dst.)
+// yang tidak relevan lagi, tambah link ke Dashboard/Admin Panel langsung di navbar.
+function memberNav(role?: string): NavOption[] {
+  return [
+    { label: "Beranda", href: "/" },
+    role === "USER" ? { label: "Dashboard", href: "/dashboard" } : { label: "Admin Panel", href: "/admin" },
+    { label: "Tiket", href: "/#tiket" },
+    { label: "Galeri", href: "/galeri" },
+    { label: "Vote", href: "/vote" },
+  ];
+}
 
 const OrgLogos = [
   { src: "/image/logo-osis.png",          alt: "OSIS SMK Telkom Malang" },
@@ -46,6 +59,17 @@ export default function Navbar() {
   }, [pathname]);
 
   const navText = "text-gray-600 hover:text-primary-500";
+
+  const isMember = status === "authenticated";
+  const navOptions = isMember ? memberNav(session?.user?.role) : PublicNav;
+  const dashboardHref = session?.user?.role === "USER" ? "/dashboard" : "/admin";
+  const dashboardLabel = session?.user?.role === "USER" ? "Dashboard" : "Admin Panel";
+
+  // Menu ke halaman utuh (bukan anchor bagian halaman utama) ditandai aktif.
+  const isActive = (href: string) => {
+    if (href.includes("#")) return false;
+    return href === "/" ? pathname === "/" : pathname.startsWith(href);
+  };
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-[999]">
@@ -85,12 +109,20 @@ export default function Navbar() {
           </div>
 
           {/* ── Tengah: Nav links ── */}
-          <div className="hidden lg:flex items-center gap-6 flex-1 justify-center">
-            {NavOptions.map((nav) => (
+          {/* Selama status sesi belum diketahui, tautan disembunyikan (tempat tetap) supaya
+              menu lengkap tidak sempat berkedip lalu mengecil untuk user yang sudah login. */}
+          <div
+            className={`hidden lg:flex items-center gap-6 flex-1 justify-center transition-opacity duration-200 ${
+              status === "loading" ? "opacity-0" : "opacity-100"
+            }`}
+          >
+            {navOptions.map((nav) => (
               <Link
                 href={nav.href}
                 key={nav.label}
-                className={`text-sm font-medium transition-all duration-200 ${navText}`}
+                className={`text-sm font-medium transition-all duration-200 ${
+                  isActive(nav.href) ? "text-primary-500 font-semibold" : navText
+                }`}
               >
                 {nav.label}
               </Link>
@@ -128,11 +160,11 @@ export default function Navbar() {
                       <p className="text-xs text-gray-400 truncate">{session.user?.email}</p>
                     </div>
                     <Link
-                      href={session.user?.role === "ADMIN" ? "/admin" : "/dashboard"}
+                      href={dashboardHref}
                       className="flex items-center px-4 py-3 text-sm text-neutral-700 hover:bg-neutral-50 transition-colors"
                       onClick={() => setIsOpened(false)}
                     >
-                      {session.user?.role === "ADMIN" ? "Admin Panel" : "Dashboard"}
+                      {dashboardLabel}
                     </Link>
                     <button
                       onClick={handleSignOut}
@@ -181,12 +213,14 @@ export default function Navbar() {
         {/* ── Mobile menu ── */}
         {isExpanded && (
           <div className="lg:hidden border-t border-white/10 px-6 py-5 flex flex-col gap-4 bg-neutral-950/95 backdrop-blur-md">
-            {NavOptions.map((nav) => (
+            {navOptions.map((nav) => (
               <Link
                 key={nav.label}
                 href={nav.href}
                 onClick={() => setIsExpanded(false)}
-                className="text-white/80 text-base font-medium hover:text-primary-400 transition-colors"
+                className={`text-base font-medium transition-colors ${
+                  isActive(nav.href) ? "text-primary-400 font-semibold" : "text-white/80 hover:text-primary-400"
+                }`}
               >
                 {nav.label}
               </Link>
@@ -194,13 +228,6 @@ export default function Navbar() {
             <div className="h-px bg-white/10 my-1" />
             {status === "authenticated" ? (
               <>
-                <Link
-                  href={session?.user?.role === "ADMIN" ? "/admin" : "/dashboard"}
-                  onClick={() => setIsExpanded(false)}
-                  className="text-white/80 text-base font-medium hover:text-primary-400 transition-colors"
-                >
-                  {session?.user?.role === "ADMIN" ? "Admin Panel" : "Dashboard"}
-                </Link>
                 <button
                   onClick={handleSignOut}
                   disabled={signingOut}
