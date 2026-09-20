@@ -57,13 +57,16 @@ const POSISI_PASUKAN = [
 export async function buildFormulirPdf(tim: Tim, anggotas: Anggota[]): Promise<Buffer> {
   const danton = anggotas.find((a) => a.posisi === "DANTON");
   const official = anggotas.find((a) => a.posisi === "OFFICIAL");
+  const pelatih = anggotas.find((a) => a.posisi === "PELATIH");
   const pasukan = POSISI_PASUKAN.map((p) => anggotas.find((a) => a.posisi === p)).filter(
     (a): a is Anggota => !!a
   );
 
-  const [kop, fotoDanton, fotoPasukan] = await Promise.all([
+  const [kop, fotoDanton, fotoPelatih, fotoOfficial, fotoPasukan] = await Promise.all([
     getKop(),
     danton?.foto ? fetchFotoBox(danton.foto) : Promise.resolve(null),
+    pelatih?.foto ? fetchFotoBox(pelatih.foto) : Promise.resolve(null),
+    official?.foto ? fetchFotoBox(official.foto) : Promise.resolve(null),
     Promise.all(pasukan.map((a) => (a.foto ? fetchFotoBox(a.foto) : Promise.resolve(null)))),
   ]);
 
@@ -106,7 +109,7 @@ export async function buildFormulirPdf(tim: Tim, anggotas: Anggota[]): Promise<B
 
     const fields: [string, string][] = [
       ["Asal Sekolah", tim.asal_sekolah],
-      ["Jumlah Tim", `1 Tim (${pasukan.length + 1} Anggota: ${pasukan.length} Pasukan + 1 Danton)`],
+      ["Jumlah Tim", `1 Tim (${pasukan.length} Anggota + 1 Danton)`],
       ["Nama Pelatih", tim.pelatih],
       ["Nama Official", official?.nama ?? "-"],
     ];
@@ -118,7 +121,7 @@ export async function buildFormulirPdf(tim: Tim, anggotas: Anggota[]): Promise<B
     }
     y += 10;
 
-    doc.font("Helvetica-Bold").fontSize(11).text("Dokumen Foto Pasukan dan Danton", PAGE_MARGIN_X, y, {
+    doc.font("Helvetica-Bold").fontSize(11).text("Dokumen Foto Pelatih, Official, Danton dan Pasukan", PAGE_MARGIN_X, y, {
       width: contentW,
       align: "center",
     });
@@ -149,8 +152,11 @@ export async function buildFormulirPdf(tim: Tim, anggotas: Anggota[]): Promise<B
       }
     };
 
-    // Halaman 1: Danton di tengah + satu baris pasukan pertama (sama seperti template).
+    // Halaman 1: Danton di tengah diapit Pelatih & Official, lalu satu baris
+    // pasukan pertama (susunan sama seperti template).
+    drawBox(colX(0), y, fotoPelatih, tim.pelatih, "Pelatih");
     drawBox(colX(1), y, fotoDanton, danton?.nama ?? "-", "Danton");
+    drawBox(colX(2), y, fotoOfficial, official?.nama ?? "-", "Official");
     y += ROW_PITCH + 12; // nama Danton bisa 2 baris + label, butuh ruang ekstra
 
     const rows: number[][] = [];

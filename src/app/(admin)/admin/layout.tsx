@@ -1,6 +1,7 @@
 "use client";
 
-import { signOut, useSession } from "next-auth/react";
+import { useSession } from "next-auth/react";
+import { useSignOut } from "@/app/components/global/useSignOut";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Fragment, useEffect, useState } from "react";
@@ -17,6 +18,7 @@ export default function AdminLayout({
   const [isExpanded, setIsExpanded] = useState(false);
   const { data: session } = useSession();
   const pathname = usePathname();
+  const { signingOut, handleSignOut } = useSignOut();
   const pathnameSplit = pathname.split("/");
   pathnameSplit.shift();
   const allowedRoutes = protectedRoutes.filter((item) =>
@@ -61,10 +63,11 @@ export default function AdminLayout({
               </Link>
             ))}
             <button
-              className={`rounded-full text-center text-primary-500 text-[16px] transition-all duration-300 hover:text-primary-400`}
-              onClick={() => signOut({ callbackUrl: "/auth/login" })}
+              className={`rounded-full text-center text-primary-500 text-[16px] transition-all duration-300 hover:text-primary-400 disabled:opacity-60`}
+              onClick={handleSignOut}
+              disabled={signingOut}
             >
-              Sign Out
+              {signingOut ? "Keluar..." : "Sign Out"}
             </button>
           </div>
         </div>

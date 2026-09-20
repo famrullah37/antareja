@@ -1,6 +1,7 @@
 ﻿"use client";
 
-import { useSession, signOut } from "next-auth/react";
+import { useSession } from "next-auth/react";
+import { useSignOut } from "./useSignOut";
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -37,6 +38,7 @@ export default function Navbar() {
   const { status, data: session } = useSession();
   const pathname = usePathname();
   const router = useRouter();
+  const { signingOut, handleSignOut } = useSignOut();
 
   useEffect(() => {
     setIsOpened(false);
@@ -133,10 +135,11 @@ export default function Navbar() {
                       {session.user?.role === "ADMIN" ? "Admin Panel" : "Dashboard"}
                     </Link>
                     <button
-                      onClick={() => signOut({ callbackUrl: "/auth/login" })}
-                      className="w-full flex items-center px-4 py-3 text-sm text-primary-500 hover:bg-primary-50 transition-colors"
+                      onClick={handleSignOut}
+                      disabled={signingOut}
+                      className="w-full flex items-center px-4 py-3 text-sm text-primary-500 hover:bg-primary-50 transition-colors disabled:opacity-60"
                     >
-                      Sign Out
+                      {signingOut ? "Keluar..." : "Sign Out"}
                     </button>
                   </div>
                 )}
@@ -199,10 +202,11 @@ export default function Navbar() {
                   {session?.user?.role === "ADMIN" ? "Admin Panel" : "Dashboard"}
                 </Link>
                 <button
-                  onClick={() => signOut({ callbackUrl: "/auth/login" })}
-                  className="text-primary-400 text-base font-medium text-left hover:text-primary-300 transition-colors"
+                  onClick={handleSignOut}
+                  disabled={signingOut}
+                  className="text-primary-400 text-base font-medium text-left hover:text-primary-300 transition-colors disabled:opacity-60"
                 >
-                  Sign Out
+                  {signingOut ? "Keluar..." : "Sign Out"}
                 </button>
               </>
             ) : status === "loading" ? null : (

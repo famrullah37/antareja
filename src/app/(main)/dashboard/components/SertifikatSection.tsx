@@ -54,7 +54,22 @@ function SertifikatCard({ s }: { s: SertifikatData }) {
 }
 
 export default function SertifikatSection({ sertifikat }: { sertifikat: SertifikatData[] }) {
-  if (!sertifikat || sertifikat.length === 0) return null;
+  if (!sertifikat || sertifikat.length === 0) {
+    return (
+      <SectionWrapper id="sertifikat-saya">
+        <H2 className="mb-4">Sertifikat</H2>
+        <div className="bg-white rounded-xl border border-dashed border-gray-300 p-6 flex items-center gap-4">
+          <FaAward className="text-gray-300 text-4xl shrink-0" />
+          <div>
+            <div className="font-semibold text-sm text-gray-700">Sertifikat belum tersedia</div>
+            <div className="text-xs text-gray-400">
+              Sertifikat tim & anggota akan muncul di sini dan bisa diunduh setelah diunggah oleh panitia.
+            </div>
+          </div>
+        </div>
+      </SectionWrapper>
+    );
+  }
 
   return (
     <SectionWrapper id="sertifikat-saya">

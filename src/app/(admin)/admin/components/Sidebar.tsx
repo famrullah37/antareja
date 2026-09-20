@@ -4,7 +4,7 @@ import { PrimaryButton } from "@/app/components/global/Button";
 import { H3 } from "@/app/components/global/Text";
 import { protectedRoutes } from "@/utils/protectedRoutes";
 import { Session } from "next-auth";
-import { signOut } from "next-auth/react";
+import { useSignOut } from "@/app/components/global/useSignOut";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { FaArrowRight } from "react-icons/fa";
@@ -16,6 +16,7 @@ interface Sidenavprops {
 
 export default function Sidebar({ active, session }: Readonly<Sidenavprops>) {
   const pathname = usePathname();
+  const { signingOut, handleSignOut } = useSignOut("/");
   const allowedRoutes = protectedRoutes.filter((item) =>
     item.roles.includes(session?.user?.role!)
   );
@@ -57,10 +58,11 @@ export default function Sidebar({ active, session }: Readonly<Sidenavprops>) {
             </ul>
             <PrimaryButton
               type="button"
-              onClick={() => signOut({ callbackUrl: "/" })}
+              onClick={handleSignOut}
+              disabled={signingOut}
               className="w-full"
             >
-              Sign Out
+              {signingOut ? "Keluar..." : "Sign Out"}
             </PrimaryButton>
           </div>
         </div>
