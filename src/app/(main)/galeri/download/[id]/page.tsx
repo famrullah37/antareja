@@ -4,10 +4,7 @@ import prisma from "@/lib/prisma";
 import { notFound } from "next/navigation";
 import Image from "next/image";
 import AutoDownload from "./AutoDownload";
-
-function toDownloadUrl(url: string) {
-  return url.replace("/upload/", "/upload/fl_attachment/");
-}
+import { toDownloadUrl } from "@/lib/downloadUrl";
 
 export default async function DownloadPage({ params }: { params: { id: string } }) {
   const transaksi = await prisma.transaksiFoto.findUnique({
@@ -25,7 +22,7 @@ export default async function DownloadPage({ params }: { params: { id: string } 
         })
       : [];
 
-  const downloadUrls = fotos.map((f) => toDownloadUrl(f.pathAsli));
+  const downloadUrls = fotos.map((f, i) => toDownloadUrl(f.pathAsli, f.tagTim ?? `Foto-${i + 1}`));
 
   return (
     <div className="min-h-screen bg-neutral-50">
@@ -101,7 +98,7 @@ export default async function DownloadPage({ params }: { params: { id: string } 
                       <p className="text-xs text-gray-500 truncate">{foto.tagTim}</p>
                     )}
                     <a
-                      href={toDownloadUrl(foto.pathAsli)}
+                      href={toDownloadUrl(foto.pathAsli, foto.tagTim ?? `Foto-${idx + 1}`)}
                       download
                       className="text-center bg-primary-500 hover:bg-primary-600 text-white text-xs font-semibold py-1.5 rounded-lg transition-colors"
                     >

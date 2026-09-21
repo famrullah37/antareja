@@ -2,6 +2,7 @@
 
 import { beliFoto } from "@/actions/Galeri";
 import { getDynamicQrisTiket } from "@/actions/Tiket";
+import { toDownloadUrl } from "@/lib/downloadUrl";
 import Image from "next/image";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -30,10 +31,6 @@ type KonfigTiket = {
   bankNoRek?: string | null;
   bankAtasNama?: string | null;
 } | null;
-
-function toDownloadUrl(url: string) {
-  return url.replace("/upload/", "/upload/fl_attachment/");
-}
 
 function formatRupiah(n: number) {
   return new Intl.NumberFormat("id-ID", {
@@ -248,7 +245,7 @@ export default function GaleriClient({
 
                 {isGratis && (
                   <a
-                    href={toDownloadUrl(foto.pathAsli)}
+                    href={toDownloadUrl(foto.pathAsli, foto.tagTim ? `Foto-${foto.tagTim}` : `Foto-${foto.album.nama}`)}
                     target="_blank"
                     rel="noreferrer"
                     onClick={(e) => e.stopPropagation()}

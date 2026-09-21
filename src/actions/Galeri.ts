@@ -15,6 +15,7 @@ import { imageUploader, validateUploadFile } from "./fileUploader";
 import { addWatermark } from "@/lib/watermark";
 import { sendMailTo } from "@/lib/mailer";
 import prisma from "@/lib/prisma";
+import { toDownloadUrl } from "@/lib/downloadUrl";
 
 async function requireAdmin() {
   const session = await getServerSession();
@@ -180,11 +181,10 @@ export async function verifikasiFoto(transaksiId: string) {
       try {
         const fotoIds = transaksi.fotoList as string[];
         const fotos = await prisma.foto.findMany({ where: { id: { in: fotoIds } }, select: { id: true, pathAsli: true, tagTim: true } });
-        const toDownloadUrl = (url: string) => url.replace("/upload/", "/upload/fl_attachment/");
         const baseUrl = (process.env.NEXTAUTH_URL ?? "").replace(/\/$/, "");
         const downloadPageUrl = `${baseUrl}/galeri/download/${transaksiId}`;
         const fotoLinks = fotos.map((f, i) =>
-          `<li style="margin-bottom:8px"><a href="${toDownloadUrl(f.pathAsli)}" download style="background:#F70048;color:#fff;padding:6px 14px;border-radius:6px;text-decoration:none;font-weight:bold;font-size:13px;display:inline-block">⬇ Unduh Foto ${i + 1}${f.tagTim ? ` — ${f.tagTim}` : ""}</a></li>`
+          `<li style="margin-bottom:8px"><a href="${toDownloadUrl(f.pathAsli, f.tagTim ?? `Foto-${i + 1}`)}" download style="background:#F70048;color:#fff;padding:6px 14px;border-radius:6px;text-decoration:none;font-weight:bold;font-size:13px;display:inline-block">⬇ Unduh Foto ${i + 1}${f.tagTim ? ` — ${f.tagTim}` : ""}</a></li>`
         ).join("");
         await sendMailTo({
           to: userEmail,
