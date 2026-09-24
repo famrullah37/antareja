@@ -1,6 +1,7 @@
 "use client";
 
 import { signOut, useSession } from "next-auth/react";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { toast } from "sonner";
 
@@ -38,6 +39,8 @@ function writeLastActivity(t: number) {
 
 export default function IdleLogout() {
   const { status } = useSession();
+  const pathname = usePathname();
+  const router = useRouter();
 
   // Pesan setelah diarahkan ke landing page karena idle (toast sebelum reload akan hilang).
   useEffect(() => {
@@ -55,12 +58,20 @@ export default function IdleLogout() {
   }, []);
 
   useEffect(() => {
-    // Terlihat logout (mis. di landing/login): buang catatan lama supaya login
-    // berikutnya tidak langsung dianggap idle.
+    // Sesi berakhir (JWT expired/dicabut, dsb) bisa terjadi kapan saja tanpa
+    // lewat logout() di bawah (mis. cookie 30 hari akhirnya habis) — tanpa
+    // redirect ini, user tetap di halaman admin/dashboard yang sudah
+    // ter-render dengan data lama, kelihatan seperti masih login padahal
+    // sesinya sudah mati di server. Cuma redirect kalau memang di halaman
+    // yang butuh login, supaya pengunjung biasa di landing page tidak
+    // ke-lempar ke /auth/login.
     if (status === "unauthenticated") {
       try {
         localStorage.removeItem(ACTIVITY_KEY);
       } catch {}
+      if (pathname?.startsWith("/admin") || pathname?.startsWith("/dashboard")) {
+        router.replace("/auth/login");
+      }
       return;
     }
     if (status !== "authenticated") return;
@@ -124,6 +135,9 @@ export default function IdleLogout() {
       window.removeEventListener("focus", check);
       window.removeEventListener("pageshow", check);
     };
+    // pathname/router sengaja tidak dimasukkan — efek ini cuma perlu jalan
+    // ulang saat status auth berubah, bukan tiap pindah halaman.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status]);
 
   return null;
