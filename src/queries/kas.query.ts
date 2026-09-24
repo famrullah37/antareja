@@ -15,7 +15,11 @@ export async function getLaporanKas() {
       prisma.tim.count({ where: { confirmed: true } }),
     ]);
 
-  // Per jenis tiket (VERIFIED)
+  // Per jenis tiket (VERIFIED) — nominal HARUS termasuk kode unik untuk
+  // tiket online (tiket.harga * jumlah + kodeUnik), itulah nominal yang
+  // benar-benar diterima lewat transfer/QRIS. Tiket offline/tunai tidak
+  // pernah punya kodeUnik (jualTiketOffline tidak mencadangkannya), jadi
+  // aman: (tr.kodeUnik ? parseInt(tr.kodeUnik) : 0) otomatis 0 untuknya.
   const perJenisTiket: Record<
     string,
     { jenis: string; harga: number; terjual: number; pendapatan: number }
@@ -23,7 +27,8 @@ export async function getLaporanKas() {
   let totalTiketVerified = 0;
   for (const tr of transaksiTikets) {
     if (tr.status !== "VERIFIED") continue;
-    totalTiketVerified += tr.tiket.harga * tr.jumlah;
+    const totalBayarTiket = tr.tiket.harga * tr.jumlah + (tr.kodeUnik ? parseInt(tr.kodeUnik) : 0);
+    totalTiketVerified += totalBayarTiket;
     if (!perJenisTiket[tr.tiketId]) {
       perJenisTiket[tr.tiketId] = {
         jenis: tr.tiket.jenis,
@@ -33,7 +38,7 @@ export async function getLaporanKas() {
       };
     }
     perJenisTiket[tr.tiketId].terjual += tr.jumlah;
-    perJenisTiket[tr.tiketId].pendapatan += tr.tiket.harga * tr.jumlah;
+    perJenisTiket[tr.tiketId].pendapatan += totalBayarTiket;
   }
 
   const totalFotoVerified = transaksiFotos
@@ -43,10 +48,10 @@ export async function getLaporanKas() {
   const verifiedTikets = transaksiTikets.filter((t) => t.status === "VERIFIED");
   const totalOffline = verifiedTikets
     .filter((t) => t.jenisJual === "OFFLINE")
-    .reduce((s, t) => s + t.tiket.harga * t.jumlah, 0);
+    .reduce((s, t) => s + t.tiket.harga * t.jumlah + (t.kodeUnik ? parseInt(t.kodeUnik) : 0), 0);
   const totalOnline = verifiedTikets
     .filter((t) => t.jenisJual !== "OFFLINE")
-    .reduce((s, t) => s + t.tiket.harga * t.jumlah, 0);
+    .reduce((s, t) => s + t.tiket.harga * t.jumlah + (t.kodeUnik ? parseInt(t.kodeUnik) : 0), 0);
 
   const totalPemasukan = kasTransaksis
     .filter((k) => k.tipe === "PEMASUKAN")
@@ -60,11 +65,15 @@ export async function getLaporanKas() {
   const totalVotingVerified = kasTransaksis
     .filter((k) => k.tipe === "PEMASUKAN" && k.sumber === "VOTING")
     .reduce((s, k) => s + k.jumlah, 0);
+  const totalPendaftaranVerified = kasTransaksis
+    .filter((k) => k.tipe === "PEMASUKAN" && k.sumber === "PENDAFTARAN")
+    .reduce((s, k) => s + k.jumlah, 0);
 
   return {
     totalTiketVerified,
     totalFotoVerified,
     totalVotingVerified,
+    totalPendaftaranVerified,
     totalPendapatan: totalPemasukan,
     totalPengeluaran,
     saldo: totalPemasukan - totalPengeluaran,

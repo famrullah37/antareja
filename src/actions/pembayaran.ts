@@ -262,6 +262,19 @@ async function setStatusPembayaran(timId: string, confirmed: boolean, isDP: bool
 
   const jumlah = await biayaPendaftaran(tim.jenjang, isDP);
 
+  // Kas HARUS mencatat nominal yang benar-benar ditransfer (hargaDasar +
+  // kode unik), bukan cuma hargaDasar — sama pola dengan Tiket/Foto/Voting.
+  // Kuitansi tetap pakai `jumlah` polos (tanpa kode unik), lihat komentar di
+  // generateDanKirimKuitansi.
+  const pembayaran = await prisma.pembayaran.findUnique({ where: { tim_id: timId } });
+  const kodeUnikAngka = pembayaran?.kodeUnik ? parseInt(pembayaran.kodeUnik) : 0;
+  const totalBayar = jumlah + kodeUnikAngka;
+  // isDP bisa berubah saat konfirmasi (beda dari saat pendaftaran) — jaga
+  // Pembayaran.totalBayar tetap sinkron dengan hargaDasar yang berlaku sekarang.
+  if (pembayaran && pembayaran.totalBayar !== totalBayar) {
+    await prisma.pembayaran.update({ where: { tim_id: timId }, data: { totalBayar } });
+  }
+
   const existing = await prisma.kasTransaksi.findFirst({
     where: { sumber: "PENDAFTARAN", referensiId: timId },
   });
@@ -269,8 +282,8 @@ async function setStatusPembayaran(timId: string, confirmed: boolean, isDP: bool
     await prisma.kasTransaksi.create({
       data: {
         tipe: "PEMASUKAN",
-        keterangan: `Pendaftaran Tim ${tim.nama_tim} — ${tim.asal_sekolah}`,
-        jumlah,
+        keterangan: `Pendaftaran Tim ${tim.nama_tim} — ${tim.asal_sekolah}${pembayaran?.kodeUnik ? ` [#${pembayaran.kodeUnik}]` : ""}`,
+        jumlah: totalBayar,
         kategori: "PENDAFTARAN_TIM",
         sumber: "PENDAFTARAN",
         referensiId: timId,
