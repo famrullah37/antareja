@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { sendMailTo } from "@/lib/mailer";
 import QRCode from "qrcode";
 import { buildDynamicQrisImage, decodeQrisFromImage } from "@/lib/qris";
+import { catatLog } from "@/lib/activityLog";
 
 async function requireAdmin() {
   const session = await getServerSession();
@@ -21,6 +22,7 @@ import {
   deleteTiket,
   findKonfigTiket,
   findTransaksiTiket,
+  incrementCounterUrutTiket,
   updateQRTiket,
   updateTiket,
   updateTransaksiTiket,
@@ -118,15 +120,40 @@ export async function deleteTiketAdmin(id: string) {
 
 // ─── User: Beli Tiket ─────────────────────────────────────────────────────────
 
+// Cadangkan kode unik 3 digit secara atomik (counter di KonfigTiket, sama
+// pola dengan reserveKodeVoting/reserveKodePendaftaran) — dipanggil dari
+// form begitu jenis tiket & jumlah dipilih, supaya nominal yang ditampilkan
+// (harga + kode unik) sudah pasti sebelum user membayar.
+export async function reserveKodeTiket() {
+  try {
+    const updated = await incrementCounterUrutTiket();
+    const kodeUnik = String(updated.counterUrutTiket % 1000).padStart(3, "0");
+    return { success: true, kodeUnik };
+  } catch (e) {
+    console.error("reserveKodeTiket error:", e);
+    return { success: false };
+  }
+}
+
 export async function beliTiket(data: FormData, userId?: string) {
   const tiketId = data.get("tiketId") as string;
   const jumlah = parseInt(data.get("jumlah") as string);
   const nama = data.get("nama") as string;
   const email = data.get("email") as string;
   const noHp = data.get("noHp") as string;
-  const bukti = data.get("bukti") as File;
+  const bukti = data.get("bukti") as File | null;
   const metodePembayaran = (data.get("metodePembayaran") as string) || "TRANSFER";
   const kodeUnik = data.get("kodeUnik") as string | null;
+
+  // Bukti wajib untuk transfer manual (admin tidak punya cara lain
+  // memverifikasi) — untuk QRIS opsional karena nominal sudah unik lewat
+  // kodeUnik, admin cocokkan manual dari riwayat QRIS/mutasi rekening.
+  if (metodePembayaran !== "QRIS" && (!bukti || bukti.size === 0)) {
+    return { success: false, message: "Bukti pembayaran wajib diunggah" };
+  }
+  if (!kodeUnik || !/^\d{3}$/.test(kodeUnik)) {
+    return { success: false, message: "Kode pembayaran tidak valid, silakan pilih ulang jumlah tiket" };
+  }
 
   // Upload bukti dulu sebelum transaksi DB
   let buktiUrl: string | undefined;
@@ -149,15 +176,12 @@ export async function beliTiket(data: FormData, userId?: string) {
       if (jumlah < 1) throw new Error("JUMLAH_INVALID");
       if (tiket.sisa < jumlah) throw new Error("STOK_KURANG");
 
-      // Cegah dua transaksi memakai kodeUnik yang sama (kodeUnik dibuat acak di
-      // klien, jadi bisa bertabrakan) — kalau bertabrakan, minta klien coba lagi
-      // dengan kode baru daripada diam-diam diganti di server.
-      if (kodeUnik) {
-        const dipakai = await tx.transaksiTiket.findFirst({
-          where: { kodeUnik, status: { in: ["PENDING", "VERIFIED"] } },
-        });
-        if (dipakai) throw new Error("KODE_UNIK_DIPAKAI");
-      }
+      // Cegah dua transaksi memakai kodeUnik yang sama — nominal transfer
+      // harus presisi unik supaya admin gampang cocokkan mutasi/QRIS.
+      const dipakai = await tx.transaksiTiket.findFirst({
+        where: { kodeUnik, status: { in: ["PENDING", "VERIFIED"] } },
+      });
+      if (dipakai) throw new Error("KODE_UNIK_DIPAKAI");
 
       await tx.transaksiTiket.create({
         data: {
@@ -169,7 +193,7 @@ export async function beliTiket(data: FormData, userId?: string) {
           ...(buktiUrl ? { bukti: buktiUrl } : {}),
           status: "PENDING",
           metodePembayaran,
-          ...(kodeUnik ? { kodeUnik } : {}),
+          kodeUnik,
           ...(userId ? { user: { connect: { id: userId } } } : {}),
         },
       });
@@ -226,6 +250,8 @@ export async function jualTiketOffline(data: FormData) {
       data: { sisa: { decrement: jumlah } },
     });
 
+    await catatLog("JUAL_TIKET_OFFLINE", `Tiket ${tiket.jenis} × ${jumlah} (${nama}) — Tunai`);
+
     await prisma.kasTransaksi.create({
       data: {
         tipe: "PEMASUKAN",
@@ -267,12 +293,21 @@ export async function verifikasiTiket(transaksiId: string) {
       data: { sisa: { decrement: transaksi.jumlah } },
     });
 
-    // Auto-kas
+    // Auto-kas — jumlah yang dicatat harus sama dengan nominal yang benar-benar
+    // ditransfer (harga tiket + kode unik), bukan cuma harga dasarnya, supaya
+    // laporan kas tidak menampilkan nominal yang sama berulang untuk tiket
+    // sejenis (lihat juga verifikasiFoto di Galeri.ts, pola yang sama).
+    const totalBayarTiket =
+      transaksi.tiket.harga * transaksi.jumlah + (transaksi.kodeUnik ? parseInt(transaksi.kodeUnik) : 0);
+    await catatLog(
+      "VERIFIKASI_TIKET",
+      `Tiket ${transaksi.tiket.jenis} × ${transaksi.jumlah} (${transaksi.nama}) — Rp${totalBayarTiket}`
+    );
     await prisma.kasTransaksi.create({
       data: {
         tipe: "PEMASUKAN",
-        keterangan: `Tiket ${transaksi.tiket.jenis} × ${transaksi.jumlah} (${transaksi.nama})`,
-        jumlah: transaksi.tiket.harga * transaksi.jumlah,
+        keterangan: `Tiket ${transaksi.tiket.jenis} × ${transaksi.jumlah} (${transaksi.nama})${transaksi.kodeUnik ? ` [#${transaksi.kodeUnik}]` : ""}`,
+        jumlah: totalBayarTiket,
         kategori: "TIKET",
         sumber: "TIKET",
         referensiId: transaksiId,
@@ -329,7 +364,11 @@ export async function verifikasiTiket(transaksiId: string) {
 export async function rejectTiket(transaksiId: string) {
   await requireAdminOrTiket();
   try {
+    const transaksi = await findTransaksiTiket({ id: transaksiId });
     await updateTransaksiTiket({ id: transaksiId }, { status: "REJECTED" });
+    if (transaksi) {
+      await catatLog("TOLAK_TIKET", `Tiket ${transaksi.tiket.jenis} × ${transaksi.jumlah} (${transaksi.nama})`);
+    }
     revalidatePath("/admin/tiket");
     return { success: true };
   } catch {

@@ -9,7 +9,7 @@ type TransaksiFotoItem = {
   paket: string | null;
   harga: number;
   status: string;
-  bukti: string;
+  bukti: string | null;
   kodeUnik: string | null;
   email: string | null;
   createdAt: Date;
@@ -101,13 +101,17 @@ export default function TransaksiFotoTable({
                 </span>
               </td>
               <td className="px-4 py-3">
-                <a
-                  href={tr.bukti}
-                  target="_blank"
-                  className="text-blue-500 hover:underline text-xs"
-                >
-                  Lihat
-                </a>
+                {tr.bukti ? (
+                  <a
+                    href={tr.bukti}
+                    target="_blank"
+                    className="text-blue-500 hover:underline text-xs"
+                  >
+                    Lihat
+                  </a>
+                ) : (
+                  <span className="text-gray-300 text-xs">QRIS (tanpa bukti)</span>
+                )}
               </td>
               <td className="px-4 py-3 text-xs text-gray-400">
                 {tr.expiredAt

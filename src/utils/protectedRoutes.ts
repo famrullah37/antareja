@@ -22,5 +22,6 @@ export const protectedRoutes: ProtectedRoutes[] = [
   // { title: "Scanner QR", path: "/admin/tiket/scanner", roles: ["ADMIN", "TIKET"] },
   { title: "Kas & Laporan", path: "/admin/kas", roles: ["ADMIN", "BENDAHARA"] },
   { title: "Sertifikat", path: "/admin/sertifikat", roles: ["ADMIN"] },
+  { title: "Log Aktivitas", path: "/admin/log-aktivitas", roles: ["ADMIN"] },
   { title: "Pengaturan", path: "/admin/pengaturan", roles: ["ADMIN"] },
 ];

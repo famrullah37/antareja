@@ -1,5 +1,6 @@
 import { validateHash } from "@/lib/hash";
 import { findUser } from "@/queries/user.query"; // prisma query user
+import { catatLogLogin } from "@/lib/activityLog";
 import { Role } from "@prisma/client";
 import {
   getServerSession as nextAuthGetServerSession,
@@ -62,6 +63,9 @@ export const authOptions: AuthOptions = {
           if (!isValidPassword) return null;
 
           if (!user.verified) return null;
+
+          // Fire-and-forget: gagal mencatat log tidak boleh menggagalkan login.
+          catatLogLogin({ id: user.id, nama: user.nama, role: user.role }).catch(() => {});
 
           return {
             id: user.id,

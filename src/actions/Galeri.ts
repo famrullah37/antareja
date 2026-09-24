@@ -11,6 +11,8 @@ import {
   updateAlbum,
   updateTransaksiFoto,
 } from "@/queries/galeri.query";
+import { incrementCounterUrutFoto } from "@/queries/tiket.query";
+import { catatLog } from "@/lib/activityLog";
 import { imageUploader, validateUploadFile } from "./fileUploader";
 import { addWatermark } from "@/lib/watermark";
 import { sendMailTo } from "@/lib/mailer";
@@ -114,13 +116,38 @@ export async function deleteFotoAdmin(fotoId: string) {
 
 // ─── User: Beli Foto ──────────────────────────────────────────────────────────
 
+// Cadangkan kode unik 3 digit secara atomik (counter di KonfigTiket, sama
+// pola dengan reserveKodeVoting/reserveKodePendaftaran/reserveKodeTiket) —
+// dipanggil dari GaleriClient begitu checkout dibuka.
+export async function reserveKodeFoto() {
+  try {
+    const updated = await incrementCounterUrutFoto();
+    const kodeUnik = String(updated.counterUrutFoto % 1000).padStart(3, "0");
+    return { success: true, kodeUnik };
+  } catch (e) {
+    console.error("reserveKodeFoto error:", e);
+    return { success: false };
+  }
+}
+
 export async function beliFoto(data: FormData, userId?: string) {
   const fotoListRaw = data.get("fotoList") as string;
-  const bukti = data.get("bukti") as File;
+  const bukti = data.get("bukti") as File | null;
   const email = (data.get("email") as string) || "";
   const namaPembeli = (data.get("namaPembeli") as string) || "";
   const metodePembayaran = (data.get("metodePembayaran") as string) || "TRANSFER";
-  const kodeUnik = (data.get("kodeUnik") as string) || String(Math.floor(100 + Math.random() * 900));
+  const kodeUnik = data.get("kodeUnik") as string | null;
+
+  // Bukti wajib untuk transfer manual (admin tidak punya cara lain
+  // memverifikasi) — untuk QRIS opsional karena nominal sudah unik lewat
+  // kodeUnik, admin cocokkan manual dari riwayat QRIS/mutasi rekening.
+  if (metodePembayaran !== "QRIS" && (!bukti || bukti.size === 0)) {
+    return { success: false, message: "Bukti pembayaran wajib diunggah" };
+  }
+  if (!kodeUnik || !/^\d{3}$/.test(kodeUnik)) {
+    return { success: false, message: "Kode pembayaran tidak valid, silakan ulangi checkout" };
+  }
+
   try {
     const fotoList = JSON.parse(fotoListRaw) as string[];
     const fotos = await prisma.foto.findMany({
@@ -128,26 +155,32 @@ export async function beliFoto(data: FormData, userId?: string) {
       select: { albumId: true, album: { select: { harga: true } } },
     });
     const uniqueAlbumPrices = Array.from(new Map(fotos.map((f) => [f.albumId, f.album.harga])).values());
-    const harga = uniqueAlbumPrices.reduce((sum, h) => sum + h, 0);
+    // Nominal akhir = total harga album + kode unik — kalau tidak ditambahkan,
+    // dua pembelian album yang sama tercatat dengan nominal identik di
+    // laporan kas (lihat juga totalBayar di Voting.ts/registrationForm.ts).
+    const harga = uniqueAlbumPrices.reduce((sum, h) => sum + h, 0) + parseInt(kodeUnik);
     const expiredAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 
-    // Cegah dua transaksi memakai kodeUnik yang sama (kodeUnik dibuat acak di
-    // klien, jadi bisa bertabrakan) — kalau bertabrakan, minta klien coba lagi
-    // dengan kode baru daripada diam-diam diganti di server.
+    // Cegah dua transaksi memakai kodeUnik yang sama — nominal transfer harus
+    // presisi unik supaya admin gampang cocokkan mutasi/QRIS.
     const dipakai = await prisma.transaksiFoto.findFirst({
       where: { kodeUnik, status: { in: ["PENDING", "VERIFIED"] } },
     });
     if (dipakai) return { success: false, message: "Kode unik sudah terpakai, silakan coba lagi" };
 
-    const fileCheck = await validateUploadFile(bukti);
-    if (!fileCheck.valid) return { success: false, message: fileCheck.message };
+    let buktiUrl: string | undefined;
+    if (bukti && bukti.size > 0) {
+      const fileCheck = await validateUploadFile(bukti);
+      if (!fileCheck.valid) return { success: false, message: fileCheck.message };
+      const upload = await imageUploader(Buffer.from(await bukti.arrayBuffer()));
+      if (!upload.data?.url) return { success: false, message: "Upload bukti gagal" };
+      buktiUrl = upload.data.url;
+    }
 
-    const upload = await imageUploader(Buffer.from(await bukti.arrayBuffer()));
-    if (!upload.data?.url) return { success: false, message: "Upload bukti gagal" };
     const transaksi = await createTransaksiFoto({
       fotoList,
       harga,
-      bukti: upload.data.url,
+      ...(buktiUrl ? { bukti: buktiUrl } : {}),
       status: "PENDING",
       expiredAt,
       kodeUnik,
@@ -172,6 +205,7 @@ export async function verifikasiFoto(transaksiId: string) {
     const t = transaksi as any;
     const kodeInfo = t.kodeUnik ? ` [#${t.kodeUnik}]` : "";
     const pembeliInfo = t.namaPembeli ? ` — ${t.namaPembeli}` : "";
+    await catatLog("VERIFIKASI_FOTO", `Foto${pembeliInfo}${kodeInfo} — Rp${transaksi.harga}`);
     await prisma.kasTransaksi.create({
       data: { tipe: "PEMASUKAN", keterangan: `Foto${pembeliInfo}${kodeInfo}`, jumlah: transaksi.harga, kategori: "FOTO", sumber: "FOTO", referensiId: transaksiId },
     });
@@ -202,7 +236,12 @@ export async function verifikasiFoto(transaksiId: string) {
 export async function rejectFoto(transaksiId: string) {
   await requireAdmin();
   try {
+    const transaksi = await prisma.transaksiFoto.findUnique({ where: { id: transaksiId } });
     await updateTransaksiFoto({ id: transaksiId }, { status: "REJECTED" });
+    if (transaksi) {
+      const pembeliInfo = transaksi.namaPembeli ? ` — ${transaksi.namaPembeli}` : "";
+      await catatLog("TOLAK_FOTO", `Foto${pembeliInfo}`);
+    }
     revalidatePath("/admin/galeri");
     return { success: true };
   } catch { return { success: false }; }

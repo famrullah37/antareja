@@ -11,6 +11,7 @@ import { buildKuitansiPdf } from "@/lib/kuitansi";
 import { ensureNomorKuitansi } from "@/lib/nomorKuitansi";
 import { imageUploader } from "./fileUploader";
 import { sendMailTo } from "@/lib/mailer";
+import { catatLog } from "@/lib/activityLog";
 
 // Halaman /admin/pembayaran juga bisa diakses role BENDAHARA (lihat middleware),
 // jadi aksi konfirmasinya harus mengizinkan BENDAHARA juga — bukan cuma ADMIN.
@@ -251,6 +252,10 @@ async function setStatusPembayaran(timId: string, confirmed: boolean, isDP: bool
     updateTim({ id: timId }, { confirmed }),
     updatePembayaran({ tim_id: timId }, { isDP }),
   ]);
+  await catatLog(
+    confirmed ? "KONFIRMASI_PEMBAYARAN_TIM" : "BATAL_KONFIRMASI_PEMBAYARAN_TIM",
+    `Tim ${tim.nama_tim} — ${tim.asal_sekolah}${isDP ? " (DP)" : ""}`
+  );
   if (!confirmed) return null;
 
   await assignNoUrutIfNeeded(timId);
@@ -295,7 +300,8 @@ export async function approvePayment(timId: string, isDP: boolean) {
 export async function batalkanKonfirmasi(timId: string) {
   try {
     await requireAdmin();
-    await updateTim({ id: timId }, { confirmed: false });
+    const tim = await updateTim({ id: timId }, { confirmed: false });
+    await catatLog("BATAL_KONFIRMASI_PEMBAYARAN_TIM", `Tim ${tim.nama_tim} — ${tim.asal_sekolah}`);
     revalidatePath("/", "layout");
     return { success: true };
   } catch (e) {
