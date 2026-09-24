@@ -12,6 +12,7 @@ type TransaksiWithRelations = {
   status: string;
   bukti: string | null;
   jenisJual: string;
+  metodePembayaran: string;
   kodeUnik: string | null;
   catatanAdmin: string | null;
   createdAt: Date;
@@ -133,6 +134,8 @@ export default function TransaksiTiketTable({
                     >
                       Lihat
                     </a>
+                  ) : tr.metodePembayaran === "QRIS" ? (
+                    <span className="text-gray-400 text-xs">QRIS (tanpa bukti)</span>
                   ) : (
                     <span className="text-gray-300 text-xs">-</span>
                   )}

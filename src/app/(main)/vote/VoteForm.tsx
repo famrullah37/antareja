@@ -425,12 +425,14 @@ export default function VoteForm({
             </div>
 
             <div className="flex flex-col gap-1">
-              <label className="text-sm font-medium">Bukti Pembayaran QRIS</label>
+              <label className="text-sm font-medium">
+                Bukti Pembayaran QRIS
+                <span className="text-xs text-gray-400 font-normal ml-1">— opsional, admin cek dari riwayat QRIS</span>
+              </label>
               <input
                 name="bukti"
                 type="file"
                 accept="image/*"
-                required
                 className="border border-gray-200 py-3 px-3 rounded-xl file:bg-primary-500 file:text-white file:rounded-md file:border-none file:py-1 hover:cursor-pointer"
               />
             </div>

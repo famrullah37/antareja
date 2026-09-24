@@ -10,50 +10,70 @@ datasource db {
 // ─── Core Auth ───────────────────────────────────────────────────────────────
 
 model User {
-  id               String           @id @default(uuid())
-  nama             String
-  email            String           @unique
-  password         String
-  role             Role
-  verified         Boolean          @default(false)
-  token            String?          @unique
+  id                String            @id @default(uuid())
+  nama              String
+  email             String            @unique
+  password          String
+  role              Role
+  verified          Boolean           @default(false)
+  token             String?           @unique
   verifyTokenSentAt DateTime?
-  penilaian        Penilaian[]
-  tims             Tim[]
-  juri             Juri?
-  transaksiTiket   TransaksiTiket[]
-  transaksiFoto    TransaksiFoto[]
-  transaksiVoting  TransaksiVoting[]
+  penilaian         Penilaian[]
+  tims              Tim[]
+  juri              Juri?
+  transaksiTiket    TransaksiTiket[]
+  transaksiFoto     TransaksiFoto[]
+  transaksiVoting   TransaksiVoting[]
+  activityLogs      ActivityLog[]
+}
+
+// Log siapa login & aksi admin (verifikasi/tolak pembayaran, dst) untuk
+// akuntabilitas — beberapa role (ADMIN, BENDAHARA, TIKET, FOTOGRAFER) bisa
+// memverifikasi transaksi uang, jadi perlu jejak siapa melakukan apa & kapan.
+// userNama/userRole disalin (bukan cuma relasi) supaya baris log tetap
+// terbaca meski user-nya kemudian dihapus (lihat onDelete: SetNull).
+model ActivityLog {
+  id        String   @id @default(uuid())
+  userId    String?
+  userNama  String
+  userRole  String
+  aksi      String
+  detail    String?
+  createdAt DateTime @default(now())
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([userId])
 }
 
 // ─── Tim & Anggota ───────────────────────────────────────────────────────────
 
 model Tim {
-  id            String         @id @default(uuid())
-  nama_tim      String
-  updated_at    DateTime       @updatedAt
-  pelatih       String
-  jenjang       Jenjang
-  confirmed     Boolean        @default(false)
-  userId        String         @unique
-  asal_sekolah  String
-  tipe_tim      Tipe
-  no_pelatih    String
-  link_berkas   String?
-  link_video    String?
-  foto          String?
-  has_cc        Boolean        @default(false)
-  has_maskot    Boolean        @default(false)
-  totalVote     Int            @default(0)
-  noUrut        Int?
-  anggotas      Anggota[]
-  pembayaran    Pembayaran?
-  penilaian     Penilaian?
-  penilaianBaru PenilaianBaru?
-  sertifikat    Sertifikat[]
+  id              String            @id @default(uuid())
+  nama_tim        String
+  updated_at      DateTime          @updatedAt
+  pelatih         String
+  jenjang         Jenjang
+  confirmed       Boolean           @default(false)
+  userId          String            @unique
+  asal_sekolah    String
+  tipe_tim        Tipe
+  no_pelatih      String
+  link_berkas     String?
+  link_video      String?
+  foto            String?
+  has_cc          Boolean           @default(false)
+  has_maskot      Boolean           @default(false)
+  totalVote       Int               @default(0)
+  noUrut          Int?
+  anggotas        Anggota[]
+  pembayaran      Pembayaran?
+  penilaian       Penilaian?
+  penilaianBaru   PenilaianBaru?
+  sertifikat      Sertifikat[]
   transaksiVoting TransaksiVoting[]
-  votingTally   VotingTally[]
-  user          User           @relation(fields: [userId], references: [id])
+  votingTally     VotingTally[]
+  user            User              @relation(fields: [userId], references: [id])
 
   @@unique([jenjang, noUrut])
 }
@@ -75,27 +95,27 @@ model Anggota {
 }
 
 model Pembayaran {
-  id       String  @id @default(uuid())
-  tim_id   String  @unique
-  bukti_tf String
-  bank     String
-  nama_rek String
-  isDP     Boolean
+  id              String    @id @default(uuid())
+  tim_id          String    @unique
+  bukti_tf        String
+  bank            String
+  nama_rek        String
+  isDP            Boolean
   // Kode unik 3 digit ditempel di nominal (biaya + kodeUnik) — dicadangkan
   // saat user pilih jenjang & tipe pembayaran, sebelum transfer. Sama pola
   // dengan TransaksiVoting/TransaksiTiket.
-  kodeUnik    String?
-  totalBayar  Int?
+  kodeUnik        String?
+  totalBayar      Int?
   // Kuitansi PDF, dibuat otomatis begitu bendahara/admin approve pembayaran
   // (lihat setStatusPembayaran di pembayaran.ts) dan dikirim via email.
-  kuitansiUrl String?
+  kuitansiUrl     String?
   // Nomor kuitansi unik (mis. KW/ANTAREJA/2026/0001). Satu nomor per kuitansi yang DITERBITKAN:
   // generate ulang untuk status yang sama memakai nomor & tanggal yang sama; kalau status
   // berubah (DP → Lunas) terbit kuitansi baru dengan nomor baru (kuitansiIsDP = status saat terbit).
-  nomorKuitansi   String?  @unique
+  nomorKuitansi   String?   @unique
   kuitansiTanggal DateTime?
   kuitansiIsDP    Boolean?
-  tim      Tim     @relation(fields: [tim_id], references: [id], onDelete: Cascade)
+  tim             Tim       @relation(fields: [tim_id], references: [id], onDelete: Cascade)
 }
 
 // ─── Juri ────────────────────────────────────────────────────────────────────
@@ -277,12 +297,17 @@ model QRTiket {
 // dan Voting Dukungan — satu gambar/kode QRIS untuk semuanya, admin tidak
 // perlu upload & sinkronkan manual di 3 tempat berbeda.
 model KonfigTiket {
-  id           String  @id @default("singleton")
-  qrisUrl      String?
-  qrisPayload  String? @db.Text
-  bankNama     String?
-  bankNoRek    String?
-  bankAtasNama String?
+  id               String  @id @default("singleton")
+  qrisUrl          String?
+  qrisPayload      String? @db.Text
+  bankNama         String?
+  bankNoRek        String?
+  bankAtasNama     String?
+  // Counter buat cadangan kode unik 3 digit (nomor urut % 1000, sama pola
+  // dengan KonfigVoting.counterUrut/KonfigUmum.counterUrutPendaftaran) —
+  // dipisah per fitur (Tiket vs Foto) supaya nomor urutnya independen.
+  counterUrutTiket Int     @default(0)
+  counterUrutFoto  Int     @default(0)
 }
 
 // ─── Sistem Voting (Dukungan Berbayar) ────────────────────────────────────────
@@ -322,7 +347,9 @@ model TransaksiVoting {
   kodeUnik     String
   totalBayar   Int
   status       String   @default("PENDING")
-  bukti        String
+  // Nullable: pembayaran QRIS tidak wajib unggah bukti (nominal sudah unik
+  // lewat kodeUnik, admin cocokkan manual dari riwayat QRIS/mutasi rekening).
+  bukti        String?
   catatanAdmin String?
   createdAt    DateTime @default(now())
   user         User?    @relation(fields: [userId], references: [id])
@@ -355,14 +382,14 @@ model Album {
 }
 
 model Foto {
-  id            String  @id @default(uuid())
+  id            String   @id @default(uuid())
   albumId       String
   pathAsli      String
   pathWatermark String
   tagTim        String?
-  statusPublish Boolean @default(false)
+  statusPublish Boolean  @default(false)
   createdAt     DateTime @default(now())
-  album         Album   @relation(fields: [albumId], references: [id])
+  album         Album    @relation(fields: [albumId], references: [id])
 }
 
 model TransaksiFoto {
@@ -374,7 +401,9 @@ model TransaksiFoto {
   paket            String?
   harga            Int
   status           String    @default("PENDING")
-  bukti            String
+  // Nullable: pembayaran QRIS tidak wajib unggah bukti (nominal sudah unik
+  // lewat kodeUnik, admin cocokkan manual dari riwayat QRIS/mutasi rekening).
+  bukti            String?
   kodeUnik         String?
   metodePembayaran String    @default("TRANSFER")
   expiredAt        DateTime?
@@ -395,7 +424,7 @@ model KonfigPaketFoto {
 
 model KasTransaksi {
   id          String   @id @default(uuid())
-  tipe        String   // PEMASUKAN | PENGELUARAN
+  tipe        String // PEMASUKAN | PENGELUARAN
   keterangan  String
   vendor      String?
   jumlah      Int
@@ -424,58 +453,58 @@ model Pengumuman {
 // ─── Konfigurasi Umum (singleton) ────────────────────────────────────────────
 
 model KonfigUmum {
-  id                  String    @id @default("singleton")
-  countdownTarget     DateTime  @default("2025-11-08T00:00:00.000Z")
-  countdownAktif      Boolean   @default(false)
+  id                     String    @id @default("singleton")
+  countdownTarget        DateTime  @default("2025-11-08T00:00:00.000Z")
+  countdownAktif         Boolean   @default(false)
   // Terpisah dari countdownTarget (itu gerbang peluncuran situs) — dulu Hero
   // memakai countdownTarget juga untuk countdown "Penutupan Pendaftaran",
   // padahal begitu situs live (countdownTarget sudah lewat), countdown itu
   // otomatis rusak karena tanggalnya sudah di masa lalu.
-  pendaftaranDeadline DateTime?
-  biayaSD             Int       @default(375000)
-  biayaSDDP           Int       @default(187500)
-  biayaSMP            Int       @default(400000)
-  biayaSMPDP          Int       @default(200000)
-  biayaSMA            Int       @default(400000)
-  biayaSMADP          Int       @default(200000)
-  biayaPurna          Int       @default(400000)
-  biayaPurnaDP        Int       @default(200000)
+  pendaftaranDeadline    DateTime?
+  biayaSD                Int       @default(375000)
+  biayaSDDP              Int       @default(187500)
+  biayaSMP               Int       @default(400000)
+  biayaSMPDP             Int       @default(200000)
+  biayaSMA               Int       @default(400000)
+  biayaSMADP             Int       @default(200000)
+  biayaPurna             Int       @default(400000)
+  biayaPurnaDP           Int       @default(200000)
   // Toggle per jenjang — kalau false, jenjang itu disembunyikan dari kartu
   // kategori di landing page & pilihan di form pendaftaran (tim yang sudah
   // terlanjur terdaftar di jenjang itu tidak terpengaruh, tetap tampil
   // normal di semua halaman admin/penilaian/sertifikat/vote).
-  sdAktif             Boolean   @default(false)
-  smpAktif            Boolean   @default(true)
-  smaAktif            Boolean   @default(true)
-  purnaAktif          Boolean   @default(false)
+  sdAktif                Boolean   @default(false)
+  smpAktif               Boolean   @default(true)
+  smaAktif               Boolean   @default(true)
+  purnaAktif             Boolean   @default(false)
   // Batas maksimal jumlah tim yang boleh mendaftar per jenjang — null berarti
   // tidak dibatasi. Dicek saat reservasi kode unik & submit form pendaftaran
   // (lihat reserveKodePendaftaran/submitFormRegistrasi di registrationForm.ts).
-  kuotaSD             Int?
-  kuotaSMP            Int?
-  kuotaSMA            Int?
-  kuotaPurna          Int?
+  kuotaSD                Int?
+  kuotaSMP               Int?
+  kuotaSMA               Int?
+  kuotaPurna             Int?
   // Rekening pendaftaran tim — dulu form pendaftaran ikut memakai KonfigTiket
   // (halaman /admin/tiket, biasanya baru dikonfigurasi belakangan setelah
   // pendaftaran dibuka), jadi bisa memblokir pendaftaran baru kalau admin
   // belum sempat isi config tiket duluan.
-  bankNama            String?
-  bankNoRek           String?
-  bankAtasNama        String?
+  bankNama               String?
+  bankNoRek              String?
+  bankAtasNama           String?
   // Array 4 tahap timeline (judul, tanggal, deskripsi, ikon) untuk section
   // Timeline di halaman utama — null berarti belum pernah diisi admin,
   // Timeline.tsx fallback ke default hardcoded-nya sendiri.
-  timeline            Json?
+  timeline               Json?
   // Link download Juklak (petunjuk pelaksanaan), diupload admin lewat
   // Pengaturan — muncul sebagai tombol download di Hero halaman utama.
-  juklakUrl           String?
+  juklakUrl              String?
   // Video Antareja di halaman utama (bagian Alur Pendaftaran): YouTube, Google Drive, atau file video langsung.
-  videoUrl            String?
+  videoUrl               String?
   // Counter kode unik pembayaran pendaftaran tim (0-999, siklus ulang) —
   // sama pola dengan KonfigVoting.counterUrut.
-  counterUrutPendaftaran Int  @default(0)
+  counterUrutPendaftaran Int       @default(0)
   // Penghitung nomor kuitansi (urutan terbit, tidak pernah dipakai ulang).
-  counterKuitansi        Int  @default(0)
+  counterKuitansi        Int       @default(0)
   // Ditampilkan di kuitansi PDF pendaftaran — nama bendahara & scan tanda
   // tangannya, diupload admin lewat Pengaturan.
   bendaharaNama          String?
@@ -497,13 +526,13 @@ model Sponsor {
 // ─── Sertifikat ───────────────────────────────────────────────────────────────
 
 model Sertifikat {
-  id           String   @id @default(uuid())
-  timId        String
-  namaAnggota  String?
-  namaJuara    String?
-  fileUrl      String
-  createdAt    DateTime @default(now())
-  tim          Tim      @relation(fields: [timId], references: [id], onDelete: Cascade)
+  id          String   @id @default(uuid())
+  timId       String
+  namaAnggota String?
+  namaJuara   String?
+  fileUrl     String
+  createdAt   DateTime @default(now())
+  tim         Tim      @relation(fields: [timId], references: [id], onDelete: Cascade)
 }
 
 // ─── Enums ────────────────────────────────────────────────────────────────────

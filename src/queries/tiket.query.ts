@@ -87,3 +87,19 @@ export async function upsertKonfigTiket(data: {
     update: data,
   });
 }
+
+export async function incrementCounterUrutTiket() {
+  return prisma.konfigTiket.upsert({
+    where: { id: "singleton" },
+    create: { id: "singleton", counterUrutTiket: 1 },
+    update: { counterUrutTiket: { increment: 1 } },
+  });
+}
+
+export async function incrementCounterUrutFoto() {
+  return prisma.konfigTiket.upsert({
+    where: { id: "singleton" },
+    create: { id: "singleton", counterUrutFoto: 1 },
+    update: { counterUrutFoto: { increment: 1 } },
+  });
+}

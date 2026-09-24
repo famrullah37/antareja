@@ -1,7 +1,8 @@
 ﻿"use client";
 
-import { beliFoto } from "@/actions/Galeri";
+import { beliFoto, reserveKodeFoto } from "@/actions/Galeri";
 import { getDynamicQrisTiket } from "@/actions/Tiket";
+import { toDownloadUrl } from "@/lib/downloadUrl";
 import Image from "next/image";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -31,10 +32,6 @@ type KonfigTiket = {
   bankAtasNama?: string | null;
 } | null;
 
-function toDownloadUrl(url: string) {
-  return url.replace("/upload/", "/upload/fl_attachment/");
-}
-
 function formatRupiah(n: number) {
   return new Intl.NumberFormat("id-ID", {
     style: "currency",
@@ -59,7 +56,8 @@ export default function GaleriClient({
   const [showCheckout, setShowCheckout] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [transaksiId, setTransaksiId] = useState<string | null>(null);
-  const [kodeUnik, setKodeUnik] = useState(() => String(Math.floor(100 + Math.random() * 900)));
+  const [kodeUnik, setKodeUnik] = useState<string | null>(null);
+  const [reservingKode, setReservingKode] = useState(false);
   const [metode, setMetode] = useState<"TRANSFER" | "QRIS">("TRANSFER");
   const [qrisDinamis, setQrisDinamis] = useState<string | null>(null);
 
@@ -82,21 +80,41 @@ export default function GaleriClient({
   const albumPriceMap = new Map(cartFotos.map((f) => [f.albumId, f.album.harga]));
   const totalHarga = Array.from(albumPriceMap.values()).reduce((s, h) => s + h, 0);
 
+  const totalBayar = kodeUnik ? totalHarga + parseInt(kodeUnik) : 0;
+
+  // Cadangkan kode unik begitu modal checkout dibuka — nomor urut atomik dari
+  // server (lihat reserveKodeFoto) supaya tidak bentrok dengan pembeli lain.
   useEffect(() => {
-    if (metode !== "QRIS" || totalHarga <= 0) {
+    if (!showCheckout) return;
+    let cancelled = false;
+    setReservingKode(true);
+    setKodeUnik(null);
+    reserveKodeFoto().then((result) => {
+      if (cancelled) return;
+      setReservingKode(false);
+      if (result.success) setKodeUnik(result.kodeUnik!);
+      else toast.error("Gagal menyiapkan kode pembayaran, coba lagi");
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [showCheckout]);
+
+  useEffect(() => {
+    if (metode !== "QRIS" || totalBayar <= 0) {
       setQrisDinamis(null);
       return;
     }
     let cancelled = false;
     const timer = setTimeout(async () => {
-      const result = await getDynamicQrisTiket(totalHarga);
+      const result = await getDynamicQrisTiket(totalBayar);
       if (!cancelled) setQrisDinamis(result.success ? result.dataUrl! : null);
     }, 250);
     return () => {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [metode, totalHarga]);
+  }, [metode, totalBayar]);
 
   async function handleCheckout(data: FormData) {
     data.set("fotoList", JSON.stringify(Array.from(cart)));
@@ -109,8 +127,12 @@ export default function GaleriClient({
       setShowCheckout(false);
     } else {
       toast.error(result.message ?? "Gagal memproses pembelian", { id: toastId });
-      if (result.message?.includes("sudah terpakai")) {
-        setKodeUnik(String(Math.floor(100 + Math.random() * 900)));
+      if (result.message?.includes("sudah terpakai") || result.message?.includes("tidak valid")) {
+        setReservingKode(true);
+        setKodeUnik(null);
+        const retry = await reserveKodeFoto();
+        setReservingKode(false);
+        if (retry.success) setKodeUnik(retry.kodeUnik!);
       }
     }
   }
@@ -248,7 +270,7 @@ export default function GaleriClient({
 
                 {isGratis && (
                   <a
-                    href={toDownloadUrl(foto.pathAsli)}
+                    href={toDownloadUrl(foto.pathAsli, foto.tagTim ? `Foto-${foto.tagTim}` : `Foto-${foto.album.nama}`)}
                     target="_blank"
                     rel="noreferrer"
                     onClick={(e) => e.stopPropagation()}
@@ -303,7 +325,7 @@ export default function GaleriClient({
               <p className="text-sm text-gray-500">{cart.size} foto dipilih.</p>
 
               <form action={handleCheckout} className="flex flex-col gap-4">
-                <input type="hidden" name="kodeUnik" value={kodeUnik} />
+                <input type="hidden" name="kodeUnik" value={kodeUnik ?? ""} />
                 <input type="hidden" name="metodePembayaran" value={metode} />
 
                 {/* Metode Pembayaran */}
@@ -328,7 +350,9 @@ export default function GaleriClient({
                 </div>
 
                 {/* Info Pembayaran */}
-                {metode === "TRANSFER" ? (
+                {reservingKode || !kodeUnik ? (
+                  <p className="text-sm text-gray-400">Menyiapkan kode pembayaran...</p>
+                ) : metode === "TRANSFER" ? (
                   <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-blue-800 flex flex-col gap-1">
                     <p className="font-semibold">Transfer ke:</p>
                     {konfig?.bankNoRek ? (
@@ -353,7 +377,7 @@ export default function GaleriClient({
                       </div>
                       <div className="flex justify-between font-bold text-primary-700 text-base border-t border-blue-200 pt-1 mt-1">
                         <span>Transfer tepat</span>
-                        <span>{formatRupiah(totalHarga + parseInt(kodeUnik))}</span>
+                        <span>{formatRupiah(totalBayar)}</span>
                       </div>
                       <p className="text-xs text-blue-400 mt-0.5">Transfer nominal tepat agar mudah diverifikasi admin.</p>
                     </div>
@@ -381,7 +405,7 @@ export default function GaleriClient({
                         QRIS belum dikonfigurasi
                       </div>
                     )}
-                    <p className="font-semibold">Nominal: {formatRupiah(totalHarga)}</p>
+                    <p className="font-semibold">Nominal: {formatRupiah(totalBayar)}</p>
                     {qrisDinamis ? (
                       <p className="text-xs text-purple-500 text-center">Nominal sudah otomatis terisi di QRIS — tinggal scan & bayar.</p>
                     ) : (
@@ -426,22 +450,26 @@ export default function GaleriClient({
                 {/* Bukti */}
                 <div className="flex flex-col gap-1">
                   <label className="text-sm font-medium">
-                    Bukti Transfer <span className="text-red-500">*</span>
+                    Bukti Transfer {metode === "TRANSFER" && <span className="text-red-500">*</span>}
+                    {metode === "QRIS" && (
+                      <span className="text-xs text-gray-400 font-normal ml-1">— opsional, admin cek dari riwayat QRIS</span>
+                    )}
                   </label>
                   <input
                     name="bukti"
                     type="file"
                     accept="image/*"
-                    required
+                    required={metode === "TRANSFER"}
                     className="border border-neutral-200 py-2 px-3 rounded-xl file:bg-primary-500 file:text-white file:rounded-md file:border-none file:py-1 file:px-3 text-sm"
                   />
                 </div>
 
                 <button
                   type="submit"
-                  className="bg-primary-500 text-white rounded-xl py-3 font-bold hover:bg-primary-600 transition-colors"
+                  disabled={reservingKode || !kodeUnik}
+                  className="bg-primary-500 text-white rounded-xl py-3 font-bold hover:bg-primary-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Kirim Pembelian — {formatRupiah(metode === "QRIS" ? totalHarga : totalHarga + parseInt(kodeUnik))}
+                  Kirim Pembelian{kodeUnik ? ` — ${formatRupiah(totalBayar)}` : ""}
                 </button>
               </form>
             </div>

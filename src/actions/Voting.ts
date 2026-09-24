@@ -7,6 +7,7 @@ import { imageUploader, validateUploadFile } from "./fileUploader";
 import { buildDynamicQrisImage } from "@/lib/qris";
 import { parseWibDatetimeLocal } from "@/lib/datetime";
 import { findKonfigTiket } from "@/queries/tiket.query";
+import { catatLog } from "@/lib/activityLog";
 import {
   findTransaksiVoting,
   getKategoriList,
@@ -155,7 +156,7 @@ export async function submitVote(data: FormData, userId?: string) {
   const kodeUnik = data.get("kodeUnik") as string;
   const kategoriRaw = (data.get("kategori") as string) || "tim_favorit";
   const jumlahVote = parseInt(data.get("jumlahVote") as string) || 1;
-  const bukti = data.get("bukti") as File;
+  const bukti = data.get("bukti") as File | null;
 
   // Kategori wajib salah satu dari "tim_favorit" atau yang terdaftar di
   // KonfigVoting.kategoriList — cegah klien mengarang key kategori sendiri
@@ -167,11 +168,14 @@ export async function submitVote(data: FormData, userId?: string) {
   }
   const kategori = kategoriRaw;
 
-  if (!bukti || bukti.size === 0) {
-    return { success: false, message: "Bukti pembayaran wajib diunggah" };
+  // Dukungan selalu dibayar via QRIS (lihat komentar KonfigVoting) — bukti
+  // jadi opsional karena nominal sudah unik lewat kodeUnik, admin cocokkan
+  // manual dari riwayat QRIS/mutasi rekening.
+  const buktiAda = bukti && bukti.size > 0;
+  if (buktiAda) {
+    const fileCheck = await validateUploadFile(bukti as File);
+    if (!fileCheck.valid) return { success: false, message: fileCheck.message };
   }
-  const fileCheck = await validateUploadFile(bukti);
-  if (!fileCheck.valid) return { success: false, message: fileCheck.message };
   if (!kodeUnik || !/^\d+$/.test(kodeUnik)) {
     return { success: false, message: "Kode pembayaran tidak valid, silakan ulangi dari pemilihan tim" };
   }
@@ -202,10 +206,14 @@ export async function submitVote(data: FormData, userId?: string) {
     const tim = await prisma.tim.findUnique({ where: { id: timId } });
     if (!tim) return { success: false, message: "Tim tidak ditemukan" };
 
-    const upload = await imageUploader(Buffer.from(await bukti.arrayBuffer()));
-    if (upload.error) {
-      console.error("Upload bukti vote gagal:", upload.message);
-      return { success: false, message: upload.message };
+    let buktiUrl: string | undefined;
+    if (buktiAda) {
+      const upload = await imageUploader(Buffer.from(await (bukti as File).arrayBuffer()));
+      if (upload.error) {
+        console.error("Upload bukti vote gagal:", upload.message);
+        return { success: false, message: upload.message };
+      }
+      buktiUrl = upload.data?.url;
     }
 
     const totalBayar = konfig.nominalVote * jumlahVote + parseInt(kodeUnik);
@@ -221,7 +229,7 @@ export async function submitVote(data: FormData, userId?: string) {
         hargaSatuan: konfig.nominalVote,
         kodeUnik,
         totalBayar,
-        bukti: upload.data!.url,
+        ...(buktiUrl ? { bukti: buktiUrl } : {}),
         status: "PENDING",
         ...(userId ? { user: { connect: { id: userId } } } : {}),
       },
@@ -262,6 +270,14 @@ async function markVotingVerified(transaksiId: string) {
       create: { timId: transaksi.timId, kategori: transaksi.kategori, total: transaksi.jumlahVote },
     });
   }
+
+  // Tidak ada sesi untuk jalur webhook (autoVerifikasiVotingByNominal) —
+  // catatLog no-op kalau tidak ada sesi login, jadi aman dipanggil di sini
+  // tanpa cabang khusus per pemanggil.
+  await catatLog(
+    "VERIFIKASI_VOTING",
+    `Dukungan ${transaksi.jumlahVote}x untuk ${transaksi.tim.nama_tim} (${transaksi.nama}) — Rp${transaksi.totalBayar}`
+  );
 
   await prisma.kasTransaksi.create({
     data: {
@@ -320,7 +336,11 @@ export async function autoVerifikasiVotingByNominal(nominal: number) {
 export async function rejectVoting(transaksiId: string) {
   await requireAdminOrBendahara();
   try {
+    const transaksi = await findTransaksiVoting({ id: transaksiId });
     await updateTransaksiVoting({ id: transaksiId }, { status: "REJECTED" });
+    if (transaksi) {
+      await catatLog("TOLAK_VOTING", `Dukungan ${transaksi.jumlahVote}x untuk ${transaksi.tim.nama_tim} (${transaksi.nama})`);
+    }
     revalidatePath("/admin/voting");
     return { success: true };
   } catch {

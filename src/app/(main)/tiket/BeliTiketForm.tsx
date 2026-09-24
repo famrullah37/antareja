@@ -1,6 +1,6 @@
 "use client";
 
-import { beliTiket, getDynamicQrisTiket } from "@/actions/Tiket";
+import { beliTiket, getDynamicQrisTiket, reserveKodeTiket } from "@/actions/Tiket";
 import { Tiket } from "@prisma/client";
 import Image from "next/image";
 import { useEffect, useState } from "react";
@@ -34,26 +34,48 @@ export default function BeliTiketForm({
   const [jumlah, setJumlah] = useState(1);
   const [metode, setMetode] = useState<"TRANSFER" | "QRIS">("TRANSFER");
   const [submitted, setSubmitted] = useState(false);
-  const [kodeUnik, setKodeUnik] = useState(() => String(Math.floor(100 + Math.random() * 900)));
+  const [kodeUnik, setKodeUnik] = useState<string | null>(null);
+  const [reservingKode, setReservingKode] = useState(false);
   const [qrisDinamis, setQrisDinamis] = useState<string | null>(null);
 
-  const totalQris = selected ? selected.harga * jumlah : 0;
+  const totalBayar = selected && kodeUnik ? selected.harga * jumlah + parseInt(kodeUnik) : 0;
+
+  // Cadangkan kode unik begitu jenis tiket dipilih — nomor urut atomik dari
+  // server (lihat reserveKodeTiket) supaya tidak bentrok dengan pembeli lain.
+  useEffect(() => {
+    if (!selected) {
+      setKodeUnik(null);
+      return;
+    }
+    let cancelled = false;
+    setReservingKode(true);
+    setKodeUnik(null);
+    reserveKodeTiket().then((result) => {
+      if (cancelled) return;
+      setReservingKode(false);
+      if (result.success) setKodeUnik(result.kodeUnik!);
+      else toast.error("Gagal menyiapkan kode pembayaran, coba pilih ulang tiket");
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [selected]);
 
   useEffect(() => {
-    if (metode !== "QRIS" || totalQris <= 0) {
+    if (metode !== "QRIS" || totalBayar <= 0) {
       setQrisDinamis(null);
       return;
     }
     let cancelled = false;
     const timer = setTimeout(async () => {
-      const result = await getDynamicQrisTiket(totalQris);
+      const result = await getDynamicQrisTiket(totalBayar);
       if (!cancelled) setQrisDinamis(result.success ? result.dataUrl! : null);
     }, 250);
     return () => {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [metode, totalQris]);
+  }, [metode, totalBayar]);
 
   async function handleSubmit(data: FormData) {
     const toastId = toast.loading("Memproses...");
@@ -66,8 +88,12 @@ export default function BeliTiketForm({
       setSubmitted(true);
     } else {
       toast.error(result.message ?? "Gagal memproses pembelian", { id: toastId });
-      if (result.message?.includes("sudah terpakai")) {
-        setKodeUnik(String(Math.floor(100 + Math.random() * 900)));
+      if (result.message?.includes("sudah terpakai") || result.message?.includes("tidak valid")) {
+        setReservingKode(true);
+        setKodeUnik(null);
+        const retry = await reserveKodeTiket();
+        setReservingKode(false);
+        if (retry.success) setKodeUnik(retry.kodeUnik!);
       }
     }
   }
@@ -177,9 +203,9 @@ export default function BeliTiketForm({
                 <span>{formatRupiah(selected.harga * jumlah)}</span>
               </div>
               <div className="border-t pt-1 flex justify-between font-bold">
-                <span>Total</span>
+                <span>Total (+ kode unik)</span>
                 <span className="text-primary-600">
-                  {formatRupiah(selected.harga * jumlah)}
+                  {kodeUnik ? formatRupiah(totalBayar) : formatRupiah(selected.harga * jumlah)}
                 </span>
               </div>
             </div>
@@ -204,11 +230,12 @@ export default function BeliTiketForm({
                 ))}
               </div>
               <input type="hidden" name="metodePembayaran" value={metode} />
-              <input type="hidden" name="kodeUnik" value={kodeUnik} />
+              <input type="hidden" name="kodeUnik" value={kodeUnik ?? ""} />
             </div>
 
-            {/* Info Pembayaran */}
-            {metode === "TRANSFER" ? (
+            {reservingKode || !kodeUnik ? (
+              <p className="text-sm text-gray-400">Menyiapkan kode pembayaran...</p>
+            ) : metode === "TRANSFER" ? (
               <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-blue-800 flex flex-col gap-1">
                 <p className="font-semibold">Transfer ke:</p>
                 {konfig?.bankNoRek ? (
@@ -222,7 +249,7 @@ export default function BeliTiketForm({
                 <div className="mt-1 border-t border-blue-200 pt-2 flex flex-col gap-0.5">
                   <div className="flex justify-between">
                     <span>Nominal transfer tepat</span>
-                    <span className="font-bold">{formatRupiah(selected.harga * jumlah + parseInt(kodeUnik))}</span>
+                    <span className="font-bold">{formatRupiah(totalBayar)}</span>
                   </div>
                   <div className="flex justify-between text-blue-600">
                     <span>Kode unik</span>
@@ -254,7 +281,7 @@ export default function BeliTiketForm({
                     QRIS belum dikonfigurasi
                   </div>
                 )}
-                <p className="font-semibold">Nominal: {formatRupiah(totalQris)}</p>
+                <p className="font-semibold">Nominal: {formatRupiah(totalBayar)}</p>
                 {qrisDinamis ? (
                   <p className="text-xs text-purple-500 text-center">Nominal sudah otomatis terisi di QRIS — tinggal scan & bayar.</p>
                 ) : (
@@ -268,12 +295,17 @@ export default function BeliTiketForm({
             )}
 
             <div className="flex flex-col gap-1">
-              <label className="text-sm font-medium">Bukti Pembayaran</label>
+              <label className="text-sm font-medium">
+                Bukti Pembayaran {metode === "TRANSFER" && <span className="text-red-500">*</span>}
+                {metode === "QRIS" && (
+                  <span className="text-xs text-gray-400 font-normal ml-1">— opsional, admin cek dari riwayat QRIS</span>
+                )}
+              </label>
               <input
                 name="bukti"
                 type="file"
                 accept="image/*"
-                required
+                required={metode === "TRANSFER"}
                 className="border border-gray-200 py-3 px-3 rounded-xl file:bg-primary-500 file:text-white file:rounded-md file:border-none file:py-1 hover:cursor-pointer"
               />
             </div>
@@ -281,7 +313,8 @@ export default function BeliTiketForm({
 
           <button
             type="submit"
-            className="bg-primary-500 text-white rounded-xl py-4 font-bold hover:bg-primary-600 transition-colors"
+            disabled={reservingKode || !kodeUnik}
+            className="bg-primary-500 text-white rounded-xl py-4 font-bold hover:bg-primary-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Kirim Pembelian
           </button>
