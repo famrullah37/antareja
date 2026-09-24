@@ -47,6 +47,7 @@ const jsonLd = {
       "@type": "Organization",
       "@id": `${siteConfig.url}/#organisasi`,
       name: siteConfig.name,
+      alternateName: ["LPKBB Antareja", "PASKIBRA Antareja"],
       url: siteConfig.url,
       logo: `${siteConfig.url}${siteConfig.logo}`,
       sameAs: Object.values(siteConfig.social),

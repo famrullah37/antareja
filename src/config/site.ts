@@ -15,6 +15,10 @@ export const siteConfig = {
     "PBB",
     "SMK Telkom Malang",
     "pendaftaran LKBB",
+    "PASKI",
+    "PASKIBRA",
+    "LKBB",
+    "LPKBB",
   ],
   // Domain produksi. Sengaja konstanta (bukan NEXTAUTH_URL) supaya canonical/sitemap tidak ikut salah
   // kalau env server keliru.
