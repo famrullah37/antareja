@@ -8,7 +8,7 @@ import { TimWithRelations } from "@/types/entityRelations";
 import { AnggotaCard } from "./parts/AnggotaCard";
 import cn from "@/lib/clsx";
 import { initials } from "@/lib/initials";
-import { updateTimForm } from "@/actions/Tim";
+import { updateLinkRekomendasi, updateTimForm } from "@/actions/Tim";
 import Field from "../components/parts/input";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -205,6 +205,20 @@ export default function ProfileTim({
     }
   }
 
+  const [savingLink, setSavingLink] = useState(false);
+  async function submitLinkRekomendasi(formData: FormData) {
+    setSavingLink(true);
+    const toastId = toast.loading("Menyimpan link...");
+    const result = await updateLinkRekomendasi(tim.id, formData);
+    setSavingLink(false);
+    if (result.success) {
+      toast.success(result.message, { id: toastId });
+      router.refresh();
+    } else {
+      toast.error(result.message, { id: toastId });
+    }
+  }
+
   return (
     <SectionWrapper id="profile-tim">
       <H2 className="mb-2">Profil Tim Anda</H2>
@@ -262,6 +276,41 @@ export default function ProfileTim({
             )}
           </div>
         )}
+
+        <form action={submitLinkRekomendasi} className="flex flex-col gap-2 mb-4">
+          <H3>Surat Rekomendasi Kepala Sekolah</H3>
+          <P className="text-sm text-gray-500">
+            Tempel link Google Drive (atau cloud lain) surat rekomendasi kepala sekolah — pastikan link
+            bisa dibuka siapa saja yang punya link (share: &quot;Siapa saja yang memiliki link&quot;).
+          </P>
+          {tim.linkRekomendasi && (
+            <a
+              href={tim.linkRekomendasi}
+              target="_blank"
+              rel="noreferrer"
+              className="text-primary-600 hover:underline text-sm break-all"
+            >
+              {tim.linkRekomendasi}
+            </a>
+          )}
+          <div className="flex flex-col sm:flex-row gap-2">
+            <input
+              name="linkRekomendasi"
+              type="url"
+              placeholder="https://drive.google.com/..."
+              defaultValue={tim.linkRekomendasi ?? ""}
+              required
+              className="flex-1 border border-neutral-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
+            />
+            <button
+              type="submit"
+              disabled={savingLink}
+              className="bg-primary-500 hover:bg-primary-600 disabled:opacity-60 text-white text-sm font-semibold px-5 py-2.5 rounded-lg transition-colors shrink-0"
+            >
+              {savingLink ? "Menyimpan..." : tim.linkRekomendasi ? "Ganti Link" : "Simpan Link"}
+            </button>
+          </div>
+        </form>
 
         {tim.confirmed ? (
           <form ref={formRef} action={submitForm} className="mb-4">

@@ -62,6 +62,10 @@ model Tim {
   link_berkas     String?
   link_video      String?
   foto            String?
+  // Link Google Drive (atau cloud lain) ke surat rekomendasi kepala sekolah —
+  // diisi sendiri oleh pelatih/tim lewat dashboard, bukan upload file, supaya
+  // tidak perlu jatah storage Cloudinary untuk dokumen yang jarang dibuka.
+  linkRekomendasi String?
   has_cc          Boolean           @default(false)
   has_maskot      Boolean           @default(false)
   totalVote       Int               @default(0)

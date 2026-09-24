@@ -234,11 +234,32 @@ function FotoUnduh({ tim }: Readonly<{ tim: TimWithRelations }>) {
   );
 }
 
+function SuratRekomendasi({ tim }: Readonly<{ tim: TimWithRelations }>) {
+  return (
+    <div className="mb-10">
+      <H3 className="mb-2">Surat Rekomendasi Kepala Sekolah</H3>
+      {tim.linkRekomendasi ? (
+        <a
+          href={tim.linkRekomendasi}
+          target="_blank"
+          rel="noreferrer"
+          className="text-primary-600 hover:underline text-sm break-all"
+        >
+          {tim.linkRekomendasi}
+        </a>
+      ) : (
+        <P className="text-sm text-gray-400">Belum diisi tim.</P>
+      )}
+    </div>
+  );
+}
+
 export default function ProfileTim({
   tim,
 }: Readonly<{ tim: TimWithRelations }>) {
   return (
     <>
+      <SuratRekomendasi tim={tim} />
       <FotoUnduh tim={tim} />
       <TimLayout tim={tim} />
     </>
