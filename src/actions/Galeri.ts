@@ -201,6 +201,12 @@ export async function verifikasiFoto(transaksiId: string) {
   try {
     const transaksi = await prisma.transaksiFoto.findUnique({ where: { id: transaksiId } });
     if (!transaksi) return { success: false };
+    // Tanpa guard ini, klik "Verifikasi" dua kali (double-click, refresh, dst)
+    // akan membuat entri kas baru tiap kali dipanggil padahal transaksinya
+    // cuma satu — sama pola guard yang sudah ada di verifikasiTiket/Voting.
+    if (transaksi.status === "VERIFIED") {
+      return { success: false, message: "Foto sudah diverifikasi sebelumnya" };
+    }
     await updateTransaksiFoto({ id: transaksiId }, { status: "VERIFIED" });
     const t = transaksi as any;
     const kodeInfo = t.kodeUnik ? ` [#${t.kodeUnik}]` : "";
