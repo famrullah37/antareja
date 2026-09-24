@@ -19,6 +19,16 @@ export const siteConfig = {
     "PASKIBRA",
     "LKBB",
     "LPKBB",
+    "pasukan pengibar bendera",
+    "ekstrakurikuler paskibra",
+    "kompetisi paskibra",
+    "lomba PBB",
+    "lomba paskibra 2026",
+    "lomba paskibra Malang",
+    "lomba paskibra Jawa Timur",
+    "LKBB SMK Telkom Malang",
+    "juara paskibra",
+    "tim paskibra sekolah",
   ],
   // Domain produksi. Sengaja konstanta (bukan NEXTAUTH_URL) supaya canonical/sitemap tidak ikut salah
   // kalau env server keliru.
