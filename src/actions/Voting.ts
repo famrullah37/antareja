@@ -8,6 +8,7 @@ import { buildDynamicQrisImage } from "@/lib/qris";
 import { parseWibDatetimeLocal } from "@/lib/datetime";
 import { findKonfigTiket } from "@/queries/tiket.query";
 import { catatLog } from "@/lib/activityLog";
+import { sendMailTo } from "@/lib/mailer";
 import {
   findTransaksiVoting,
   getKategoriList,
@@ -291,6 +292,22 @@ async function markVotingVerified(transaksiId: string) {
       referensiId: transaksiId,
     },
   });
+
+  // Bukti/konfirmasi dukungan ke email pendukung — sebelumnya tidak pernah
+  // dikirim sama sekali (beda dengan Tiket/Foto yang sudah kirim email
+  // begitu diverifikasi), padahal email wajib diisi di form. Kegagalan
+  // kirim tidak boleh menggagalkan verifikasi itu sendiri.
+  const kategoriLabel =
+    transaksi.kategori === "tim_favorit" ? "Tim Favorit" : transaksi.kategori.replace(/_/g, " ");
+  try {
+    await sendMailTo({
+      to: transaksi.email,
+      subject: `✅ Dukungan LKBB Antareja 2026 — ${transaksi.tim.nama_tim}`,
+      html: `<div style="font-family:sans-serif;max-width:520px;margin:auto"><h2 style="color:#F70048">Dukunganmu Terverifikasi!</h2><p>Halo <b>${transaksi.nama}</b>,</p><p>Terima kasih! Pembayaran dukunganmu untuk <b>${transaksi.tim.nama_tim}</b> (${transaksi.tim.asal_sekolah}) sudah diverifikasi dan dihitung.</p><div style="background:#f9f9f9;border-radius:8px;padding:16px;margin:16px 0;font-size:14px"><p style="margin:0 0 4px"><b>Kategori:</b> ${kategoriLabel}</p><p style="margin:0 0 4px"><b>Jumlah vote:</b> ${transaksi.jumlahVote}x</p><p style="margin:0 0 4px"><b>Kode unik:</b> ${transaksi.kodeUnik}</p><p style="margin:0"><b>Total bayar:</b> Rp${transaksi.totalBayar.toLocaleString("id-ID")}</p></div><p>Ini adalah bukti pembayaran dukunganmu — simpan email ini sebagai referensi.</p><p style="font-size:12px;color:#aaa">LKBB Antareja 2026 — SMK Telkom Malang</p></div>`,
+    });
+  } catch (e) {
+    console.error("Gagal kirim email bukti dukungan voting:", e);
+  }
 
   revalidatePath("/admin/voting");
   revalidatePath("/admin/kas");
