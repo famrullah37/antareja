@@ -92,7 +92,7 @@ export default function LaporanKasClient({ data }: { data: KasData }) {
     const toastId = toast.loading("Menghapus...");
     const result = await deleteKasTransaksi(id);
     if (result.success) { toast.success("Dihapus", { id: toastId }); router.refresh(); }
-    else toast.error("Gagal hapus", { id: toastId });
+    else toast.error((result as any).message ?? "Gagal hapus", { id: toastId });
   }
 
   function exportExcel() {
@@ -190,12 +190,13 @@ export default function LaporanKasClient({ data }: { data: KasData }) {
                     <th className="px-4 py-2.5 text-right text-green-700">Pemasukan</th>
                     <th className="px-4 py-2.5 text-right text-red-700">Pengeluaran</th>
                     <th className="px-4 py-2.5 text-right">Saldo</th>
+                    <th className="px-4 py-2.5"></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-50">
                   {rows.length === 0 && (
                     <tr>
-                      <td colSpan={6} className="px-4 py-8 text-center text-gray-400">Belum ada transaksi</td>
+                      <td colSpan={7} className="px-4 py-8 text-center text-gray-400">Belum ada transaksi</td>
                     </tr>
                   )}
                   {rows.map((k, i) => {
@@ -220,6 +221,9 @@ export default function LaporanKasClient({ data }: { data: KasData }) {
                         <td className={`px-4 py-2.5 text-right font-bold ${saldoSnap >= 0 ? "text-neutral-800" : "text-red-600"}`}>
                           {formatRupiah(saldoSnap)}
                         </td>
+                        <td className="px-4 py-2.5 text-right">
+                          <button onClick={() => handleDelete(k.id, k.keterangan)} className="text-xs text-red-500 hover:text-red-700">Hapus</button>
+                        </td>
                       </tr>
                     );
                   })}
@@ -233,6 +237,7 @@ export default function LaporanKasClient({ data }: { data: KasData }) {
                       <td className={`px-4 py-3 text-right text-lg ${data.saldo >= 0 ? "text-primary-600" : "text-red-600"}`}>
                         {formatRupiah(data.saldo)}
                       </td>
+                      <td></td>
                     </tr>
                   </tfoot>
                 )}
