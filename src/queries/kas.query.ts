@@ -46,11 +46,15 @@ export async function getLaporanKas() {
     .reduce((s, f) => s + f.harga, 0);
 
   const verifiedTikets = transaksiTikets.filter((t) => t.status === "VERIFIED");
+  // "Offline" = uang tunai fisik (POS metode CASH); penjualan POS via QRIS
+  // sudah masuk rekening, jadi dihitung ke non-tunai bersama online.
+  const isTunai = (t: { jenisJual: string; metodePembayaran: string }) =>
+    t.jenisJual === "OFFLINE" && t.metodePembayaran === "CASH";
   const totalOffline = verifiedTikets
-    .filter((t) => t.jenisJual === "OFFLINE")
+    .filter(isTunai)
     .reduce((s, t) => s + t.tiket.harga * t.jumlah + (t.kodeUnik ? parseInt(t.kodeUnik) : 0), 0);
   const totalOnline = verifiedTikets
-    .filter((t) => t.jenisJual !== "OFFLINE")
+    .filter((t) => !isTunai(t))
     .reduce((s, t) => s + t.tiket.harga * t.jumlah + (t.kodeUnik ? parseInt(t.kodeUnik) : 0), 0);
 
   const totalPemasukan = kasTransaksis

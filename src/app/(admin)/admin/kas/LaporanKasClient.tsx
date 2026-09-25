@@ -162,8 +162,8 @@ export default function LaporanKasClient({ data }: { data: KasData }) {
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <SummaryCard label="Online" value={formatRupiah(data.totalOnline)} color="primary" />
-        <SummaryCard label="Offline/Tunai" value={formatRupiah(data.totalOffline)} color="orange" />
+        <SummaryCard label="Non-Tunai (Transfer/QRIS)" value={formatRupiah(data.totalOnline)} color="primary" />
+        <SummaryCard label="Tunai" value={formatRupiah(data.totalOffline)} color="orange" />
       </div>
 
       {/* Tabs */}

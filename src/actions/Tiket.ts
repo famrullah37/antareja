@@ -145,6 +145,10 @@ export async function beliTiket(data: FormData, userId?: string) {
   const metodePembayaran = (data.get("metodePembayaran") as string) || "TRANSFER";
   const kodeUnik = data.get("kodeUnik") as string | null;
 
+  if (metodePembayaran !== "TRANSFER" && metodePembayaran !== "QRIS") {
+    return { success: false, message: "Metode pembayaran online hanya QRIS atau Transfer" };
+  }
+
   // Bukti wajib untuk transfer manual (admin tidak punya cara lain
   // memverifikasi) — untuk QRIS opsional karena nominal sudah unik lewat
   // kodeUnik, admin cocokkan manual dari riwayat QRIS/mutasi rekening.
@@ -222,10 +226,17 @@ export async function jualTiketOffline(data: FormData) {
   const noHp = (data.get("noHp") as string) || "-";
   const catatanAdmin = (data.get("catatanAdmin") as string) || null;
   const metodePembayaran = (data.get("metodePembayaran") as string) || "CASH";
+  if (metodePembayaran !== "CASH" && metodePembayaran !== "QRIS")
+    return { success: false, message: "Metode pembayaran POS hanya Cash atau QRIS" };
+  const labelMetode = metodePembayaran === "QRIS" ? "QRIS" : "Tunai";
 
   try {
     const tiket = await prisma.tiket.findUnique({ where: { id: tiketId } });
     if (!tiket) return { success: false };
+    if (!Number.isInteger(jumlah) || jumlah < 1)
+      return { success: false, message: "Jumlah tidak valid" };
+    if (tiket.sisa < jumlah)
+      return { success: false, message: `Stok tiket tidak cukup (sisa ${tiket.sisa})` };
 
     const transaksi = await createTransaksiTiket({
       tiket: { connect: { id: tiketId } },
@@ -250,12 +261,12 @@ export async function jualTiketOffline(data: FormData) {
       data: { sisa: { decrement: jumlah } },
     });
 
-    await catatLog("JUAL_TIKET_OFFLINE", `Tiket ${tiket.jenis} × ${jumlah} (${nama}) — Tunai`);
+    await catatLog("JUAL_TIKET_OFFLINE", `Tiket ${tiket.jenis} × ${jumlah} (${nama}) — ${labelMetode}`);
 
     await prisma.kasTransaksi.create({
       data: {
         tipe: "PEMASUKAN",
-        keterangan: `Tiket ${tiket.jenis} × ${jumlah} (${nama}) — Offline`,
+        keterangan: `Tiket ${tiket.jenis} × ${jumlah} (${nama}) — POS ${labelMetode}`,
         jumlah: tiket.harga * jumlah,
         kategori: "TIKET",
         sumber: "TIKET",

@@ -1,8 +1,8 @@
 ﻿"use client";
 
-import { jualTiketOffline } from "@/actions/Tiket";
+import { jualTiketOffline, getDynamicQrisTiket } from "@/actions/Tiket";
 import { toast } from "sonner";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 type Tiket = { id: string; jenis: string; harga: number; sisa: number };
 
@@ -14,13 +14,30 @@ function formatRupiah(n: number) {
   }).format(n);
 }
 
-export default function JualOfflineForm({ tikets }: { tikets: Tiket[] }) {
+export default function JualOfflineForm({ tikets, qrisUrl }: { tikets: Tiket[]; qrisUrl: string | null }) {
   const [selectedTiketId, setSelectedTiketId] = useState(tikets[0]?.id ?? "");
   const [jumlah, setJumlah] = useState(1);
-  const [metode, setMetode] = useState<"CASH" | "TRANSFER" | "QRIS">("CASH");
+  const [metode, setMetode] = useState<"CASH" | "QRIS">("CASH");
+  const [qrisDinamis, setQrisDinamis] = useState<string | null>(null);
 
   const selectedTiket = tikets.find((t) => t.id === selectedTiketId);
   const total = selectedTiket ? selectedTiket.harga * jumlah : 0;
+
+  useEffect(() => {
+    if (metode !== "QRIS" || total <= 0) {
+      setQrisDinamis(null);
+      return;
+    }
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      const result = await getDynamicQrisTiket(total);
+      if (!cancelled) setQrisDinamis(result.success ? result.dataUrl! : null);
+    }, 250);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [metode, total]);
 
   async function handleSubmit(data: FormData) {
     const toastId = toast.loading("Memproses penjualan...");
@@ -31,7 +48,7 @@ export default function JualOfflineForm({ tikets }: { tikets: Tiket[] }) {
       });
       setJumlah(1);
     } else {
-      toast.error("Gagal menjual tiket", { id: toastId });
+      toast.error((result as any).message ?? "Gagal menjual tiket", { id: toastId });
     }
   }
 
@@ -115,17 +132,40 @@ export default function JualOfflineForm({ tikets }: { tikets: Tiket[] }) {
       <div className="flex flex-col gap-1">
         <label className="text-sm font-medium text-neutral-700">Metode Pembayaran</label>
         <div className="flex gap-2">
-          {(["CASH", "TRANSFER", "QRIS"] as const).map((m) => (
+          {(["CASH", "QRIS"] as const).map((m) => (
             <button key={m} type="button" onClick={() => setMetode(m)}
               className={`flex-1 py-2 rounded-lg border text-sm font-medium transition-colors ${
                 metode === m ? "border-orange-500 bg-orange-50 text-orange-700" : "border-neutral-200 text-neutral-600 hover:border-neutral-400"
               }`}>
-              {m}
+              {m === "CASH" ? "Tunai" : "QRIS"}
             </button>
           ))}
         </div>
         <input type="hidden" name="metodePembayaran" value={metode} />
       </div>
+
+      {metode === "QRIS" && total > 0 && (
+        <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 flex flex-col items-center gap-2 text-sm text-orange-800">
+          <p className="font-semibold">Minta pembeli scan QRIS berikut</p>
+          {qrisDinamis ? (
+            // eslint-disable-next-line @next/next/no-img-element -- QRIS dinamis (data URL sekali pakai)
+            <img src={qrisDinamis} alt="QRIS Dinamis" className="w-52 h-52 object-contain rounded-lg border border-orange-200 bg-white" />
+          ) : qrisUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element -- QRIS statis dari konfigurasi tiket
+            <img src={qrisUrl} alt="QRIS" className="w-52 h-52 object-contain rounded-lg border border-orange-200 bg-white" />
+          ) : (
+            <div className="w-40 h-40 bg-white border border-orange-200 rounded-lg flex items-center justify-center text-gray-400 text-xs text-center px-2">
+              QRIS belum dikonfigurasi di halaman Tiket
+            </div>
+          )}
+          <p className="font-bold text-lg">{formatRupiah(total)}</p>
+          <p className="text-xs text-orange-600 text-center">
+            {qrisDinamis
+              ? "Nominal sudah terisi otomatis. Tekan tombol di bawah setelah pembayaran masuk."
+              : "QRIS statis: minta pembeli mengetik nominal di atas, lalu tekan tombol di bawah setelah pembayaran masuk."}
+          </p>
+        </div>
+      )}
 
       <div className="flex flex-col gap-1">
         <label className="text-sm font-medium text-neutral-700">
@@ -153,7 +193,7 @@ export default function JualOfflineForm({ tikets }: { tikets: Tiket[] }) {
         type="submit"
         className="bg-orange-500 hover:bg-orange-600 text-white font-semibold rounded-lg py-2.5 transition-colors"
       >
-        Jual & Aktifkan QR
+        {metode === "QRIS" ? "Pembayaran Diterima — Aktifkan QR" : "Terima Tunai — Aktifkan QR"}
       </button>
     </form>
   );
