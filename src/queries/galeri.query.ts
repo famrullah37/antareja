@@ -30,7 +30,10 @@ export async function updateAlbum(
 }
 
 export async function deleteAlbum(where: Prisma.AlbumWhereUniqueInput) {
-  return prisma.album.delete({ where });
+  return prisma.$transaction([
+    prisma.foto.deleteMany({ where: { album: where } }),
+    prisma.album.delete({ where }),
+  ]);
 }
 
 // ─── Foto ─────────────────────────────────────────────────────────────────────

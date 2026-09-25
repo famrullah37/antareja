@@ -59,8 +59,12 @@ export async function deleteAlbumAdmin(albumId: string) {
   try {
     await deleteAlbum({ id: albumId });
     revalidatePath("/admin/galeri");
+    revalidatePath("/galeri");
     return { success: true };
-  } catch { return { success: false }; }
+  } catch (e) {
+    console.error("deleteAlbumAdmin error:", e);
+    return { success: false };
+  }
 }
 
 // ─── Fotografer/Admin: Upload Foto ───────────────────────────────────────────
