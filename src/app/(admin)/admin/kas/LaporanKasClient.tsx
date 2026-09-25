@@ -11,6 +11,9 @@ type KasTransaksi = {
   tipe: string;
   keterangan: string;
   vendor: string | null;
+  satuan: string | null;
+  qty: number | null;
+  hargaSatuan: number | null;
   jumlah: number;
   kategori: string;
   nota: string | null;
@@ -60,6 +63,9 @@ export default function LaporanKasClient({ data }: { data: KasData }) {
   const [filterStatus, setFilterStatus] = useState("ALL");
   const [tipeInput, setTipeInput] = useState<"PEMASUKAN" | "PENGELUARAN">("PENGELUARAN");
   const [submitting, setSubmitting] = useState(false);
+  const [qtyInput, setQtyInput] = useState("");
+  const [hargaInput, setHargaInput] = useState("");
+  const subTotalInput = (Number(qtyInput) || 0) * (Number(hargaInput) || 0);
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
 
@@ -83,6 +89,8 @@ export default function LaporanKasClient({ data }: { data: KasData }) {
     if (result.success) {
       toast.success("Transaksi disimpan", { id: toastId });
       formRef.current?.reset();
+      setQtyInput("");
+      setHargaInput("");
       router.refresh();
     } else toast.error((result as any).message ?? "Gagal", { id: toastId });
   }
@@ -100,9 +108,12 @@ export default function LaporanKasClient({ data }: { data: KasData }) {
       Tanggal: formatDate(k.createdAt),
       Tipe: k.tipe,
       Keterangan: k.keterangan,
+      Satuan: k.satuan ?? "-",
+      Jumlah: k.qty ?? "-",
+      "Harga Satuan": k.hargaSatuan ?? "-",
+      "Sub Total": k.jumlah,
       Vendor: k.vendor ?? "-",
       Kategori: k.kategori,
-      Jumlah: k.jumlah,
       Sumber: k.sumber,
     }));
     const tiketRows = data.transaksiTikets.filter((t) => t.status === "VERIFIED").map((t) => ({
@@ -270,16 +281,42 @@ export default function LaporanKasClient({ data }: { data: KasData }) {
                   <label className="text-xs text-gray-500">Keterangan</label>
                   <input name="keterangan" required placeholder="Keterangan" className="border rounded-lg px-3 py-2 text-sm" />
                 </div>
-                <div className="flex flex-col gap-1">
-                  <label className="text-xs text-gray-500">Jumlah (Rp)</label>
-                  <input name="jumlah" type="number" min="0" required placeholder="0" className="border rounded-lg px-3 py-2 text-sm" />
-                </div>
+                {tipeInput === "PENGELUARAN" && (
+                  <>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-xs text-gray-500">Satuan</label>
+                      <input name="satuan" placeholder="pcs, kg, dus, paket..." className="border rounded-lg px-3 py-2 text-sm" />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-xs text-gray-500">Jumlah</label>
+                      <input name="qty" type="number" min="0" required placeholder="0" value={qtyInput} onChange={(e) => setQtyInput(e.target.value)} className="border rounded-lg px-3 py-2 text-sm" />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-xs text-gray-500">Harga Satuan (Rp)</label>
+                      <input name="hargaSatuan" type="number" min="0" required placeholder="0" value={hargaInput} onChange={(e) => setHargaInput(e.target.value)} className="border rounded-lg px-3 py-2 text-sm" />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-xs text-gray-500">Sub Total (Harga Satuan × Jumlah)</label>
+                      <input readOnly value={formatRupiah(subTotalInput)} className="border rounded-lg px-3 py-2 text-sm bg-neutral-100 font-semibold" />
+                    </div>
+                  </>
+                )}
+                {tipeInput === "PEMASUKAN" && (
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs text-gray-500">Jumlah (Rp)</label>
+                    <input name="jumlah" type="number" min="0" required placeholder="0" className="border rounded-lg px-3 py-2 text-sm" />
+                  </div>
+                )}
                 {tipeInput === "PENGELUARAN" && (
                   <div className="flex flex-col gap-1">
-                    <label className="text-xs text-gray-500">Vendor / Toko</label>
+                    <label className="text-xs text-gray-500">Nama Vendor / Toko</label>
                     <input name="vendor" placeholder="Nama vendor" className="border rounded-lg px-3 py-2 text-sm" />
                   </div>
                 )}
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs text-gray-500">Tanggal</label>
+                  <input name="tanggal" type="date" defaultValue={new Date().toISOString().slice(0, 10)} className="border rounded-lg px-3 py-2 text-sm" />
+                </div>
                 <div className="flex flex-col gap-1">
                   <label className="text-xs text-gray-500">Kategori</label>
                   <select name="kategori" className="border rounded-lg px-3 py-2 text-sm">
@@ -323,35 +360,52 @@ export default function LaporanKasClient({ data }: { data: KasData }) {
                 <table className="w-full text-sm">
                   <thead className="text-xs text-gray-400 bg-neutral-50">
                     <tr>
+                      <th className="px-4 py-2 text-left">Tanggal</th>
                       <th className="px-4 py-2 text-left">Keterangan</th>
+                      {color === "red" && <th className="px-4 py-2 text-left">Satuan</th>}
+                      {color === "red" && <th className="px-4 py-2 text-right">Jumlah</th>}
+                      {color === "red" && <th className="px-4 py-2 text-right">Harga Satuan</th>}
+                      <th className="px-4 py-2 text-right">{color === "red" ? "Sub Total" : "Jumlah"}</th>
                       <th className="px-4 py-2 text-left">Vendor</th>
                       <th className="px-4 py-2 text-left">Kategori</th>
-                      <th className="px-4 py-2 text-right">Jumlah</th>
                       <th className="px-4 py-2 text-left">Nota</th>
-                      <th className="px-4 py-2 text-left">Tanggal</th>
                       <th className="px-4 py-2"></th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-neutral-50">
-                    {rows.length === 0 && <tr><td colSpan={7} className="px-4 py-6 text-center text-gray-400 text-xs">Belum ada data</td></tr>}
+                    {rows.length === 0 && <tr><td colSpan={9} className="px-4 py-6 text-center text-gray-400 text-xs">Belum ada data</td></tr>}
                     {rows.map((k) => (
                       <tr key={k.id} className="hover:bg-neutral-50">
+                        <td className="px-4 py-2.5 text-xs text-gray-400 whitespace-nowrap">{formatDate(k.createdAt)}</td>
                         <td className="px-4 py-2.5 font-medium">{k.keterangan}</td>
+                        {color === "red" && <td className="px-4 py-2.5 text-gray-500 text-xs">{k.satuan ?? "-"}</td>}
+                        {color === "red" && <td className="px-4 py-2.5 text-right">{k.qty ?? "-"}</td>}
+                        {color === "red" && <td className="px-4 py-2.5 text-right">{k.hargaSatuan != null ? formatRupiah(k.hargaSatuan) : "-"}</td>}
+                        <td className={`px-4 py-2.5 text-right font-semibold ${color === "green" ? "text-green-600" : "text-red-600"}`}>{formatRupiah(k.jumlah)}</td>
                         <td className="px-4 py-2.5 text-gray-500 text-xs">{k.vendor ?? "-"}</td>
                         <td className="px-4 py-2.5">
                           <span className={`text-xs px-2 py-0.5 rounded-full ${color === "green" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
                             {(k.kategori ?? "").replace(/_/g, " ")}
                           </span>
                         </td>
-                        <td className={`px-4 py-2.5 text-right font-semibold ${color === "green" ? "text-green-600" : "text-red-600"}`}>{formatRupiah(k.jumlah)}</td>
                         <td className="px-4 py-2.5">{k.nota ? <a href={k.nota} target="_blank" rel="noreferrer" className="text-xs text-blue-600 underline">Lihat</a> : <span className="text-xs text-gray-400">-</span>}</td>
-                        <td className="px-4 py-2.5 text-xs text-gray-400">{formatDate(k.createdAt)}</td>
                         <td className="px-4 py-2.5 text-right">
                           <button onClick={() => handleDelete(k.id, k.keterangan)} className="text-xs text-red-500 hover:text-red-700">Hapus</button>
                         </td>
                       </tr>
                     ))}
                   </tbody>
+                  {rows.length > 0 && (
+                    <tfoot className="border-t-2 border-neutral-200 bg-neutral-50 font-bold">
+                      <tr>
+                        <td colSpan={color === "red" ? 5 : 2} className="px-4 py-2.5 text-neutral-600">Total</td>
+                        <td className={`px-4 py-2.5 text-right ${color === "green" ? "text-green-700" : "text-red-600"}`}>
+                          {formatRupiah(rows.reduce((sum, k) => sum + k.jumlah, 0))}
+                        </td>
+                        <td colSpan={4}></td>
+                      </tr>
+                    </tfoot>
+                  )}
                 </table>
               </div>
             ))}

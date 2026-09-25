@@ -31,7 +31,18 @@ export async function addKasTransaksi(data: FormData) {
   const tipe = data.get("tipe") as string;
   const keterangan = data.get("keterangan") as string;
   const vendor = (data.get("vendor") as string) || undefined;
-  const jumlah = parseInt(data.get("jumlah") as string);
+  const satuan = (data.get("satuan") as string) || undefined;
+  const qtyRaw = parseInt(data.get("qty") as string);
+  const qty = Number.isNaN(qtyRaw) ? undefined : qtyRaw;
+  const hargaRaw = parseInt(data.get("hargaSatuan") as string);
+  const hargaSatuan = Number.isNaN(hargaRaw) ? undefined : hargaRaw;
+  const jumlah =
+    hargaSatuan !== undefined && qty !== undefined
+      ? hargaSatuan * qty
+      : parseInt(data.get("jumlah") as string);
+  if (Number.isNaN(jumlah)) return { success: false, message: "Jumlah tidak valid" };
+  const tanggalRaw = data.get("tanggal") as string;
+  const tanggal = tanggalRaw ? new Date(`${tanggalRaw}T12:00:00`) : undefined;
   const kategori = (data.get("kategori") as string) || "LAINNYA";
   const notaFile = data.get("nota") as File | null;
 
@@ -47,7 +58,7 @@ export async function addKasTransaksi(data: FormData) {
 
   try {
     await prisma.kasTransaksi.create({
-      data: { tipe, keterangan, vendor, jumlah, kategori, nota: notaUrl, sumber: "MANUAL" },
+      data: { tipe, keterangan, vendor, satuan, qty, hargaSatuan, jumlah, kategori, nota: notaUrl, sumber: "MANUAL", ...(tanggal && { createdAt: tanggal }) },
     });
     revalidatePath("/admin/kas");
     return { success: true };

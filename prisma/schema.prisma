@@ -431,7 +431,10 @@ model KasTransaksi {
   tipe        String // PEMASUKAN | PENGELUARAN
   keterangan  String
   vendor      String?
-  jumlah      Int
+  satuan      String?
+  qty         Int?
+  hargaSatuan Int?
+  jumlah      Int // sub total Rp (hargaSatuan x qty untuk pengeluaran manual)
   kategori    String   @default("LAINNYA")
   nota        String?
   sumber      String   @default("MANUAL")
