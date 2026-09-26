@@ -1,6 +1,6 @@
 "use client";
 
-import signUp from "@/actions/Signup";
+import signUp, { resendVerificationEmail } from "@/actions/Signup";
 import { Eye } from "@/app/components/global/Icons";
 import TextField from "@/app/components/global/Input";
 import SubmitButton from "@/app/components/global/SubmitButton";
@@ -8,25 +8,36 @@ import { H1, H3, P } from "@/app/components/global/Text";
 import { useSession } from "next-auth/react";
 import Image from "next/image";
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import { useState } from "react";
 import { FaEyeSlash } from "react-icons/fa";
 import { toast } from "sonner";
 
-async function submit(data: FormData) {
-  const toastId = toast.loading("Membuat akun...");
-  const result = await signUp(data);
-  if (result.success) {
-    toast.success("Akun berhasil dibuat! Cek email Anda untuk verifikasi.", { id: toastId, duration: 6000 });
-    redirect("/auth/login");
-  } else {
-    toast.error(result.message, { id: toastId });
-  }
-}
-
 export default function Register() {
   const [isShown, setIsShown] = useState(false);
+  // Diisi setelah daftar berhasil — halaman berganti ke panel "cek email"
+  // (bukan langsung redirect ke login) supaya pesan verifikasi tidak
+  // terlewat seperti toast yang hilang beberapa detik kemudian.
+  const [registeredEmail, setRegisteredEmail] = useState<string | null>(null);
   const { data: session, status } = useSession();
+
+  async function submit(data: FormData) {
+    const toastId = toast.loading("Membuat akun...");
+    const result = await signUp(data);
+    if (result.success) {
+      toast.success("Akun berhasil dibuat! Cek email Anda untuk verifikasi.", { id: toastId, duration: 6000 });
+      setRegisteredEmail(data.get("email") as string);
+    } else {
+      toast.error(result.message, { id: toastId });
+    }
+  }
+
+  async function resend() {
+    if (!registeredEmail) return;
+    const toastId = toast.loading("Mengirim ulang email verifikasi...");
+    const result = await resendVerificationEmail(registeredEmail);
+    if (result.success) toast.success(result.message, { id: toastId, duration: 5000 });
+    else toast.error(result.message, { id: toastId });
+  }
 
   // Konsisten dengan fix di halaman login (reload penuh, bukan navigasi
   // client-side) — kalau sudah authenticated (mis. buka /auth/register
@@ -35,6 +46,36 @@ export default function Register() {
     const dest = session?.user?.role === "ADMIN" ? "/admin" : "/dashboard";
     if (typeof window !== "undefined") window.location.href = dest;
     return null;
+  }
+
+  if (registeredEmail) {
+    return (
+      <div className="flex justify-center items-center my-[54px] mx-[40px] lg:mx-[108px]">
+        <div className="bg-white w-full sm:w-[458px] rounded-[24px] p-[30px] flex flex-col gap-6 text-center">
+          <div className="mx-auto bg-primary-500 w-[64px] h-[60px] flex justify-center items-center rounded-xl drop-shadow-glow">
+            <Image src={"/icon.svg"} width={36} height={38} alt="logo" className="invert" />
+          </div>
+          <H3>Cek Email Anda</H3>
+          <P>
+            Akun berhasil dibuat. Kami sudah mengirim link verifikasi ke{" "}
+            <span className="font-bold text-black break-all">{registeredEmail}</span>.
+            Buka email tersebut dan klik link verifikasi sebelum login.
+          </P>
+          <P className="text-sm">
+            Tidak menemukan emailnya? Periksa juga folder Spam/Promosi.
+          </P>
+          <Link
+            href={"/auth/login"}
+            className="w-full h-[60px] bg-primary-500 rounded-[14px] text-white font-bold flex justify-center items-center"
+          >
+            Ke Halaman Login
+          </Link>
+          <button type="button" onClick={resend} className="text-primary-500 font-bold text-sm">
+            Belum menerima email? Kirim ulang
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (
