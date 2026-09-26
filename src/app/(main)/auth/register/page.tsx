@@ -50,8 +50,8 @@ export default function Register() {
 
   if (registeredEmail) {
     return (
-      <div className="flex justify-center items-center my-[54px] mx-[40px] lg:mx-[108px]">
-        <div className="bg-white w-full sm:w-[458px] rounded-[24px] p-[30px] flex flex-col gap-6 text-center">
+      <div className="flex justify-center items-center my-6 sm:my-[54px] mx-4 sm:mx-[40px] lg:mx-[108px]">
+        <div className="bg-white w-full sm:w-[458px] rounded-[24px] p-5 sm:p-[30px] flex flex-col gap-4 sm:gap-6 text-center">
           <div className="mx-auto bg-primary-500 w-[64px] h-[60px] flex justify-center items-center rounded-xl drop-shadow-glow">
             <Image src={"/icon.svg"} width={36} height={38} alt="logo" className="invert" />
           </div>
@@ -66,7 +66,7 @@ export default function Register() {
           </P>
           <Link
             href={"/auth/login"}
-            className="w-full h-[60px] bg-primary-500 rounded-[14px] text-white font-bold flex justify-center items-center"
+            className="w-full h-[52px] sm:h-[60px] bg-primary-500 rounded-[14px] text-white font-bold flex justify-center items-center"
           >
             Ke Halaman Login
           </Link>
@@ -80,7 +80,7 @@ export default function Register() {
 
   return (
     <form
-      className="flex lg:justify-between gap-[60px] lg:gap-0 my-[54px] mx-[40px] lg:mx-[108px] flex-col lg:flex-row items-center justify-center"
+      className="flex lg:justify-between gap-8 sm:gap-[60px] lg:gap-0 my-6 sm:my-[54px] mx-4 sm:mx-[40px] lg:mx-[108px] flex-col lg:flex-row items-center justify-center"
       action={submit}
     >
       <div className="w-full xl:w-[635px] text-wrap flex flex-col gap-1 lg:gap-6 justify-center relative">
@@ -109,7 +109,7 @@ export default function Register() {
         </P>
       </div>
       <div className="bg-white w-full sm:w-[458px] rounded-[24px] ">
-        <div className="p-[30px] flex flex-col gap-[30px]">
+        <div className="p-5 sm:p-[30px] flex flex-col gap-5 sm:gap-[30px]">
           <div className="w-[65px] h-[32px] bg-primary-300 flex justify-center items-center py-1 px-2 rounded-2xl">
             <P className="rounded-[16px] text-primary-500 font-bold">Daftar</P>
           </div>
@@ -117,7 +117,7 @@ export default function Register() {
             <H3>Selamat Datang!</H3>
             <P>Yuk buat akun sebelum bergabung menjadi bagian dari Antareja!</P>
           </div>
-          <div className="flex flex-col gap-6">
+          <div className="flex flex-col gap-4 sm:gap-6">
             <div className="flex flex-col gap-2">
               <P className="font-bold text-black">Nama</P>
               <TextField
@@ -157,10 +157,10 @@ export default function Register() {
               </div>
             </div>
           </div>
-          <div className="flex flex-col gap-6">
+          <div className="flex flex-col gap-4 sm:gap-6">
             <SubmitButton
               text={"Daftar"}
-              className="w-full h-[60px] bg-primary-500 rounded-[14px]"
+              className="w-full h-[52px] sm:h-[60px] bg-primary-500 rounded-[14px]"
             />
             <div className="w-full flex justify-center items-center">
               <P>

@@ -84,7 +84,7 @@ export default function Login() {
 
   return (
     <form
-      className="flex justify-center items-center lg:justify-between gap-[40px] lg:gap-0 my-[24px] mx-[40px] lg:mx-[108px] flex-col lg:flex-row"
+      className="flex justify-center items-center lg:justify-between gap-8 sm:gap-[40px] lg:gap-0 my-[24px] mx-4 sm:mx-[40px] lg:mx-[108px] flex-col lg:flex-row"
       onSubmit={onSubmit}
     >
       <div className="w-full xl:w-[635px] text-wrap flex flex-col gap-1 lg:gap-6 justify-center relative ">
@@ -113,7 +113,7 @@ export default function Login() {
         </P>
       </div>
       <div className="bg-white w-full sm:w-[458px] rounded-[24px] ">
-        <div className="p-[24px] flex flex-col gap-[18px]">
+        <div className="p-5 sm:p-[24px] flex flex-col gap-[18px]">
           <div className="w-[65px] h-[32px] bg-primary-300 flex justify-center items-center py-1 px-2 rounded-2xl">
             <P className="rounded-[16px] text-primary-500 font-bold">Masuk</P>
           </div>
