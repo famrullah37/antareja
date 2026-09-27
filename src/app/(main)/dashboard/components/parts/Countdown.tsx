@@ -11,8 +11,8 @@ function TimeFigure({
 }: Readonly<{ time: number; title: string }>) {
   return (
     <figure className="flex flex-col items-center gap-3">
-      <div className="p-[30px] rounded-[18px] w-[108px] h-[110px] bg-primary-500 drop-shadow-glow flex flex-col justify-center items-center">
-        <span className="text-[50px] text-white font-bold leading-[1]">
+      <div className="sm:p-[30px] rounded-[14px] sm:rounded-[18px] w-[66px] h-[70px] sm:w-[108px] sm:h-[110px] bg-primary-500 drop-shadow-glow flex flex-col justify-center items-center">
+        <span className="text-[28px] sm:text-[50px] text-white font-bold leading-[1]">
           {time.toString().length >= 2 ? time : "0" + time.toString()}
         </span>
       </div>
@@ -27,7 +27,7 @@ export default function Countdown() {
   return (
     <figure className="flex flex-col gap-4">
       <H2>Waktu Tersisa Sebelum Hari-H</H2>
-      <div className="flex gap-[17px] flex-wrap md:flex-nowrap w-full justify-center">
+      <div className="flex gap-2 sm:gap-[17px] w-full justify-center">
         <TimeFigure time={days} title="Hari" />
         <TimeFigure time={hours} title="Jam" />
         <TimeFigure time={minutes} title="Menit" />

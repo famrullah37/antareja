@@ -162,17 +162,17 @@ export default function NilaiAkhirSection({ penilaianBaru }: { penilaianBaru: Pe
       <H2 className="mb-5">Hasil Penilaian</H2>
 
       {/* Ringkasan skor */}
-      <div className="grid grid-cols-3 gap-3 mb-6">
-        <div className="bg-white rounded-xl border border-neutral-200 p-4 text-center">
-          <div className="text-2xl font-bold text-neutral-800">{penilaianBaru.nilaiKotor}</div>
+      <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-6">
+        <div className="bg-white rounded-xl border border-neutral-200 p-3 sm:p-4 text-center">
+          <div className="text-lg sm:text-2xl font-bold text-neutral-800">{penilaianBaru.nilaiKotor}</div>
           <div className="text-xs text-gray-400 mt-1">Nilai Kotor</div>
         </div>
-        <div className="bg-red-50 rounded-xl border border-red-100 p-4 text-center">
-          <div className="text-2xl font-bold text-red-500">-{penilaianBaru.totalPengurang}</div>
+        <div className="bg-red-50 rounded-xl border border-red-100 p-3 sm:p-4 text-center">
+          <div className="text-lg sm:text-2xl font-bold text-red-500">-{penilaianBaru.totalPengurang}</div>
           <div className="text-xs text-gray-400 mt-1">Pengurangan</div>
         </div>
-        <div className="bg-primary-50 rounded-xl border border-primary-200 p-4 text-center">
-          <div className="text-2xl font-bold text-primary-600">{penilaianBaru.nilaiAkhir}</div>
+        <div className="bg-primary-50 rounded-xl border border-primary-200 p-3 sm:p-4 text-center">
+          <div className="text-lg sm:text-2xl font-bold text-primary-600">{penilaianBaru.nilaiAkhir}</div>
           <div className="text-xs text-primary-500 mt-1 font-medium">Nilai Akhir</div>
         </div>
       </div>

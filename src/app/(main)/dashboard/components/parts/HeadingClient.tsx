@@ -29,7 +29,7 @@ export default function HeadingClient({ session, pengumumans }: HeadingClientPro
 
   return (
     <>
-      <div className="flex items-center justify-between w-full mb-3">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 w-full mb-3">
         <H2 className="mb-2">
           Selamat Datang, {session?.user?.nama ?? "Tamu"} 👋
         </H2>
@@ -53,9 +53,9 @@ export default function HeadingClient({ session, pengumumans }: HeadingClientPro
         <H3 className="mb-8">Pengumuman Dari Panitia</H3>
         <div className="flex flex-col gap-6">
           {pengumumans.map((pengumuman) => (
-            <div key={pengumuman.id} className="w-full flex items-center gap-4">
+            <div key={pengumuman.id} className="w-full flex flex-col md:flex-row md:items-center gap-1 md:gap-4">
               <dl className="w-full text-gray-500 md:max-w-[20%] md:border-r md:border-gray-500">
-                <dd className="flex flex-row gap-[18px] text-base font-medium leading-6 md:flex-col md:gap-2">
+                <dd className="flex flex-row gap-[18px] text-sm md:text-base font-medium leading-6 md:flex-col md:gap-2">
                   <time>{stringifyDate(pengumuman.createdAt)}</time>
                   <time>
                     {stringifyTime(

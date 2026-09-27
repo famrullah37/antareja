@@ -7,8 +7,8 @@ function TimeFigure({ time, title }: { time: number; title: string }) {
   const display = time.toString().padStart(2, "0");
   return (
     <div className="flex flex-col items-center gap-2">
-      <div className="relative w-[72px] h-[72px] sm:w-[90px] sm:h-[90px] rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center shadow-lg">
-        <span className="text-[32px] sm:text-[42px] font-extrabold text-white leading-none tabular-nums">
+      <div className="relative w-[60px] h-[60px] sm:w-[90px] sm:h-[90px] rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center shadow-lg">
+        <span className="text-[26px] sm:text-[42px] font-extrabold text-white leading-none tabular-nums">
           {display}
         </span>
       </div>
@@ -50,7 +50,7 @@ export default function Countdown({
           {label}
         </span>
       </div>
-      <div className="flex gap-3 sm:gap-5">
+      <div className="flex gap-2 sm:gap-5">
         <TimeFigure time={days} title="Hari" />
         <div className="text-white/50 text-3xl font-bold self-start mt-4">:</div>
         <TimeFigure time={hours} title="Jam" />
