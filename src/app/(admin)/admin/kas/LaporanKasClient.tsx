@@ -2,7 +2,7 @@
 
 import { useState, useRef } from "react";
 import { toast } from "sonner";
-import { addKasTransaksi, deleteKasTransaksi } from "@/actions/Kas";
+import { addKasTransaksi } from "@/actions/Kas";
 import { useRouter } from "next-nprogress-bar";
 import * as XLSX from "xlsx";
 
@@ -93,14 +93,6 @@ export default function LaporanKasClient({ data }: { data: KasData }) {
       setHargaInput("");
       router.refresh();
     } else toast.error((result as any).message ?? "Gagal", { id: toastId });
-  }
-
-  async function handleDelete(id: string, label: string) {
-    if (!confirm(`Hapus ${label}?`)) return;
-    const toastId = toast.loading("Menghapus...");
-    const result = await deleteKasTransaksi(id);
-    if (result.success) { toast.success("Dihapus", { id: toastId }); router.refresh(); }
-    else toast.error((result as any).message ?? "Gagal hapus", { id: toastId });
   }
 
   function exportExcel() {
@@ -205,13 +197,12 @@ export default function LaporanKasClient({ data }: { data: KasData }) {
                     <th className="px-4 py-2.5 text-right text-green-700">Pemasukan</th>
                     <th className="px-4 py-2.5 text-right text-red-700">Pengeluaran</th>
                     <th className="px-4 py-2.5 text-right">Saldo</th>
-                    <th className="px-4 py-2.5"></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-50">
                   {rows.length === 0 && (
                     <tr>
-                      <td colSpan={7} className="px-4 py-8 text-center text-gray-400">Belum ada transaksi</td>
+                      <td colSpan={6} className="px-4 py-8 text-center text-gray-400">Belum ada transaksi</td>
                     </tr>
                   )}
                   {rows.map((k, i) => {
@@ -236,9 +227,6 @@ export default function LaporanKasClient({ data }: { data: KasData }) {
                         <td className={`px-4 py-2.5 text-right font-bold ${saldoSnap >= 0 ? "text-neutral-800" : "text-red-600"}`}>
                           {formatRupiah(saldoSnap)}
                         </td>
-                        <td className="px-4 py-2.5 text-right">
-                          <button onClick={() => handleDelete(k.id, k.keterangan)} className="text-xs text-red-500 hover:text-red-700">Hapus</button>
-                        </td>
                       </tr>
                     );
                   })}
@@ -252,7 +240,6 @@ export default function LaporanKasClient({ data }: { data: KasData }) {
                       <td className={`px-4 py-3 text-right text-lg ${data.saldo >= 0 ? "text-primary-600" : "text-red-600"}`}>
                         {formatRupiah(data.saldo)}
                       </td>
-                      <td></td>
                     </tr>
                   </tfoot>
                 )}
@@ -369,11 +356,10 @@ export default function LaporanKasClient({ data }: { data: KasData }) {
                       <th className="px-4 py-2 text-left">Vendor</th>
                       <th className="px-4 py-2 text-left">Kategori</th>
                       <th className="px-4 py-2 text-left">Nota</th>
-                      <th className="px-4 py-2"></th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-neutral-50">
-                    {rows.length === 0 && <tr><td colSpan={9} className="px-4 py-6 text-center text-gray-400 text-xs">Belum ada data</td></tr>}
+                    {rows.length === 0 && <tr><td colSpan={color === "red" ? 9 : 6} className="px-4 py-6 text-center text-gray-400 text-xs">Belum ada data</td></tr>}
                     {rows.map((k) => (
                       <tr key={k.id} className="hover:bg-neutral-50">
                         <td className="px-4 py-2.5 text-xs text-gray-400 whitespace-nowrap">{formatDate(k.createdAt)}</td>
@@ -389,9 +375,6 @@ export default function LaporanKasClient({ data }: { data: KasData }) {
                           </span>
                         </td>
                         <td className="px-4 py-2.5">{k.nota ? <a href={k.nota} target="_blank" rel="noreferrer" className="text-xs text-blue-600 underline">Lihat</a> : <span className="text-xs text-gray-400">-</span>}</td>
-                        <td className="px-4 py-2.5 text-right">
-                          <button onClick={() => handleDelete(k.id, k.keterangan)} className="text-xs text-red-500 hover:text-red-700">Hapus</button>
-                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -402,7 +385,7 @@ export default function LaporanKasClient({ data }: { data: KasData }) {
                         <td className={`px-4 py-2.5 text-right ${color === "green" ? "text-green-700" : "text-red-600"}`}>
                           {formatRupiah(rows.reduce((sum, k) => sum + k.jumlah, 0))}
                         </td>
-                        <td colSpan={4}></td>
+                        <td colSpan={3}></td>
                       </tr>
                     </tfoot>
                   )}
