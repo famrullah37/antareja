@@ -46,6 +46,30 @@ export default function TiketForm() {
         type="number"
         required
       />
+      <div className="border-t border-neutral-100 pt-4 flex flex-col gap-3">
+        <div>
+          <p className="font-medium text-sm">Bundling (opsional)</p>
+          <p className="text-xs text-neutral-500">
+            Contoh: tambah Rp5.000 dapat &quot;2 Air Minum&quot;. Kosongkan jika tidak ada bundling.
+          </p>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <TextField
+            id="bundleHarga"
+            name="bundleHarga"
+            label="Harga Tambahan (Rp)"
+            placeholder="5000"
+            type="number"
+          />
+          <TextField
+            id="bundleIsi"
+            name="bundleIsi"
+            label="Isi Bundling"
+            placeholder="2 Air Minum"
+            type="text"
+          />
+        </div>
+      </div>
       <div className="flex justify-end">
         <SubmitButton text="Tambah Tiket" />
       </div>

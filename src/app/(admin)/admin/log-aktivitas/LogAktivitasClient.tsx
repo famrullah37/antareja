@@ -22,6 +22,7 @@ const aksiBadge: Record<string, string> = {
   VERIFIKASI_VOTING: "bg-green-100 text-green-700",
   KONFIRMASI_PEMBAYARAN_TIM: "bg-green-100 text-green-700",
   JUAL_TIKET_OFFLINE: "bg-blue-100 text-blue-700",
+  UBAH_BUNDLING_TIKET: "bg-amber-100 text-amber-700",
   TOLAK_TIKET: "bg-red-100 text-red-700",
   TOLAK_FOTO: "bg-red-100 text-red-700",
   TOLAK_VOTING: "bg-red-100 text-red-700",

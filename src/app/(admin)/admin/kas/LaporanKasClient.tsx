@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { addKasTransaksi } from "@/actions/Kas";
 import { useRouter } from "next-nprogress-bar";
 import * as XLSX from "xlsx";
+import { totalBayarTiket } from "@/lib/tiket";
 
 type KasTransaksi = {
   id: string;
@@ -25,6 +26,7 @@ type PerJenis = { jenis: string; harga: number; terjual: number; pendapatan: num
 type TransaksiTiket = {
   id: string; nama: string; email: string; jumlah: number; status: string;
   jenisJual: string; metodePembayaran: string; createdAt: Date;
+  kodeUnik: string | null; bundleJumlah: number; bundleHarga: number; bundleIsi: string | null;
   tiket: { jenis: string; harga: number };
 };
 type TransaksiFoto = {
@@ -114,7 +116,8 @@ export default function LaporanKasClient({ data }: { data: KasData }) {
       Email: t.email,
       Jenis: t.tiket.jenis,
       Jumlah: t.jumlah,
-      Total: t.tiket.harga * t.jumlah,
+      Bundling: t.bundleJumlah > 0 ? `${t.bundleIsi} × ${t.bundleJumlah}` : "",
+      Total: totalBayarTiket(t),
       JenisJual: t.jenisJual,
       Metode: t.metodePembayaran,
     }));
@@ -416,9 +419,9 @@ export default function LaporanKasClient({ data }: { data: KasData }) {
                 {filteredTikets.map((tr) => (
                   <tr key={tr.id} className="hover:bg-neutral-50">
                     <td className="px-4 py-2.5"><div className="font-medium">{tr.nama}</div><div className="text-xs text-gray-400">{tr.email}</div></td>
-                    <td className="px-4 py-2.5">{tr.tiket.jenis}</td>
+                    <td className="px-4 py-2.5">{tr.tiket.jenis}{tr.bundleJumlah > 0 && <div className="text-xs text-amber-600">+ {tr.bundleIsi} × {tr.bundleJumlah}</div>}</td>
                     <td className="px-4 py-2.5 text-right">{tr.jumlah}</td>
-                    <td className="px-4 py-2.5 text-right font-semibold">{formatRupiah(tr.tiket.harga * tr.jumlah)}</td>
+                    <td className="px-4 py-2.5 text-right font-semibold">{formatRupiah(totalBayarTiket(tr))}</td>
                     <td className="px-4 py-2.5"><span className={`text-xs font-medium px-2 py-0.5 rounded-full ${tr.jenisJual === "OFFLINE" ? "bg-orange-100 text-orange-700" : "bg-blue-100 text-blue-700"}`}>{tr.jenisJual === "OFFLINE" ? "Tunai" : "Online"}</span></td>
                     <td className="px-4 py-2.5 text-xs text-gray-500">{tr.metodePembayaran}</td>
                     <td className="px-4 py-2.5"><span className={`text-xs font-medium px-2 py-0.5 rounded-full ${STATUS_COLORS[tr.status] ?? ""}`}>{tr.status}</span></td>

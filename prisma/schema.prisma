@@ -265,6 +265,10 @@ model Tiket {
   harga     Int
   kuota     Int              @default(0)
   sisa      Int              @default(0)
+  // Bundling opsional per jenis tiket, mis. tambah Rp5.000 dapat "2 Air Minum".
+  // bundleHarga null/0 = tidak ada bundling. Maksimal 1 paket per tiket.
+  bundleHarga Int?
+  bundleIsi   String?
   transaksi TransaksiTiket[]
 }
 
@@ -282,6 +286,11 @@ model TransaksiTiket {
   metodePembayaran String    @default("TRANSFER")
   kodeUnik         String?
   catatanAdmin     String?
+  // Snapshot bundling saat beli — harga/isi di master tiket bisa berubah,
+  // nominal yang sudah dibayar tidak boleh ikut berubah.
+  bundleJumlah     Int       @default(0)
+  bundleHarga      Int       @default(0)
+  bundleIsi        String?
   createdAt        DateTime  @default(now())
   user             User?     @relation(fields: [userId], references: [id])
   tiket            Tiket     @relation(fields: [tiketId], references: [id])
@@ -294,6 +303,8 @@ model QRTiket {
   token       String         @unique @default(uuid())
   statusScan  Boolean        @default(false)
   waktuScan   DateTime?
+  // true = pemegang QR ini berhak dapat isi bundling (bundleIsi transaksi)
+  bundle      Boolean        @default(false)
   transaksi   TransaksiTiket @relation(fields: [transaksiId], references: [id], onDelete: Cascade)
 }
 

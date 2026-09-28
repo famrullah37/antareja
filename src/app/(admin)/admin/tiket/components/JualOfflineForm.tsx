@@ -4,7 +4,14 @@ import { jualTiketOffline, getDynamicQrisTiket } from "@/actions/Tiket";
 import { toast } from "sonner";
 import { useEffect, useState } from "react";
 
-type Tiket = { id: string; jenis: string; harga: number; sisa: number };
+type Tiket = {
+  id: string;
+  jenis: string;
+  harga: number;
+  sisa: number;
+  bundleHarga: number | null;
+  bundleIsi: string | null;
+};
 
 function formatRupiah(n: number) {
   return new Intl.NumberFormat("id-ID", {
@@ -17,11 +24,23 @@ function formatRupiah(n: number) {
 export default function JualOfflineForm({ tikets, qrisUrl }: { tikets: Tiket[]; qrisUrl: string | null }) {
   const [selectedTiketId, setSelectedTiketId] = useState(tikets[0]?.id ?? "");
   const [jumlah, setJumlah] = useState(1);
+  const [bundleJumlah, setBundleJumlah] = useState(0);
   const [metode, setMetode] = useState<"CASH" | "QRIS">("CASH");
   const [qrisDinamis, setQrisDinamis] = useState<string | null>(null);
 
   const selectedTiket = tikets.find((t) => t.id === selectedTiketId);
-  const total = selectedTiket ? selectedTiket.harga * jumlah : 0;
+  const adaBundling = !!selectedTiket?.bundleHarga && !!selectedTiket?.bundleIsi;
+  const total = selectedTiket
+    ? selectedTiket.harga * jumlah + (adaBundling ? selectedTiket.bundleHarga! * bundleJumlah : 0)
+    : 0;
+
+  // Paket bundling maksimal 1 per tiket; reset saat ganti jenis tiket
+  useEffect(() => {
+    setBundleJumlah(0);
+  }, [selectedTiketId]);
+  useEffect(() => {
+    setBundleJumlah((b) => Math.min(b, jumlah));
+  }, [jumlah]);
 
   useEffect(() => {
     if (metode !== "QRIS" || total <= 0) {
@@ -47,6 +66,7 @@ export default function JualOfflineForm({ tikets, qrisUrl }: { tikets: Tiket[]; 
         id: toastId,
       });
       setJumlah(1);
+      setBundleJumlah(0);
     } else {
       toast.error((result as any).message ?? "Gagal menjual tiket", { id: toastId });
     }
@@ -85,6 +105,7 @@ export default function JualOfflineForm({ tikets, qrisUrl }: { tikets: Tiket[]; 
           {tikets.map((t) => (
             <option key={t.id} value={t.id}>
               {t.jenis} — {formatRupiah(t.harga)} (sisa {t.sisa})
+              {t.bundleHarga && t.bundleIsi ? ` · bundling +${formatRupiah(t.bundleHarga)}` : ""}
             </option>
           ))}
         </select>
@@ -127,6 +148,37 @@ export default function JualOfflineForm({ tikets, qrisUrl }: { tikets: Tiket[]; 
           />
         </div>
       </div>
+
+      {adaBundling && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5 flex items-center justify-between gap-3">
+          <div className="text-sm">
+            <p className="font-medium text-amber-900">
+              Bundling +{formatRupiah(selectedTiket!.bundleHarga!)} → {selectedTiket!.bundleIsi}
+            </p>
+            <p className="text-xs text-amber-700">Maks. 1 paket per tiket</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setBundleJumlah((b) => Math.max(0, b - 1))}
+              disabled={bundleJumlah <= 0}
+              className="w-8 h-8 rounded-lg border border-amber-300 bg-white font-bold text-amber-800 disabled:opacity-40"
+            >
+              −
+            </button>
+            <span className="min-w-[1.5rem] text-center font-semibold">{bundleJumlah}</span>
+            <button
+              type="button"
+              onClick={() => setBundleJumlah((b) => Math.min(jumlah, b + 1))}
+              disabled={bundleJumlah >= jumlah}
+              className="w-8 h-8 rounded-lg border border-amber-300 bg-white font-bold text-amber-800 disabled:opacity-40"
+            >
+              +
+            </button>
+          </div>
+        </div>
+      )}
+      <input type="hidden" name="bundleJumlah" value={adaBundling ? bundleJumlah : 0} />
 
       {/* Metode Pembayaran */}
       <div className="flex flex-col gap-1">

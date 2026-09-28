@@ -2,6 +2,7 @@
 
 import { rejectTiket, verifikasiTiket } from "@/actions/Tiket";
 import { toast } from "sonner";
+import { totalBayarTiket } from "@/lib/tiket";
 
 type TransaksiWithRelations = {
   id: string;
@@ -15,18 +16,24 @@ type TransaksiWithRelations = {
   metodePembayaran: string;
   kodeUnik: string | null;
   catatanAdmin: string | null;
+  bundleJumlah: number;
+  bundleHarga: number;
+  bundleIsi: string | null;
   createdAt: Date;
   tiket: { jenis: string; harga: number };
-  qrTikets: { token: string; statusScan: boolean; waktuScan: Date | null }[];
+  qrTikets: { token: string; statusScan: boolean; waktuScan: Date | null; bundle: boolean }[];
 };
 
 function buildWAMessage(tr: TransaksiWithRelations) {
-  const tokens = tr.qrTikets.map((q, i) => `Tiket ${i + 1}: ${q.token}`).join("\n");
+  const tokens = tr.qrTikets
+    .map((q, i) => `Tiket ${i + 1}${q.bundle ? ` (+ ${tr.bundleIsi})` : ""}: ${q.token}`)
+    .join("\n");
   const msg = [
     `✅ *Tiket LKBB Antareja 2026 Terverifikasi!*`,
     ``,
     `Halo *${tr.nama}*,`,
     `Tiket *${tr.tiket.jenis}* (${tr.jumlah} tiket) sudah diverifikasi.`,
+    ...(tr.bundleJumlah > 0 ? [`Termasuk bundling *${tr.bundleIsi}* × ${tr.bundleJumlah}.`] : []),
     ``,
     `*Token QR:*`,
     tokens || "(belum ada token)",
@@ -99,12 +106,19 @@ export default function TransaksiTiketTable({
                   <div className="font-medium">{tr.nama}</div>
                   <div className="text-gray-400 text-xs">{tr.email}</div>
                 </td>
-                <td className="px-4 py-3">{tr.tiket.jenis}</td>
+                <td className="px-4 py-3">
+                  {tr.tiket.jenis}
+                  {tr.bundleJumlah > 0 && (
+                    <div className="text-xs text-amber-600">
+                      + {tr.bundleIsi} × {tr.bundleJumlah}
+                    </div>
+                  )}
+                </td>
                 <td className="px-4 py-3">{tr.jumlah}</td>
                 <td className="px-4 py-3">
-                  {formatRupiah(tr.tiket.harga * tr.jumlah)}
+                  {formatRupiah(totalBayarTiket(tr))}
                   {tr.kodeUnik && (
-                    <div className="text-xs text-gray-400">+{tr.kodeUnik}</div>
+                    <div className="text-xs text-gray-400">incl. kode +{tr.kodeUnik}</div>
                   )}
                 </td>
                 <td className="px-4 py-3">

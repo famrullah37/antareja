@@ -6,6 +6,7 @@ import { sendMailTo } from "@/lib/mailer";
 import QRCode from "qrcode";
 import { buildDynamicQrisImage, decodeQrisFromImage } from "@/lib/qris";
 import { catatLog } from "@/lib/activityLog";
+import { labelBundling, punyaBundling, totalBayarTiket } from "@/lib/tiket";
 
 async function requireAdmin() {
   const session = await getServerSession();
@@ -33,13 +34,21 @@ import prisma from "@/lib/prisma";
 
 // ─── Admin: Master Tiket ──────────────────────────────────────────────────────
 
+// Bundling kosong/0 = nonaktif (disimpan null supaya jelas tidak ada bundling)
+function parseBundling(data: FormData) {
+  const harga = parseInt((data.get("bundleHarga") as string) || "0");
+  const isi = ((data.get("bundleIsi") as string) || "").trim();
+  if (!Number.isFinite(harga) || harga <= 0 || !isi) return { bundleHarga: null, bundleIsi: null };
+  return { bundleHarga: harga, bundleIsi: isi };
+}
+
 export async function createTiketAdmin(data: FormData) {
   await requireAdmin();
   const jenis = data.get("jenis") as string;
   const harga = parseInt(data.get("harga") as string);
   const kuota = parseInt(data.get("kuota") as string);
   try {
-    await createTiket({ jenis, harga, kuota, sisa: kuota });
+    await createTiket({ jenis, harga, kuota, sisa: kuota, ...parseBundling(data) });
     revalidatePath("/admin/tiket");
     return { success: true };
   } catch { return { success: false }; }
@@ -51,8 +60,26 @@ export async function updateTiketAdmin(data: FormData, id: string) {
   const harga = parseInt(data.get("harga") as string);
   const kuota = parseInt(data.get("kuota") as string);
   try {
-    await updateTiket({ id }, { jenis, harga, kuota });
+    await updateTiket({ id }, { jenis, harga, kuota, ...parseBundling(data) });
     revalidatePath("/admin/tiket");
+    return { success: true };
+  } catch { return { success: false }; }
+}
+
+export async function updateBundlingTiket(data: FormData, id: string) {
+  await requireAdmin();
+  try {
+    const bundling = parseBundling(data);
+    const tiket = await updateTiket({ id }, bundling);
+    await catatLog(
+      "UBAH_BUNDLING_TIKET",
+      bundling.bundleHarga
+        ? `Tiket ${tiket.jenis}: +Rp${bundling.bundleHarga} dapat ${bundling.bundleIsi}`
+        : `Tiket ${tiket.jenis}: bundling dinonaktifkan`
+    );
+    revalidatePath("/admin/tiket");
+    revalidatePath("/admin/tiket/pos");
+    revalidatePath("/tiket");
     return { success: true };
   } catch { return { success: false }; }
 }
@@ -138,6 +165,7 @@ export async function reserveKodeTiket() {
 export async function beliTiket(data: FormData, userId?: string) {
   const tiketId = data.get("tiketId") as string;
   const jumlah = parseInt(data.get("jumlah") as string);
+  const bundleJumlah = parseInt((data.get("bundleJumlah") as string) || "0");
   const nama = data.get("nama") as string;
   const email = data.get("email") as string;
   const noHp = data.get("noHp") as string;
@@ -179,6 +207,9 @@ export async function beliTiket(data: FormData, userId?: string) {
       if (!tiket) throw new Error("TIKET_TIDAK_DITEMUKAN");
       if (jumlah < 1) throw new Error("JUMLAH_INVALID");
       if (tiket.sisa < jumlah) throw new Error("STOK_KURANG");
+      if (!Number.isInteger(bundleJumlah) || bundleJumlah < 0 || bundleJumlah > jumlah)
+        throw new Error("BUNDLE_INVALID");
+      if (bundleJumlah > 0 && !punyaBundling(tiket)) throw new Error("BUNDLE_INVALID");
 
       // Cegah dua transaksi memakai kodeUnik yang sama — nominal transfer
       // harus presisi unik supaya admin gampang cocokkan mutasi/QRIS.
@@ -198,6 +229,9 @@ export async function beliTiket(data: FormData, userId?: string) {
           status: "PENDING",
           metodePembayaran,
           kodeUnik,
+          ...(bundleJumlah > 0
+            ? { bundleJumlah, bundleHarga: tiket.bundleHarga!, bundleIsi: tiket.bundleIsi }
+            : {}),
           ...(userId ? { user: { connect: { id: userId } } } : {}),
         },
       });
@@ -209,6 +243,7 @@ export async function beliTiket(data: FormData, userId?: string) {
     if (msg === "TIKET_TIDAK_DITEMUKAN") return { success: false, message: "Tiket tidak ditemukan" };
     if (msg === "JUMLAH_INVALID") return { success: false, message: "Jumlah tiket tidak valid" };
     if (msg === "STOK_KURANG") return { success: false, message: "Stok tiket tidak mencukupi" };
+    if (msg === "BUNDLE_INVALID") return { success: false, message: "Jumlah paket bundling tidak valid (maksimal 1 per tiket)" };
     if (msg === "KODE_UNIK_DIPAKAI") return { success: false, message: "Kode unik sudah terpakai, silakan coba lagi" };
     console.error("beliTiket error:", e);
     return { success: false };
@@ -221,6 +256,7 @@ export async function jualTiketOffline(data: FormData) {
   await requireAdminOrTiket();
   const tiketId = data.get("tiketId") as string;
   const jumlah = parseInt(data.get("jumlah") as string);
+  const bundleJumlah = parseInt((data.get("bundleJumlah") as string) || "0");
   const nama = data.get("nama") as string;
   const email = (data.get("email") as string) || "-";
   const noHp = (data.get("noHp") as string) || "-";
@@ -237,6 +273,10 @@ export async function jualTiketOffline(data: FormData) {
       return { success: false, message: "Jumlah tidak valid" };
     if (tiket.sisa < jumlah)
       return { success: false, message: `Stok tiket tidak cukup (sisa ${tiket.sisa})` };
+    if (!Number.isInteger(bundleJumlah) || bundleJumlah < 0 || bundleJumlah > jumlah)
+      return { success: false, message: "Jumlah paket bundling tidak valid (maksimal 1 per tiket)" };
+    if (bundleJumlah > 0 && !punyaBundling(tiket))
+      return { success: false, message: "Tiket ini tidak punya bundling" };
 
     const transaksi = await createTransaksiTiket({
       tiket: { connect: { id: tiketId } },
@@ -247,12 +287,17 @@ export async function jualTiketOffline(data: FormData) {
       status: "VERIFIED",
       jenisJual: "OFFLINE",
       metodePembayaran,
+      ...(bundleJumlah > 0
+        ? { bundleJumlah, bundleHarga: tiket.bundleHarga!, bundleIsi: tiket.bundleIsi }
+        : {}),
       ...(catatanAdmin ? { catatanAdmin } : {}),
     });
 
+    // QR pertama sebanyak bundleJumlah ditandai berhak dapat isi bundling
     await prisma.qRTiket.createMany({
-      data: Array.from({ length: jumlah }, () => ({
+      data: Array.from({ length: jumlah }, (_, i) => ({
         transaksiId: transaksi.id,
+        bundle: i < bundleJumlah,
       })),
     });
 
@@ -261,13 +306,14 @@ export async function jualTiketOffline(data: FormData) {
       data: { sisa: { decrement: jumlah } },
     });
 
-    await catatLog("JUAL_TIKET_OFFLINE", `Tiket ${tiket.jenis} × ${jumlah} (${nama}) — ${labelMetode}`);
+    const bundling = labelBundling(transaksi);
+    await catatLog("JUAL_TIKET_OFFLINE", `Tiket ${tiket.jenis} × ${jumlah}${bundling} (${nama}) — ${labelMetode}`);
 
     await prisma.kasTransaksi.create({
       data: {
         tipe: "PEMASUKAN",
-        keterangan: `Tiket ${tiket.jenis} × ${jumlah} (${nama}) — POS ${labelMetode}`,
-        jumlah: tiket.harga * jumlah,
+        keterangan: `Tiket ${tiket.jenis} × ${jumlah}${bundling} (${nama}) — POS ${labelMetode}`,
+        jumlah: totalBayarTiket({ ...transaksi, tiket }),
         kategori: "TIKET",
         sumber: "TIKET",
         referensiId: transaksi.id,
@@ -294,8 +340,9 @@ export async function verifikasiTiket(transaksiId: string) {
     await updateTransaksiTiket({ id: transaksiId }, { status: "VERIFIED" });
 
     await prisma.qRTiket.createMany({
-      data: Array.from({ length: transaksi.jumlah }, () => ({
+      data: Array.from({ length: transaksi.jumlah }, (_, i) => ({
         transaksiId,
+        bundle: i < transaksi.bundleJumlah,
       })),
     });
 
@@ -308,17 +355,17 @@ export async function verifikasiTiket(transaksiId: string) {
     // ditransfer (harga tiket + kode unik), bukan cuma harga dasarnya, supaya
     // laporan kas tidak menampilkan nominal yang sama berulang untuk tiket
     // sejenis (lihat juga verifikasiFoto di Galeri.ts, pola yang sama).
-    const totalBayarTiket =
-      transaksi.tiket.harga * transaksi.jumlah + (transaksi.kodeUnik ? parseInt(transaksi.kodeUnik) : 0);
+    const totalBayar = totalBayarTiket(transaksi);
+    const bundling = labelBundling(transaksi);
     await catatLog(
       "VERIFIKASI_TIKET",
-      `Tiket ${transaksi.tiket.jenis} × ${transaksi.jumlah} (${transaksi.nama}) — Rp${totalBayarTiket}`
+      `Tiket ${transaksi.tiket.jenis} × ${transaksi.jumlah}${bundling} (${transaksi.nama}) — Rp${totalBayar}`
     );
     await prisma.kasTransaksi.create({
       data: {
         tipe: "PEMASUKAN",
-        keterangan: `Tiket ${transaksi.tiket.jenis} × ${transaksi.jumlah} (${transaksi.nama})${transaksi.kodeUnik ? ` [#${transaksi.kodeUnik}]` : ""}`,
-        jumlah: totalBayarTiket,
+        keterangan: `Tiket ${transaksi.tiket.jenis} × ${transaksi.jumlah}${bundling} (${transaksi.nama})${transaksi.kodeUnik ? ` [#${transaksi.kodeUnik}]` : ""}`,
+        jumlah: totalBayar,
         kategori: "TIKET",
         sumber: "TIKET",
         referensiId: transaksiId,
@@ -333,6 +380,7 @@ export async function verifikasiTiket(transaksiId: string) {
         return `
           <div style="display:inline-block;text-align:center;margin:8px">
             <div style="font-size:12px;font-weight:bold;margin-bottom:4px">Tiket #${i + 1}</div>
+            ${q.bundle ? `<div style="font-size:11px;color:#b45309;margin-bottom:4px">+ ${transaksi.bundleIsi ?? "Bundling"}</div>` : ""}
             <img src="${dataUrl}" width="160" height="160" style="display:block;border-radius:8px;border:1px solid #e5e7eb" alt="QR Tiket ${i + 1}"/>
             <div style="font-size:10px;font-family:monospace;color:#888;margin-top:4px;max-width:160px;overflow:hidden;text-overflow:ellipsis">${q.token}</div>
           </div>`;
@@ -349,6 +397,7 @@ export async function verifikasiTiket(transaksiId: string) {
             <h2 style="color:#F70048">Tiket Anda Terverifikasi!</h2>
             <p>Halo <b>${transaksi.nama}</b>,</p>
             <p>Pembelian tiket <b>${transaksi.tiket.jenis}</b> (${transaksi.jumlah} tiket) telah diverifikasi.</p>
+            ${transaksi.bundleJumlah > 0 ? `<p>Termasuk bundling <b>${transaksi.bundleIsi}</b> × ${transaksi.bundleJumlah} — diambil saat QR bertanda bundling di-scan di pintu masuk.</p>` : ""}
             <div style="background:#f9f9f9;border-radius:8px;padding:16px;margin:16px 0">
               <p style="margin:0 0 12px;font-weight:bold">QR Code Tiket Anda:</p>
               <div style="display:flex;flex-wrap:wrap;gap:8px">
@@ -411,6 +460,7 @@ export async function scanQRTiket(token: string) {
       data: {
         nama: qr.transaksi.nama,
         jenis: qr.transaksi.tiket.jenis,
+        bundle: qr.bundle ? qr.transaksi.bundleIsi ?? "Bundling" : null,
         waktuScan: new Date().toISOString(),
       },
     };

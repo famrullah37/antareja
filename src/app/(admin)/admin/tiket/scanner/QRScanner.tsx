@@ -8,7 +8,7 @@ export default function QRScanner() {
   const [result, setResult] = useState<{
     success: boolean;
     message?: string;
-    data?: { nama: string; jenis: string; waktuScan: string };
+    data?: { nama: string; jenis: string; bundle: string | null; waktuScan: string };
   } | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -64,6 +64,11 @@ export default function QRScanner() {
                   <span className="font-medium">Jenis:</span>{" "}
                   {result.data.jenis}
                 </div>
+                {result.data.bundle && (
+                  <div className="bg-amber-100 border border-amber-300 text-amber-900 rounded-lg px-3 py-2 font-semibold">
+                    🎁 Berikan bundling: {result.data.bundle}
+                  </div>
+                )}
                 <div>
                   <span className="font-medium">Waktu Scan:</span>{" "}
                   {new Date(result.data.waktuScan).toLocaleString("id-ID")}

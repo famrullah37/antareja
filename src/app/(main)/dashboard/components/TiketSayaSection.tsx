@@ -1,12 +1,17 @@
 ﻿import { H2 } from "@/app/components/global/Text";
 import SectionWrapper from "@/app/components/global/Wrapper";
 import QRCode from "qrcode";
+import { totalBayarTiket } from "@/lib/tiket";
 
-type QRTiket = { token: string; statusScan: boolean; waktuScan: Date | null };
+type QRTiket = { token: string; statusScan: boolean; waktuScan: Date | null; bundle: boolean };
 type TransaksiItem = {
   id: string;
   jumlah: number;
   status: string;
+  kodeUnik: string | null;
+  bundleJumlah: number;
+  bundleHarga: number;
+  bundleIsi: string | null;
   createdAt: Date;
   tiket: { jenis: string; harga: number };
   qrTikets: QRTiket[];
@@ -65,8 +70,13 @@ export default async function TiketSayaSection({
                   <div className="font-semibold text-lg">{tr.tiket.jenis}</div>
                   <div className="text-sm text-gray-500">
                     {tr.jumlah} tiket ·{" "}
-                    {formatRupiah(tr.tiket.harga * tr.jumlah)}
+                    {formatRupiah(totalBayarTiket(tr))}
                   </div>
+                  {tr.bundleJumlah > 0 && (
+                    <div className="text-xs text-amber-600">
+                      + Bundling {tr.bundleIsi} × {tr.bundleJumlah}
+                    </div>
+                  )}
                   <div className="text-xs text-gray-400 mt-0.5">
                     {new Date(tr.createdAt).toLocaleDateString("id-ID", {
                       day: "numeric",
@@ -101,6 +111,11 @@ export default async function TiketSayaSection({
                         <div className="text-xs font-semibold text-neutral-600">
                           Tiket #{idx + 1}
                         </div>
+                        {qr.bundle && (
+                          <div className="text-[11px] text-amber-700 bg-amber-50 rounded px-2">
+                            + {tr.bundleIsi}
+                          </div>
+                        )}
                         <div className="relative">
                           {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img

@@ -32,13 +32,21 @@ export default function BeliTiketForm({
 }) {
   const [selected, setSelected] = useState<Tiket | null>(null);
   const [jumlah, setJumlah] = useState(1);
+  const [bundleJumlah, setBundleJumlah] = useState(0);
   const [metode, setMetode] = useState<"TRANSFER" | "QRIS">("TRANSFER");
   const [submitted, setSubmitted] = useState(false);
   const [kodeUnik, setKodeUnik] = useState<string | null>(null);
   const [reservingKode, setReservingKode] = useState(false);
   const [qrisDinamis, setQrisDinamis] = useState<string | null>(null);
 
-  const totalBayar = selected && kodeUnik ? selected.harga * jumlah + parseInt(kodeUnik) : 0;
+  const adaBundling = !!selected?.bundleHarga && !!selected?.bundleIsi;
+  const subtotal = selected ? selected.harga * jumlah + (adaBundling ? selected.bundleHarga! * bundleJumlah : 0) : 0;
+  const totalBayar = selected && kodeUnik ? subtotal + parseInt(kodeUnik) : 0;
+
+  // Paket bundling maksimal 1 per tiket — ikut turun kalau jumlah tiket dikurangi
+  useEffect(() => {
+    setBundleJumlah((b) => Math.min(b, Number.isFinite(jumlah) ? Math.max(jumlah, 0) : 0));
+  }, [jumlah]);
 
   // Cadangkan kode unik begitu jenis tiket dipilih — nomor urut atomik dari
   // server (lihat reserveKodeTiket) supaya tidak bentrok dengan pembeli lain.
@@ -48,6 +56,7 @@ export default function BeliTiketForm({
       return;
     }
     let cancelled = false;
+    setBundleJumlah(0);
     setReservingKode(true);
     setKodeUnik(null);
     reserveKodeTiket().then((result) => {
@@ -132,6 +141,11 @@ export default function BeliTiketForm({
             <div className="text-primary-600 font-semibold text-xl">
               {formatRupiah(t.harga)}
             </div>
+            {t.bundleHarga && t.bundleIsi ? (
+              <div className="text-xs text-amber-700 bg-amber-50 rounded-lg px-2 py-1 mt-2 inline-block">
+                Bundling: +{formatRupiah(t.bundleHarga)} dapat {t.bundleIsi}
+              </div>
+            ) : null}
             <div className="text-xs text-gray-400 mt-1">
               Sisa: {t.sisa} tiket
             </div>
@@ -194,6 +208,40 @@ export default function BeliTiketForm({
               />
             </div>
 
+            {adaBundling && (
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex flex-col gap-2">
+                <div>
+                  <p className="text-sm font-medium text-amber-900">
+                    Tambah Bundling: +{formatRupiah(selected.bundleHarga!)} dapat {selected.bundleIsi}
+                  </p>
+                  <p className="text-xs text-amber-700">
+                    Maksimal 1 paket per tiket. Diambil saat QR tiket di-scan di pintu masuk.
+                  </p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setBundleJumlah((b) => Math.max(0, b - 1))}
+                    disabled={bundleJumlah <= 0}
+                    className="w-9 h-9 rounded-lg border border-amber-300 bg-white font-bold text-amber-800 disabled:opacity-40"
+                  >
+                    −
+                  </button>
+                  <span className="min-w-[2rem] text-center font-semibold">{bundleJumlah}</span>
+                  <button
+                    type="button"
+                    onClick={() => setBundleJumlah((b) => Math.min(jumlah || 0, b + 1))}
+                    disabled={bundleJumlah >= (jumlah || 0)}
+                    className="w-9 h-9 rounded-lg border border-amber-300 bg-white font-bold text-amber-800 disabled:opacity-40"
+                  >
+                    +
+                  </button>
+                  <span className="text-xs text-amber-700">paket</span>
+                </div>
+              </div>
+            )}
+            <input type="hidden" name="bundleJumlah" value={adaBundling ? bundleJumlah : 0} />
+
             {/* Ringkasan */}
             <div className="bg-gray-50 rounded-xl p-4 text-sm flex flex-col gap-1">
               <div className="flex justify-between">
@@ -202,10 +250,18 @@ export default function BeliTiketForm({
                 </span>
                 <span>{formatRupiah(selected.harga * jumlah)}</span>
               </div>
+              {adaBundling && bundleJumlah > 0 && (
+                <div className="flex justify-between">
+                  <span>
+                    Bundling {selected.bundleIsi} × {bundleJumlah}
+                  </span>
+                  <span>{formatRupiah(selected.bundleHarga! * bundleJumlah)}</span>
+                </div>
+              )}
               <div className="border-t pt-1 flex justify-between font-bold">
                 <span>Total (+ kode unik)</span>
                 <span className="text-primary-600">
-                  {kodeUnik ? formatRupiah(totalBayar) : formatRupiah(selected.harga * jumlah)}
+                  {kodeUnik ? formatRupiah(totalBayar) : formatRupiah(subtotal)}
                 </span>
               </div>
             </div>

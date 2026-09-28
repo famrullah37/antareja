@@ -1,4 +1,5 @@
 import prisma from "@/lib/prisma";
+import { totalBayarTiket } from "@/lib/tiket";
 
 export async function getLaporanKas() {
   const [transaksiTikets, transaksiFotos, kasTransaksis, timsConfirmed] =
@@ -16,7 +17,7 @@ export async function getLaporanKas() {
     ]);
 
   // Per jenis tiket (VERIFIED) — nominal HARUS termasuk kode unik untuk
-  // tiket online (tiket.harga * jumlah + kodeUnik), itulah nominal yang
+  // tiket online (tiket.harga * jumlah + bundling + kodeUnik), itulah nominal yang
   // benar-benar diterima lewat transfer/QRIS. Tiket offline/tunai tidak
   // pernah punya kodeUnik (jualTiketOffline tidak mencadangkannya), jadi
   // aman: (tr.kodeUnik ? parseInt(tr.kodeUnik) : 0) otomatis 0 untuknya.
@@ -27,8 +28,8 @@ export async function getLaporanKas() {
   let totalTiketVerified = 0;
   for (const tr of transaksiTikets) {
     if (tr.status !== "VERIFIED") continue;
-    const totalBayarTiket = tr.tiket.harga * tr.jumlah + (tr.kodeUnik ? parseInt(tr.kodeUnik) : 0);
-    totalTiketVerified += totalBayarTiket;
+    const totalBayar = totalBayarTiket(tr);
+    totalTiketVerified += totalBayar;
     if (!perJenisTiket[tr.tiketId]) {
       perJenisTiket[tr.tiketId] = {
         jenis: tr.tiket.jenis,
@@ -38,7 +39,7 @@ export async function getLaporanKas() {
       };
     }
     perJenisTiket[tr.tiketId].terjual += tr.jumlah;
-    perJenisTiket[tr.tiketId].pendapatan += totalBayarTiket;
+    perJenisTiket[tr.tiketId].pendapatan += totalBayar;
   }
 
   const totalFotoVerified = transaksiFotos
@@ -52,10 +53,10 @@ export async function getLaporanKas() {
     t.jenisJual === "OFFLINE" && t.metodePembayaran === "CASH";
   const totalOffline = verifiedTikets
     .filter(isTunai)
-    .reduce((s, t) => s + t.tiket.harga * t.jumlah + (t.kodeUnik ? parseInt(t.kodeUnik) : 0), 0);
+    .reduce((s, t) => s + totalBayarTiket(t), 0);
   const totalOnline = verifiedTikets
     .filter((t) => !isTunai(t))
-    .reduce((s, t) => s + t.tiket.harga * t.jumlah + (t.kodeUnik ? parseInt(t.kodeUnik) : 0), 0);
+    .reduce((s, t) => s + totalBayarTiket(t), 0);
 
   const totalPemasukan = kasTransaksis
     .filter((k) => k.tipe === "PEMASUKAN")
