@@ -18,12 +18,12 @@ import prisma from "@/lib/prisma";
 
 async function requireAdmin() {
   const session = await getServerSession();
-  if (session?.user?.role !== "ADMIN") throw new Error("Forbidden");
+  if (!["ADMIN", "SIE_LOMBA"].includes(session?.user?.role ?? "")) throw new Error("Forbidden");
 }
 
 async function requireAdminOrJuri() {
   const session = await getServerSession();
-  if (!["ADMIN", "JURI"].includes(session?.user?.role ?? "")) throw new Error("Forbidden");
+  if (!["ADMIN", "SIE_LOMBA", "JURI"].includes(session?.user?.role ?? "")) throw new Error("Forbidden");
 }
 
 export async function saveMasterNilaiDiskrit(data: FormData) {
@@ -109,7 +109,7 @@ export async function inputNilaiJuri(
   scores: { subKategoriId: string; nilai: number; predikat: string; catatan?: string }[]
 ) {
   const session = await getServerSession();
-  if (!["ADMIN", "JURI"].includes(session?.user?.role ?? "")) throw new Error("Forbidden");
+  if (!["ADMIN", "SIE_LOMBA", "JURI"].includes(session?.user?.role ?? "")) throw new Error("Forbidden");
 
   // Juri hanya bisa submit atas namanya sendiri; admin bisa submit tapi tetap pakai userId-nya
   const juri = await prisma.juri.findUnique({ where: { userId: session!.user!.id } });
@@ -134,7 +134,7 @@ export async function inputPelanggaranTim(
   poinPerKejadian: number
 ) {
   const session = await getServerSession();
-  if (!["ADMIN", "JURI"].includes(session?.user?.role ?? "")) throw new Error("Forbidden");
+  if (!["ADMIN", "SIE_LOMBA", "JURI"].includes(session?.user?.role ?? "")) throw new Error("Forbidden");
 
   const juri = await prisma.juri.findUnique({ where: { userId: session!.user!.id } });
   if (!juri) return { success: false, message: "Akun tidak terhubung ke data Juri" };

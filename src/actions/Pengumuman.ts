@@ -6,7 +6,7 @@ import { createPengumuman, deletePengumuman } from "@/queries/pengumuman.query";
 
 async function requireAdmin() {
   const session = await getServerSession();
-  if (session?.user?.role !== "ADMIN") throw new Error("Forbidden");
+  if (!["ADMIN", "SIE_LOMBA"].includes(session?.user?.role ?? "")) throw new Error("Forbidden");
 }
 
 export async function createPengumumanForm(data: FormData) {

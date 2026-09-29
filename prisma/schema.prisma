@@ -584,6 +584,7 @@ enum Role {
   FOTOGRAFER
   TIKET
   BENDAHARA
+  SIE_LOMBA
 }
 
 enum Tipe {

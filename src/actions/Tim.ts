@@ -16,7 +16,7 @@ const jumlahPasukan: Record<Tipe, number> = { SMALL: 12, NORMAL: 15 };
 
 async function requireAdmin() {
   const session = await getServerSession();
-  if (session?.user?.role !== "ADMIN") throw new Error("Forbidden");
+  if (!["ADMIN", "SIE_LOMBA"].includes(session?.user?.role ?? "")) throw new Error("Forbidden");
 }
 
 export async function getTimById(timId: string) {

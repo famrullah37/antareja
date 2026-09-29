@@ -11,6 +11,7 @@ import { makeSlug } from "@/lib/timSlug";
 const ROLE_COLORS: Record<string, string> = {
   USER: "bg-blue-100 text-blue-700",
   ADMIN: "bg-purple-100 text-purple-700",
+  SIE_LOMBA: "bg-pink-100 text-pink-700",
   JURI: "bg-green-100 text-green-700",
   TIKET: "bg-cyan-100 text-cyan-700",
   BENDAHARA: "bg-yellow-100 text-yellow-700",
@@ -107,6 +108,7 @@ export default function TimTable({ data }: { data: User[] }) {
                   >
                     <option value="USER">USER</option>
                     <option value="ADMIN">ADMIN</option>
+                    <option value="SIE_LOMBA">SIE_LOMBA</option>
                     <option value="JURI">JURI</option>
                     <option value="TIKET">TIKET</option>
                     <option value="BENDAHARA">BENDAHARA</option>

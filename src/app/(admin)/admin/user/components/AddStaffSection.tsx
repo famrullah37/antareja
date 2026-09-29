@@ -4,9 +4,10 @@ import { createStaffUser } from "@/actions/User";
 import { useState } from "react";
 import { toast } from "sonner";
 
-type StaffRole = "FOTOGRAFER" | "TIKET" | "BENDAHARA";
+type StaffRole = "SIE_LOMBA" | "FOTOGRAFER" | "TIKET" | "BENDAHARA";
 
 const ROLES: { value: StaffRole; label: string; color: string }[] = [
+  { value: "SIE_LOMBA", label: "Sie Lomba", color: "bg-pink-100 text-pink-700 border-pink-300" },
   { value: "FOTOGRAFER", label: "Fotografer", color: "bg-orange-100 text-orange-700 border-orange-300" },
   { value: "TIKET", label: "Petugas Tiket", color: "bg-cyan-100 text-cyan-700 border-cyan-300" },
   { value: "BENDAHARA", label: "Bendahara", color: "bg-yellow-100 text-yellow-700 border-yellow-300" },

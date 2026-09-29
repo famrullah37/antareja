@@ -6,6 +6,7 @@ import { toast } from "sonner";
 const ROLE_LABEL: Record<string, string> = {
   USER: "Peserta",
   ADMIN: "Admin",
+  SIE_LOMBA: "Sie Lomba",
   JURI: "Juri",
   FOTOGRAFER: "Fotografer",
 };
@@ -13,6 +14,7 @@ const ROLE_LABEL: Record<string, string> = {
 const ROLE_COLORS: Record<string, string> = {
   USER: "bg-blue-100 text-blue-700",
   ADMIN: "bg-purple-100 text-purple-700",
+  SIE_LOMBA: "bg-pink-100 text-pink-700",
   JURI: "bg-green-100 text-green-700",
   FOTOGRAFER: "bg-orange-100 text-orange-700",
 };
