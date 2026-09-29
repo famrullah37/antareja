@@ -42,4 +42,11 @@ export const siteConfig = {
     instagram: "https://www.instagram.com/lpkbb.antareja",
     youtube: "https://www.youtube.com/@lpkbb.antareja",
   },
+  // Nomor WhatsApp resmi panitia untuk pertanyaan peserta/pengunjung. `number` format internasional
+  // tanpa "+" / spasi (dipakai wa.me), `display` untuk ditampilkan.
+  whatsapp: {
+    number: "6285198240667",
+    display: "+62 851-9824-0667",
+    message: "Halo Panitia LKBB Antareja, saya ingin bertanya.",
+  },
 } as const;

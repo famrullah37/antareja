@@ -1,8 +1,9 @@
 import Image from "next/image";
 import { P } from "./Text";
 import Link from "next/link";
-import { FaTiktok, FaInstagram, FaYoutube } from "react-icons/fa";
+import { FaTiktok, FaInstagram, FaYoutube, FaWhatsapp } from "react-icons/fa";
 import { siteConfig } from "@/config/site";
+import { whatsappUrl } from "./WhatsAppButton";
 
 interface FootOption {
   label: string;
@@ -21,6 +22,7 @@ const socials = [
   { icon: <FaTiktok />, href: siteConfig.social.tiktok, label: "TikTok" },
   { icon: <FaInstagram />, href: siteConfig.social.instagram, label: "Instagram" },
   { icon: <FaYoutube />, href: siteConfig.social.youtube, label: "YouTube" },
+  { icon: <FaWhatsapp />, href: whatsappUrl, label: "WhatsApp" },
 ].filter((s) => !!s.href);
 
 export default function Footer() {
@@ -40,6 +42,15 @@ export default function Footer() {
               Website resmi LKBB Antareja tingkat Jawa Timur yang
               diselenggarakan oleh SMK Telkom Malang.
             </P>
+            <a
+              href={whatsappUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 text-sm font-semibold text-neutral-600 hover:text-[#25D366] transition-all duration-300"
+            >
+              <FaWhatsapp className="text-lg text-[#25D366]" />
+              Narahubung: {siteConfig.whatsapp.display}
+            </a>
           </div>
           <div className="flex flex-col gap-6 lg:gap-[72px] items-start lg:items-end">
             <div className="flex gap-[17px] sm:gap-10">
