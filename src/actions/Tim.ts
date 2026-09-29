@@ -19,19 +19,6 @@ async function requireAdmin() {
   if (!["ADMIN", "SIE_LOMBA"].includes(session?.user?.role ?? "")) throw new Error("Forbidden");
 }
 
-export async function getTimById(timId: string) {
-  try {
-    const tim = await prisma.tim.findUnique({
-      where: { id: timId },
-      include: { anggotas: true, pembayaran: true },
-    });
-    if (!tim) return { success: false, message: "Tim tidak ditemukan" };
-    return { success: true, data: tim };
-  } catch {
-    return { success: false, message: "Gagal mengambil data tim" };
-  }
-}
-
 export async function updateTimForm(id: string, formData: FormData) {
   const session = await getServerSession();
   if (!session?.user?.id) return { success: false, message: "Unauthorized" };
@@ -183,8 +170,13 @@ export async function exportDataTim(timId?: string) {
   }
 }
 
+// Hapus tim permanen (ikut anggota, pembayaran, nilai) — khusus ADMIN,
+// Sie Lomba hanya boleh mengelola, bukan menghapus.
 export async function deleteTimForm(id: string) {
-  await requireAdmin();
+  const session = await getServerSession();
+  if (session?.user?.role !== "ADMIN") {
+    return { success: false, message: "Hanya admin yang boleh menghapus tim" };
+  }
   try {
     await prisma.$transaction(async (tx) => {
       await tx.penilaianBaru.deleteMany({ where: { timId: id } });

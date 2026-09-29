@@ -101,8 +101,16 @@ export const authOptions: AuthOptions = {
       // user, token lama masih membawa role lama. Ambil ulang dari DB supaya
       // perubahan role langsung berlaku tanpa harus logout-login.
       if (token.id) {
-        const fresh = await findUser({ id: token.id as string }).catch(() => null);
-        if (fresh) token.role = fresh.role;
+        let fresh;
+        try {
+          fresh = await findUser({ id: token.id as string });
+        } catch {
+          return token; // DB sedang bermasalah: pakai token lama, jangan logout-kan semua orang
+        }
+        // User sudah dihapus: cabut role-nya supaya token lama (mis. milik
+        // admin yang dihapus) tidak bisa dipakai lagi untuk aksi admin.
+        if (!fresh) return {} as typeof token;
+        token.role = fresh.role;
       }
       return token;
     },

@@ -53,7 +53,10 @@ export default async function middleware(req: NextRequest) {
 
   if (pathname.startsWith("/admin")) {
     if (role === "ADMIN") return NextResponse.next();
-    if (STAFF_ROUTES[role]?.some((r) => pathname.startsWith(r))) return NextResponse.next();
+    // Cocokkan per segmen: "/admin/tim" boleh "/admin/tim/123", tapi bukan
+    // route lain yang kebetulan berawalan sama (mis. "/admin/timeline").
+    if (STAFF_ROUTES[role]?.some((r) => pathname === r || pathname.startsWith(r + "/")))
+      return NextResponse.next();
     return NextResponse.redirect(new URL(STAFF_HOME[role] ?? "/", req.url));
   }
 

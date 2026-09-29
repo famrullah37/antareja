@@ -1,12 +1,17 @@
 "use client";
 
 import { generateKuitansiManual } from "@/actions/pembayaran";
+import { useSession } from "next-auth/react";
 import { useState } from "react";
 import { toast } from "sonner";
 
 // Buat ulang kuitansi & kirim ke email akun tim (hanya untuk tim terkonfirmasi).
+// Kuitansi urusan keuangan: disembunyikan untuk staf lain (mis. Sie Lomba),
+// sama seperti guard di generateKuitansiManual.
 export default function GenerateKuitansiButton({ timId }: Readonly<{ timId: string }>) {
   const [loading, setLoading] = useState(false);
+  const { data: session } = useSession();
+  if (!["ADMIN", "BENDAHARA"].includes(session?.user?.role ?? "")) return null;
 
   async function handleClick() {
     setLoading(true);

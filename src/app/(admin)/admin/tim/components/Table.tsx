@@ -7,10 +7,13 @@ import { FaRegTrashCan } from "react-icons/fa6";
 import { toast } from "sonner";
 import { deleteTimForm } from "@/actions/Tim"; 
 import { timSlug } from "@/lib/timSlug";
+import { useSession } from "next-auth/react";
 
 export default function TimTable({ data }: { data: TimWithRelations[] }) {
   const [loader, setLoader] = useState(true);
   const router = useRouter();
+  const { data: session } = useSession();
+  const isAdmin = session?.user?.role === "ADMIN";
 
   const columns: TableColumn<TimWithRelations>[] = [
     {
@@ -80,6 +83,8 @@ export default function TimTable({ data }: { data: TimWithRelations[] }) {
         </div>
       ),
       sortable: false,
+      // Hapus tim khusus admin (lihat deleteTimForm).
+      omit: !isAdmin,
     },
   ];
 
