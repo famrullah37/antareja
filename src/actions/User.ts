@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { generateHash } from "@/lib/hash";
-import { createUser, updateUser } from "@/queries/user.query";
+import { createUser, findUserByEmail, normalizeEmail, updateUser } from "@/queries/user.query";
 import { Role } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { getServerSession } from "@/lib/next-auth";
@@ -15,9 +15,11 @@ async function requireAdmin() {
 export async function createStaffUser(data: FormData) {
   await requireAdmin();
   const nama = data.get("nama") as string;
-  const email = data.get("email") as string;
+  const email = normalizeEmail((data.get("email") as string) ?? "");
   const password = data.get("password") as string;
   const role = data.get("role") as Role;
+
+  if (await findUserByEmail(email)) return { success: false, message: "Email sudah terdaftar" };
 
   try {
     const hashedPass = generateHash(password);
@@ -35,9 +37,11 @@ export async function createStaffUser(data: FormData) {
 export async function createUserForm(data: FormData) {
   await requireAdmin();
   const name = data.get("nama") as string;
-  const email = data.get("email") as string;
+  const email = normalizeEmail((data.get("email") as string) ?? "");
   const password = data.get("password") as string;
   const role = data.get("role") as Role;
+
+  if (await findUserByEmail(email)) return { success: false, message: "Email sudah terdaftar" };
 
   try {
     const hashedPass = generateHash(password);
@@ -58,13 +62,15 @@ export async function createUserForm(data: FormData) {
 export async function updateUserForm(data: FormData, id: string) {
   await requireAdmin();
   const name = data.get("nama") as string;
-  const email = data.get("email") as string;
+  const email = normalizeEmail((data.get("email") as string) ?? "");
   const password = (data.get("password") as string) || undefined;
   const role = data.get("role") as Role;
   const verified = data.get("verified") === "true";
 
   if (password && password.length < 8)
     return { success: false, message: "Password minimal 8 karakter" };
+  if (await findUserByEmail(email, id))
+    return { success: false, message: "Email sudah dipakai akun lain" };
 
   try {
     await updateUser(

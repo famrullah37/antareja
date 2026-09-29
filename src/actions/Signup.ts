@@ -2,12 +2,12 @@
 
 import { generateHash } from "@/lib/hash";
 import { sendMailTo } from "@/lib/mailer";
-import { createUser, findUser, updateUser } from "@/queries/user.query";
+import { createUser, findUserByEmail, normalizeEmail, updateUser } from "@/queries/user.query";
 import { verifyEmailTemplate } from "@/utils/emailTemplate";
 import { revalidatePath } from "next/cache";
 
 export default async function signUp(data: FormData) {
-  const email = data.get("email") as string;
+  const email = normalizeEmail((data.get("email") as string) ?? "");
   const nama = data.get("nama") as string;
   const password = data.get("password") as string;
 
@@ -18,8 +18,17 @@ export default async function signUp(data: FormData) {
     return { success: false, message: "Password minimal 8 karakter" };
   }
 
-  const existing = await findUser({ email });
-  if (existing) return { success: false, message: "Email sudah terdaftar!" };
+  // Email yang sudah ada selalu ditolak, termasuk yang belum diverifikasi —
+  // pemiliknya diarahkan kirim ulang verifikasi dari halaman login.
+  const existing = await findUserByEmail(email);
+  if (existing) {
+    return {
+      success: false,
+      message: existing.verified
+        ? "Email sudah terdaftar!"
+        : "Email sudah terdaftar tapi belum diverifikasi. Cek inbox/spam, atau kirim ulang email verifikasi dari halaman login.",
+    };
+  }
 
   try {
     const hashedPass = generateHash(password);
@@ -62,7 +71,7 @@ const RESEND_COOLDOWN_MS = 60 * 1000;
 export async function resendVerificationEmail(email: string) {
   if (!email) return { success: false, message: "Email wajib diisi" };
 
-  const user = await findUser({ email });
+  const user = await findUserByEmail(email);
   if (!user) return { success: false, message: "Email tidak ditemukan" };
   if (user.verified) return { success: false, message: "Akun sudah terverifikasi, silakan login." };
 

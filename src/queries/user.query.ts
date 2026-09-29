@@ -18,6 +18,25 @@ export async function findUser(where: Prisma.UserWhereUniqueInput) {
   return user;
 }
 
+// Email disimpan & dibandingkan tanpa beda huruf besar/kecil dan tanpa spasi
+// di ujung — "Budi@Gmail.com " dan "budi@gmail.com" adalah akun yang sama.
+export function normalizeEmail(email: string) {
+  return email.trim().toLowerCase();
+}
+
+// Cari user berdasarkan email secara case-insensitive (data lama mungkin
+// tersimpan dengan huruf besar). Kalau kebetulan ada duplikat beda kapital
+// dari sebelum perbaikan ini, akun yang sudah terverifikasi didahulukan.
+export async function findUserByEmail(email: string, excludeId?: string) {
+  return prisma.user.findFirst({
+    where: {
+      email: { equals: normalizeEmail(email), mode: "insensitive" },
+      ...(excludeId ? { NOT: { id: excludeId } } : {}),
+    },
+    orderBy: { verified: "desc" },
+  });
+}
+
 export async function updateUser(
   where: Prisma.UserWhereUniqueInput,
   data: Prisma.UserUncheckedUpdateInput

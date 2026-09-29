@@ -1,5 +1,5 @@
 import { validateHash } from "@/lib/hash";
-import { findUser } from "@/queries/user.query"; // prisma query user
+import { findUser, findUserByEmail } from "@/queries/user.query"; // prisma query user
 import { catatLogLogin } from "@/lib/activityLog";
 import { Role } from "@prisma/client";
 import {
@@ -56,7 +56,7 @@ export const authOptions: AuthOptions = {
       async authorize(credentials) {
           if (!credentials?.email || !credentials.password) return null;
 
-          const user = await findUser({ email: credentials.email });
+          const user = await findUserByEmail(credentials.email);
           if (!user) return null;
 
           const isValidPassword = validateHash(credentials.password, user.password);
