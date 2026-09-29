@@ -32,17 +32,8 @@ export async function saveKonfigUmum(data: FormData) {
   const smpAktif = data.get("smpAktif") === "on";
   const smaAktif = data.get("smaAktif") === "on";
   const purnaAktif = data.get("purnaAktif") === "on";
-
-  // Kuota per jenjang — kosong berarti tidak dibatasi (null), bukan 0.
-  const parseKuota = (raw: string | null): number | null => {
-    if (!raw || !raw.trim()) return null;
-    const n = parseInt(raw, 10);
-    return Number.isFinite(n) && n >= 0 ? n : null;
-  };
-  const kuotaSD = parseKuota(data.get("kuotaSD") as string | null);
-  const kuotaSMP = parseKuota(data.get("kuotaSMP") as string | null);
-  const kuotaSMA = parseKuota(data.get("kuotaSMA") as string | null);
-  const kuotaPurna = parseKuota(data.get("kuotaPurna") as string | null);
+  // Kuota per jenjang tidak lagi di sini — diatur Sie Lomba/admin lewat
+  // saveKuotaTim di halaman Tim, jadi form Pengaturan tidak menimpanya.
 
   // Video Antareja — kosong = tidak ada video; kalau diisi harus YouTube / Google Drive / file video langsung.
   const videoUrlRaw = ((data.get("videoUrl") as string) || "").trim();
@@ -119,7 +110,6 @@ export async function saveKonfigUmum(data: FormData) {
       biayaSD, biayaSDDP, biayaSMP, biayaSMPDP, biayaSMA, biayaSMADP,
       biayaPurna, biayaPurnaDP,
       sdAktif, smpAktif, smaAktif, purnaAktif,
-      kuotaSD, kuotaSMP, kuotaSMA, kuotaPurna,
       videoUrl,
       bankNama, bankNoRek, bankAtasNama,
       timeline,
@@ -131,5 +121,36 @@ export async function saveKonfigUmum(data: FormData) {
     return { success: true };
   } catch {
     return { success: false, message: "Gagal menyimpan konfigurasi" };
+  }
+}
+
+// Kuota tim yang berlaga per jenjang — diatur Sie Lomba (dan admin) dari
+// halaman Tim. Kosong = tidak dibatasi (null), bukan 0. Kuota dibandingkan
+// dengan jumlah tim terkonfirmasi (lihat getKuotaJenjang di registrationForm).
+export async function saveKuotaTim(data: FormData) {
+  const session = await getServerSession();
+  if (!["ADMIN", "SIE_LOMBA"].includes(session?.user?.role ?? "")) {
+    return { success: false, message: "Forbidden" };
+  }
+
+  const kuota: Record<"kuotaSD" | "kuotaSMP" | "kuotaSMA" | "kuotaPurna", number | null> = {
+    kuotaSD: null, kuotaSMP: null, kuotaSMA: null, kuotaPurna: null,
+  };
+  for (const key of Object.keys(kuota) as (keyof typeof kuota)[]) {
+    const raw = ((data.get(key) as string) || "").trim();
+    if (!raw) continue;
+    const n = Number(raw);
+    if (!Number.isInteger(n) || n < 0 || n > 9999) {
+      return { success: false, message: "Kuota harus bilangan bulat 0–9999 (kosongkan kalau tanpa batas)" };
+    }
+    kuota[key] = n;
+  }
+
+  try {
+    await upsertKonfigUmum(kuota);
+    revalidatePath("/", "layout");
+    return { success: true };
+  } catch {
+    return { success: false, message: "Gagal menyimpan kuota" };
   }
 }

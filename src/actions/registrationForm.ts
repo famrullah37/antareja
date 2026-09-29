@@ -9,7 +9,7 @@ import { biayaPendaftaran } from "./pembayaran";
 const VALID_JENJANG: Jenjang[] = ["SD", "SMP", "SMA", "PURNA"];
 const VALID_TIPE: Tipe[] = ["SMALL", "NORMAL"];
 
-// Batas maksimal tim per jenjang, dikonfigurasi admin lewat /admin/pengaturan
+// Batas maksimal tim per jenjang, diatur Sie Lomba/admin lewat /admin/tim
 // (KonfigUmum.kuotaSD/SMP/SMA/Purna). null berarti tidak dibatasi. Menerima
 // client Prisma biasa ATAU transaksi (tx) supaya bisa dipakai atomic di
 // submitFormRegistrasi.

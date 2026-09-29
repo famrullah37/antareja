@@ -20,10 +20,6 @@ type Konfig = {
   smpAktif: boolean;
   smaAktif: boolean;
   purnaAktif: boolean;
-  kuotaSD: number | null;
-  kuotaSMP: number | null;
-  kuotaSMA: number | null;
-  kuotaPurna: number | null;
   bankNama: string | null;
   bankNoRek: string | null;
   bankAtasNama: string | null;
@@ -350,32 +346,9 @@ export default function PengaturanForm({ konfig }: { konfig: Konfig }) {
           ))}
         </div>
 
-        <h2 className="font-semibold text-lg mt-2">Kuota Pendaftaran per Jenjang</h2>
         <p className="text-sm text-gray-500">
-          Batas maksimal jumlah tim yang boleh mendaftar di jenjang tersebut. Kosongkan (biarkan
-          kosong) kalau tidak mau dibatasi. Begitu kuota tercapai, jenjang otomatis tidak bisa
-          dipilih lagi di form pendaftaran meskipun statusnya masih Aktif.
+          Kuota jumlah tim per jenjang diatur di menu <strong>Tim</strong> (bisa oleh Sie Lomba).
         </p>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {[
-            { label: "SD", name: "kuotaSD", value: konfig.kuotaSD },
-            { label: "SMP", name: "kuotaSMP", value: konfig.kuotaSMP },
-            { label: "SMA", name: "kuotaSMA", value: konfig.kuotaSMA },
-            { label: "Purna", name: "kuotaPurna", value: konfig.kuotaPurna },
-          ].map(({ label, name, value }) => (
-            <label key={name} className="flex flex-col gap-1 text-sm font-medium">
-              {label}
-              <input
-                type="number"
-                min={0}
-                name={name}
-                defaultValue={value ?? ""}
-                placeholder="Tanpa batas"
-                className="border border-neutral-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-primary-400"
-              />
-            </label>
-          ))}
-        </div>
 
         <button
           type="submit"
