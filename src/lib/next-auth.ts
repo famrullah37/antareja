@@ -95,6 +95,14 @@ export const authOptions: AuthOptions = {
         token.role = (user as any).role;
         token.nama = (user as any).nama;
         token.email = user.email!;
+        return token;
+      }
+      // Role disimpan di JWT (berlaku 30 hari), jadi kalau admin mengubah role
+      // user, token lama masih membawa role lama. Ambil ulang dari DB supaya
+      // perubahan role langsung berlaku tanpa harus logout-login.
+      if (token.id) {
+        const fresh = await findUser({ id: token.id as string }).catch(() => null);
+        if (fresh) token.role = fresh.role;
       }
       return token;
     },

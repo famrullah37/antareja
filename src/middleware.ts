@@ -3,8 +3,25 @@ import { NextRequest, NextResponse } from "next/server";
 
 const JURI_ROUTES = ["/admin/penilaian", "/admin/penilaian-baru"];
 const TIKET_ROUTES = ["/admin/tiket"];
-const BENDAHARA_ROUTES = ["/admin/kas", "/admin/pembayaran"];
+const BENDAHARA_ROUTES = ["/admin/kas", "/admin/pembayaran", "/admin/voting"];
 const FOTOGRAFER_ROUTES = ["/admin/galeri"];
+
+const STAFF_ROUTES: Record<string, string[]> = {
+  JURI: JURI_ROUTES,
+  TIKET: TIKET_ROUTES,
+  BENDAHARA: BENDAHARA_ROUTES,
+  FOTOGRAFER: FOTOGRAFER_ROUTES,
+};
+
+// Halaman awal staf = route pertama yang boleh dia buka. "/admin" (dashboard)
+// khusus ADMIN, jadi staf yang membuka "/admin" atau "/dashboard" diarahkan ke
+// sini, bukan ditendang ke landing page.
+const STAFF_HOME: Record<string, string> = {
+  JURI: "/admin/penilaian-baru/input",
+  TIKET: "/admin/tiket/pos",
+  BENDAHARA: "/admin/pembayaran",
+  FOTOGRAFER: "/admin/galeri",
+};
 
 // Sengaja tidak memakai withAuth: redirect bawaannya menambah
 // ?callbackUrl=<halaman asal> ke URL login, padahal halaman login menentukan
@@ -18,18 +35,15 @@ export default async function middleware(req: NextRequest) {
 
   if (pathname.startsWith("/dashboard")) {
     if (role !== "USER") {
-      return NextResponse.redirect(new URL("/admin", req.url));
+      return NextResponse.redirect(new URL(STAFF_HOME[role] ?? "/admin", req.url));
     }
     return NextResponse.next();
   }
 
   if (pathname.startsWith("/admin")) {
     if (role === "ADMIN") return NextResponse.next();
-    if (role === "JURI" && JURI_ROUTES.some((r) => pathname.startsWith(r))) return NextResponse.next();
-    if (role === "TIKET" && TIKET_ROUTES.some((r) => pathname.startsWith(r))) return NextResponse.next();
-    if (role === "BENDAHARA" && BENDAHARA_ROUTES.some((r) => pathname.startsWith(r))) return NextResponse.next();
-    if (role === "FOTOGRAFER" && FOTOGRAFER_ROUTES.some((r) => pathname.startsWith(r))) return NextResponse.next();
-    return NextResponse.redirect(new URL("/", req.url));
+    if (STAFF_ROUTES[role]?.some((r) => pathname.startsWith(r))) return NextResponse.next();
+    return NextResponse.redirect(new URL(STAFF_HOME[role] ?? "/", req.url));
   }
 
   return NextResponse.next();
