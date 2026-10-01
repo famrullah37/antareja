@@ -20,13 +20,10 @@ interface Pengumuman {
 interface HeadingClientProps {
   session: Session | null;
   pengumumans: Pengumuman[];
+  juklakUrl: string | null;
 }
 
-export default function HeadingClient({ session, pengumumans }: HeadingClientProps) {
-  const manualDownloadLink =
-    "https://drive.google.com/file/d/1SlmV82GvAk9OS0HNVWS-AUYIe6YiuU8C/view?usp=drive_link";
-
-
+export default function HeadingClient({ session, pengumumans, juklakUrl }: HeadingClientProps) {
   return (
     <>
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 w-full mb-3">
@@ -40,12 +37,15 @@ export default function HeadingClient({ session, pengumumans }: HeadingClientPro
           >
             Profil Saya
           </PrimaryLinkButton>
-          <PrimaryLinkButton
-            href={manualDownloadLink}
-            className="inline-flex gap-2 items-center"
-          >
-            Unduh buku panduan <FaDownload />
-          </PrimaryLinkButton>
+          {juklakUrl && (
+            <PrimaryLinkButton
+              href={juklakUrl}
+              target="_blank"
+              className="inline-flex gap-2 items-center"
+            >
+              Unduh Juklak <FaDownload />
+            </PrimaryLinkButton>
+          )}
         </div>
       </div>
 

@@ -6,14 +6,17 @@ export function PrimaryLinkButton({
   children,
   href,
   className,
+  target,
 }: {
   children: ReactNode;
   href?: string;
   className?: string;
+  target?: HTMLAttributeAnchorTarget;
 }) {
   return (
     <Link
       href={href!}
+      target={target}
       className={cn(
         "bg-primary-500 drop-shadow-glow hover:opacity-75 duration-300 transition-all py-3 px-6 text-white rounded-full ",
         className

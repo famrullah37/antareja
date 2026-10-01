@@ -46,12 +46,15 @@ export default async function Video() {
               rangkaian pendaftaran hingga seleksi berjalan dengan lancar.
             </P>
           </div>
-          <PrimaryLinkButton
-            href="https://drive.google.com/file/d/1SlmV82GvAk9OS0HNVWS-AUYIe6YiuU8C/view?usp=drive_link"
-            className="inline-flex gap-2 items-center mb-[40px]"
-          >
-            Unduh buku panduan <FaDownload />
-          </PrimaryLinkButton>
+          {konfig.juklakUrl && (
+            <PrimaryLinkButton
+              href={konfig.juklakUrl}
+              target="_blank"
+              className="inline-flex gap-2 items-center mb-[40px]"
+            >
+              Unduh Juklak <FaDownload />
+            </PrimaryLinkButton>
+          )}
           <VideoPlayer
             url={konfig.videoUrl}
             className="rounded-[20px] sm:w-[500px] h-[250px] sm:h-[276px] w-full"
@@ -93,12 +96,15 @@ export default async function Video() {
               rangkaian pendaftaran hingga seleksi berjalan dengan lancar.
             </P>
           </div>
-          <PrimaryLinkButton
-            href="https://drive.google.com/file/d/1SlmV82GvAk9OS0HNVWS-AUYIe6YiuU8C/view?usp=drive_link"
-            className="inline-flex gap-2 items-center mb-[40px]"
-          >
-            Unduh buku panduan <FaDownload />
-          </PrimaryLinkButton>
+          {konfig.juklakUrl && (
+            <PrimaryLinkButton
+              href={konfig.juklakUrl}
+              target="_blank"
+              className="inline-flex gap-2 items-center mb-[40px]"
+            >
+              Unduh Juklak <FaDownload />
+            </PrimaryLinkButton>
+          )}
           <VideoPlayer
             url={konfig.videoUrl}
             className="rounded-[20px] sm:w-[500px] h-[276px] w-full"
