@@ -43,7 +43,7 @@ function SlotDokumen({ dokumenKey, label, dokumen }: { dokumenKey: DokumenKey; l
   }
 
   return (
-    <form ref={formRef} action={upload} className="flex flex-col gap-2 border border-neutral-200 rounded-lg p-4">
+    <form ref={formRef} action={upload} className="min-w-0 flex flex-col gap-3 border border-neutral-200 rounded-lg p-4">
       <span className="text-sm font-medium">{label}</span>
       {info ? (
         <div className="flex flex-wrap items-center gap-3 text-sm">
@@ -57,22 +57,22 @@ function SlotDokumen({ dokumenKey, label, dokumen }: { dokumenKey: DokumenKey; l
       ) : (
         <span className="text-xs text-gray-400">Belum ada file — tombol unduh tidak muncul di dashboard peserta.</span>
       )}
-      <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-        <input
-          type="file"
-          name="file"
-          accept=".pdf,.doc,.docx"
-          required
-          className="flex-1 text-sm text-gray-500 file:mr-3 file:py-1.5 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary-50 file:text-primary-600 hover:file:bg-primary-100"
-        />
-        <button
-          type="submit"
-          disabled={busy}
-          className="self-start bg-primary-500 text-white rounded-lg py-2 px-5 text-sm font-semibold hover:bg-primary-600 disabled:opacity-60 transition-colors"
-        >
-          {busy ? "Memproses..." : info ? "Ganti" : "Upload"}
-        </button>
-      </div>
+      {/* Selalu bertumpuk: kartunya sempit (2 kolom), input file + tombol
+          berjajar akan meluber keluar kartu. */}
+      <input
+        type="file"
+        name="file"
+        accept=".pdf,.doc,.docx"
+        required
+        className="w-full min-w-0 text-sm text-gray-500 file:mr-3 file:py-1.5 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary-50 file:text-primary-600 hover:file:bg-primary-100"
+      />
+      <button
+        type="submit"
+        disabled={busy}
+        className="self-start bg-primary-500 text-white rounded-lg py-2 px-5 text-sm font-semibold hover:bg-primary-600 disabled:opacity-60 transition-colors"
+      >
+        {busy ? "Memproses..." : info ? "Ganti" : "Upload"}
+      </button>
     </form>
   );
 }
