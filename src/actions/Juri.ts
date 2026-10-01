@@ -4,6 +4,19 @@ import { getServerSession } from "@/lib/next-auth";
 import { imageUploader, validateUploadFile } from "./fileUploader";
 import { createJuri, deleteJuri, updateJuri } from "@/queries/juri.query";
 import { revalidatePath } from "next/cache";
+import prisma from "@/lib/prisma";
+
+// Samakan penugasan juri (JuriKategori) dengan checkbox kategori di form.
+async function syncJuriKategori(juriId: string, data: FormData) {
+  const kategori = Array.from(new Set(data.getAll("kategori").map(String).filter(Boolean)));
+  await prisma.$transaction([
+    prisma.juriKategori.deleteMany({ where: { juriId, kategori: { notIn: kategori } } }),
+    prisma.juriKategori.createMany({
+      data: kategori.map((k) => ({ juriId, kategori: k })),
+      skipDuplicates: true,
+    }),
+  ]);
+}
 
 async function requireAdmin() {
   const session = await getServerSession();
@@ -21,7 +34,8 @@ export async function createJuriForm(data: FormData) {
     if (!fileCheck.valid) return { success: false, message: fileCheck.message };
     const upload = await imageUploader(Buffer.from(await foto.arrayBuffer()));
     if (upload.error) return { success: false, message: upload.message };
-    await createJuri({ nama, email, no_hp, kategori: "", foto: upload.data!.url });
+    const juri = await createJuri({ nama, email, no_hp, kategori: "", foto: upload.data!.url });
+    await syncJuriKategori(juri.id, data);
     revalidatePath("/", "layout");
     return { success: true };
   } catch {
@@ -48,6 +62,7 @@ export async function updateJuriForm(data: FormData, id: string) {
       updateData.foto = upload.data!.url;
     }
     await updateJuri({ id }, updateData);
+    await syncJuriKategori(id, data);
     revalidatePath("/", "layout");
     return { success: true };
   } catch {

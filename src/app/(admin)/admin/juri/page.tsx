@@ -1,11 +1,11 @@
 export const dynamic = "force-dynamic";
-import { findJuris } from "@/queries/juri.query";
+import { findJurisWithKategori } from "@/queries/juri.query";
 import { PrimaryLinkButton } from "@/app/components/global/LinkButton";
 import { H1 } from "@/app/components/global/Text";
 import JuriTable from "./components/Table";
 
 export default async function JuriPage() {
-  const juris = await findJuris();
+  const juris = await findJurisWithKategori();
 
   return (
     <div className="py-6">

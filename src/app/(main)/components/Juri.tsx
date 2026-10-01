@@ -1,5 +1,5 @@
 ﻿import SectionWrapper from "@/app/components/global/Wrapper";
-import { findJuris } from "@/queries/juri.query";
+import { findJurisWithKategori } from "@/queries/juri.query";
 import Image from "next/image";
 
 interface JuriCardProps {
@@ -22,16 +22,18 @@ function JuriCard({ image, name, title }: JuriCardProps) {
       </div>
       <div className="text-center flex flex-col gap-1">
         <p className="font-bold text-neutral-900 text-sm leading-snug">{name}</p>
-        <span className="inline-flex px-3 py-1 bg-primary-50 text-primary-600 text-xs font-semibold rounded-full border border-primary-100">
-          {title}
-        </span>
+        {title?.trim() && (
+          <span className="inline-flex self-center px-3 py-1 bg-primary-50 text-primary-600 text-xs font-semibold rounded-full border border-primary-100">
+            {title}
+          </span>
+        )}
       </div>
     </div>
   );
 }
 
 export default async function Juri() {
-  const juris = await findJuris();
+  const juris = await findJurisWithKategori();
 
   const displayJuris = juris.length > 0
     ? juris
@@ -61,7 +63,7 @@ export default async function Juri() {
         </div>
 
         {/* Cards */}
-        <div className="relative z-10 flex flex-wrap gap-5 justify-center sm:justify-start">
+        <div className="relative z-10 flex flex-wrap gap-5 justify-center">
           {displayJuris.map((j) => (
             <JuriCard key={j.nama} image={j.foto} name={j.nama} title={j.kategori} />
           ))}

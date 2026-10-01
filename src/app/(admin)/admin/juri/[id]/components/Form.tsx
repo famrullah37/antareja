@@ -13,10 +13,14 @@ export default function JuriForm({
   data,
   edit,
   id,
+  kategoris,
+  terpilih = [],
 }: {
   data?: Juri;
   edit?: boolean;
   id?: string;
+  kategoris: string[];
+  terpilih?: string[];
 }) {
   const [preview, setPreview] = useState<string>(data?.foto ?? "");
   const fileRef = useRef<HTMLInputElement>(null);
@@ -103,6 +107,32 @@ export default function JuriForm({
           value={data?.no_hp}
           required={!edit}
         />
+        <div className="flex flex-col gap-2">
+          <label className="text-[16px]">Kategori yang Dinilai</label>
+          {kategoris.length === 0 ? (
+            <p className="text-sm text-neutral-400">
+              Belum ada kategori lomba. Tambahkan dulu di menu Penilaian.
+            </p>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {kategoris.map((k) => (
+                <label
+                  key={k}
+                  className="flex items-center gap-2 px-4 py-2 rounded-full border border-neutral-300 bg-white text-sm cursor-pointer has-[:checked]:border-primary-500 has-[:checked]:bg-primary-50 has-[:checked]:text-primary-600 transition-all"
+                >
+                  <input
+                    type="checkbox"
+                    name="kategori"
+                    value={k}
+                    defaultChecked={terpilih.includes(k)}
+                    className="accent-primary-500"
+                  />
+                  {k}
+                </label>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
       <div className="w-full justify-end flex mt-5">
         <SubmitButton text={edit ? "Update" : "Submit"} />
