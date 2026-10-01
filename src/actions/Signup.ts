@@ -71,16 +71,19 @@ const RESEND_COOLDOWN_MS = 60 * 1000;
 export async function resendVerificationEmail(email: string) {
   if (!email) return { success: false, message: "Email wajib diisi" };
 
+  // Jawaban sama untuk email yang tidak terdaftar / sudah terverifikasi,
+  // supaya fitur ini tidak bisa dipakai menebak email siapa yang terdaftar.
+  const pesanUmum = {
+    success: true,
+    message: "Jika email terdaftar dan belum terverifikasi, email verifikasi sudah dikirim ulang. Cek inbox/spam Anda.",
+  };
   const user = await findUserByEmail(email);
-  if (!user) return { success: false, message: "Email tidak ditemukan" };
-  if (user.verified) return { success: false, message: "Akun sudah terverifikasi, silakan login." };
+  if (!user || user.verified) return pesanUmum;
 
   if (user.verifyTokenSentAt) {
     const elapsed = Date.now() - new Date(user.verifyTokenSentAt).getTime();
-    if (elapsed < RESEND_COOLDOWN_MS) {
-      const sisaDetik = Math.ceil((RESEND_COOLDOWN_MS - elapsed) / 1000);
-      return { success: false, message: `Tunggu ${sisaDetik} detik sebelum kirim ulang lagi.` };
-    }
+    // Dalam masa jeda: diam-diam tidak kirim, jawabannya tetap sama.
+    if (elapsed < RESEND_COOLDOWN_MS) return pesanUmum;
   }
 
   try {
@@ -94,7 +97,7 @@ export async function resendVerificationEmail(email: string) {
       html: verifyEmailTemplate(user.nama, verifyLink),
     });
 
-    return { success: true, message: "Email verifikasi sudah dikirim ulang, cek inbox/spam Anda." };
+    return pesanUmum;
   } catch {
     return { success: false, message: "Gagal mengirim ulang email, coba lagi nanti." };
   }

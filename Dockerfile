@@ -51,6 +51,7 @@ EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
-# Terapkan migrasi SQL yang tertunda (db/sql) dulu; kalau gagal, server tetap start
-# dan errornya terlihat di `docker logs`.
-CMD ["sh", "-c", "node scripts/migrate-sql.mjs; exec node server.js"]
+# Terapkan migrasi SQL yang tertunda (db/sql) dulu, lalu enkripsi data pribadi lama
+# yang masih teks biasa; kalau gagal, server tetap start dan errornya terlihat di
+# `docker logs`.
+CMD ["sh", "-c", "node scripts/migrate-sql.mjs; node scripts/encrypt-data.mjs; exec node server.js"]

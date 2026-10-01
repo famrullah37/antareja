@@ -1,5 +1,5 @@
 "use server";
-import { Jenjang, PrismaClient, Tipe } from "@prisma/client";
+import { Jenjang, Tipe } from "@prisma/client";
 import { imageUploader, validateUploadFile } from "./fileUploader";
 import { revalidatePath } from "next/cache";
 import { getServerSession } from "@/lib/next-auth";
@@ -14,7 +14,7 @@ const VALID_TIPE: Tipe[] = ["SMALL", "NORMAL"];
 // client Prisma biasa ATAU transaksi (tx) supaya bisa dipakai atomic di
 // submitFormRegistrasi.
 async function getKuotaJenjang(
-  client: Pick<PrismaClient, "konfigUmum">,
+  client: { konfigUmum: Pick<typeof prisma.konfigUmum, "findUnique"> },
   jenjang: Jenjang
 ): Promise<number | null> {
   const konfig = await client.konfigUmum.findUnique({ where: { id: "singleton" } });

@@ -1,6 +1,7 @@
 import { validateHash } from "@/lib/hash";
 import { findUser, findUserByEmail } from "@/queries/user.query"; // prisma query user
 import { catatLogLogin } from "@/lib/activityLog";
+import { catatLoginGagal, loginDiblokir, resetLoginGagal } from "@/lib/loginLimit";
 import { Role } from "@prisma/client";
 import {
   getServerSession as nextAuthGetServerSession,
@@ -55,12 +56,20 @@ export const authOptions: AuthOptions = {
       },
       async authorize(credentials) {
           if (!credentials?.email || !credentials.password) return null;
+          if (loginDiblokir(credentials.email)) return null;
 
           const user = await findUserByEmail(credentials.email);
-          if (!user) return null;
+          if (!user) {
+            catatLoginGagal(credentials.email);
+            return null;
+          }
 
           const isValidPassword = validateHash(credentials.password, user.password);
-          if (!isValidPassword) return null;
+          if (!isValidPassword) {
+            catatLoginGagal(credentials.email);
+            return null;
+          }
+          resetLoginGagal(credentials.email);
 
           if (!user.verified) return null;
 

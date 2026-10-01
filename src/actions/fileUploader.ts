@@ -1,4 +1,7 @@
-'use server';
+// Bukan "use server": semua export di file seperti itu menjadi server action
+// publik, sehingga siapa pun bisa upload ke Cloudinary atau membebani CPU
+// lewat compressPhoto tanpa login. Dipakai hanya dari server action lain.
+import 'server-only';
 
 import { v2 as cloudinary } from 'cloudinary';
 import { UploadApiResponse } from 'cloudinary';

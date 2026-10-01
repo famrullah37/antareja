@@ -31,6 +31,7 @@ import {
 } from "@/queries/tiket.query";
 import { imageUploader, validateUploadFile } from "./fileUploader";
 import prisma from "@/lib/prisma";
+import { escapeHtml } from "@/lib/escapeHtml";
 
 // ─── Admin: Master Tiket ──────────────────────────────────────────────────────
 
@@ -395,7 +396,7 @@ export async function verifikasiTiket(transaksiId: string) {
         html: `
           <div style="font-family:sans-serif;max-width:520px;margin:auto">
             <h2 style="color:#F70048">Tiket Anda Terverifikasi!</h2>
-            <p>Halo <b>${transaksi.nama}</b>,</p>
+            <p>Halo <b>${escapeHtml(transaksi.nama)}</b>,</p>
             <p>Pembelian tiket <b>${transaksi.tiket.jenis}</b> (${transaksi.jumlah} tiket) telah diverifikasi.</p>
             ${transaksi.bundleJumlah > 0 ? `<p>Termasuk bundling <b>${transaksi.bundleIsi}</b> × ${transaksi.bundleJumlah} — diambil saat QR bertanda bundling di-scan di pintu masuk.</p>` : ""}
             <div style="background:#f9f9f9;border-radius:8px;padding:16px;margin:16px 0">

@@ -15,6 +15,9 @@ services:
       SMTP_PORT: ${SMTP_PORT}
       SMTP_USER: ${SMTP_USER}
       SMTP_PASS: ${SMTP_PASS}
+      # Kunci enkripsi data pribadi (no. HP, NISN, email anggota, no. pelatih).
+      # Buat sekali dengan `openssl rand -base64 32`; JANGAN diganti/hilang.
+      DATA_ENCRYPTION_KEY: ${DATA_ENCRYPTION_KEY}
     volumes:
       # File Juklak disimpan di sini (bukan Cloudinary); volume menjaga file
       # tetap ada walau container dibuat ulang saat deploy.

@@ -1,4 +1,4 @@
-import { autoVerifikasiVotingByNominal } from "@/actions/Voting";
+import { autoVerifikasiVotingByNominal } from "@/lib/votingVerifikasi";
 import { NextRequest, NextResponse } from "next/server";
 
 // ─── Webhook callback QRIS Mandiri (KERANGKA — belum tersambung penuh) ───────

@@ -22,20 +22,34 @@ const nextConfig = {
     ],
   },
   productionBrowserSourceMaps: false,
+  poweredByHeader: false,
   // Halaman privat tidak boleh masuk indeks mesin pencari (berlapis dengan robots.txt: robots.txt cuma
   // meminta crawler tidak merayap, header ini melarang mengindeks walau URL-nya ditemukan dari tempat lain).
   async headers() {
     const noindex = [{ key: "X-Robots-Tag", value: "noindex, nofollow" }];
+    // Header keamanan dasar untuk semua halaman: cegah situs dimuat di iframe
+    // situs lain (clickjacking), cegah browser menebak tipe file, batasi
+    // Referer ke situs lain, dan paksa HTTPS (Traefik sudah melayani TLS).
+    const security = [
+      { key: "X-Frame-Options", value: "SAMEORIGIN" },
+      { key: "X-Content-Type-Options", value: "nosniff" },
+      { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+      { key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" },
+      { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+    ];
     return [
-      "/admin/:path*",
-      "/dashboard/:path*",
-      "/form",
-      "/confirmation",
-      "/auth/login",
-      "/auth/verify",
-      "/galeri/download/:path*",
-    ].map((source) => ({ source, headers: noindex }));
-  }, 
+      { source: "/:path*", headers: security },
+      ...[
+        "/admin/:path*",
+        "/dashboard/:path*",
+        "/form",
+        "/confirmation",
+        "/auth/login",
+        "/auth/verify",
+        "/galeri/download/:path*",
+      ].map((source) => ({ source, headers: noindex })),
+    ];
+  },
 };
 
 export default nextConfig;
