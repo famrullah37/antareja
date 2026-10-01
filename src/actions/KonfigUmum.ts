@@ -6,7 +6,7 @@ import { revalidatePath } from "next/cache";
 import { parseWibDatetimeLocal } from "@/lib/datetime";
 import { parseVideoUrl } from "@/lib/videoUrl";
 import { imageUploader, validateUploadFile } from "./fileUploader";
-import { saveJuklakFile } from "@/lib/juklakFile";
+import { saveUploadFile } from "@/lib/localUpload";
 
 async function requireAdmin() {
   const session = await getServerSession();
@@ -91,7 +91,7 @@ export async function saveKonfigUmum(data: FormData) {
       return { success: false, message: "File Juklak harus berupa PDF" };
     }
     try {
-      await saveJuklakFile(buffer);
+      await saveUploadFile("juklak.pdf", buffer);
     } catch (e) {
       console.error("Gagal menyimpan Juklak:", e);
       return { success: false, message: "Gagal menyimpan file Juklak" };

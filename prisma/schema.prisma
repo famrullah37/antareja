@@ -518,6 +518,9 @@ model KonfigUmum {
   // Link download Juklak (petunjuk pelaksanaan), diupload admin lewat
   // Pengaturan — muncul sebagai tombol download di Hero halaman utama.
   juklakUrl              String?
+  // Surat undangan & surat rekomendasi Diknas per jenjang (SMP/SMA) yang
+  // diunduh peserta di dashboard — lihat DokumenPeserta di src/lib/dokumenPeserta.ts.
+  dokumenPeserta         Json?
   // Video Antareja di halaman utama (bagian Alur Pendaftaran): YouTube, Google Drive, atau file video langsung.
   videoUrl               String?
   // Counter kode unik pembayaran pendaftaran tim (0-999, siklus ulang) —

@@ -12,6 +12,7 @@ import { updateLinkPoster, updateLinkRekomendasi, updateTimForm } from "@/action
 import Field from "../components/parts/input";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { FaDownload } from "react-icons/fa";
 import SubmitButton from "@/app/components/global/SubmitButton";
 import { downloadFormulir, downloadKuitansi } from "./parts/downloadFormulir";
 
@@ -144,10 +145,13 @@ export default function ProfileTim({
   tim,
   penilaian,
   biayaDasar,
+  dokumen = [],
 }: {
   tim: TimWithRelations;
   penilaian?: any;
   biayaDasar?: number;
+  // Surat undangan & surat rekomendasi Diknas untuk jenjang tim ini (diupload admin).
+  dokumen?: { jenis: string; label: string; url: string }[];
 }) {
   const router = useRouter();
   const [downloading, setDownloading] = useState(false);
@@ -278,6 +282,26 @@ export default function ProfileTim({
             {!tim.confirmed && (
               <P className="text-sm text-gray-400">Kuitansi tersedia setelah pembayaran dikonfirmasi admin.</P>
             )}
+          </div>
+        )}
+
+        {dokumen.length > 0 && (
+          <div className="flex flex-col gap-2 mb-4">
+            <H3>Surat Undangan & Rekomendasi</H3>
+            <P className="text-sm text-gray-500">
+              Unduh surat undangan dari panitia dan surat rekomendasi dari Diknas untuk jenjang {tim.jenjang}.
+            </P>
+            <div className="flex flex-wrap gap-3">
+              {dokumen.map((d) => (
+                <a
+                  key={d.jenis}
+                  href={d.url}
+                  className="inline-flex items-center gap-2 bg-primary-500 hover:bg-primary-600 text-white text-sm font-semibold px-5 py-2.5 rounded-lg transition-colors"
+                >
+                  Unduh {d.label} <FaDownload />
+                </a>
+              ))}
+            </div>
           </div>
         )}
 

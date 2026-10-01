@@ -13,6 +13,15 @@ import TiketSayaSection from "./components/TiketSayaSection";
 import NilaiAkhirSection from "./components/NilaiAkhirSection";
 import SertifikatSection from "./components/SertifikatSection";
 import { biayaPendaftaran } from "@/actions/pembayaran";
+import { getKonfigUmum } from "@/queries/konfigUmum.query";
+import {
+  DOKUMEN_JENIS,
+  dokumenUrl,
+  isDokumenKey,
+  type DokumenJenis,
+  type DokumenKey,
+  type DokumenPeserta,
+} from "@/lib/dokumenPeserta";
 
 export default async function TimDashboard() {
   const session = await getServerSession();
@@ -27,17 +36,26 @@ export default async function TimDashboard() {
 
   const tim = tims[0] as TimWithRelations;
 
-  const [transaksiTikets, penilaianBaru, sertifikat, biayaDasar] = await Promise.all([
+  const [transaksiTikets, penilaianBaru, sertifikat, biayaDasar, konfig] = await Promise.all([
     findTransaksiTikets({ userId: session.user!.id }),
     findPenilaianBaru({ timId: tim.id }),
     findSertifikatByTim(tim.id),
     biayaPendaftaran(tim.jenjang, tim.pembayaran?.isDP ?? false),
+    getKonfigUmum(),
   ]);
+
+  // Surat undangan & surat rekomendasi Diknas sesuai jenjang tim (hanya SMP/SMA).
+  const daftarDokumen = (konfig.dokumenPeserta ?? {}) as DokumenPeserta;
+  const dokumen = (Object.keys(DOKUMEN_JENIS) as DokumenJenis[]).flatMap((jenis) => {
+    const key = `${jenis}-${tim.jenjang}`;
+    const info = isDokumenKey(key) ? daftarDokumen[key] : undefined;
+    return info ? [{ jenis, label: DOKUMEN_JENIS[jenis], url: dokumenUrl(key as DokumenKey, info) }] : [];
+  });
 
   return (
     <>
       <Heading />
-      <ProfileTim tim={tim} penilaian={tim.penilaian ?? null} biayaDasar={biayaDasar} />
+      <ProfileTim tim={tim} penilaian={tim.penilaian ?? null} biayaDasar={biayaDasar} dokumen={dokumen} />
       <NilaiAkhirSection penilaianBaru={penilaianBaru as any} />
       <SertifikatSection sertifikat={sertifikat as any} />
       <TiketSayaSection transaksis={transaksiTikets as any} />
