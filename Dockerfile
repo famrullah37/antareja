@@ -40,6 +40,9 @@ COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 COPY --from=builder /app/node_modules/pdfkit ./node_modules/pdfkit
 COPY --from=builder /app/scripts ./scripts
 COPY --from=builder /app/db ./db
+# File upload lokal (Juklak). Dibuat di sini dengan pemilik nextjs supaya
+# named volume di docker-compose.yml mewarisi izin tulisnya.
+RUN mkdir -p /app/uploads && chown nextjs:nodejs /app/uploads
 
 USER nextjs
 

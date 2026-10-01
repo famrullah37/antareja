@@ -15,6 +15,10 @@ services:
       SMTP_PORT: ${SMTP_PORT}
       SMTP_USER: ${SMTP_USER}
       SMTP_PASS: ${SMTP_PASS}
+    volumes:
+      # File Juklak disimpan di sini (bukan Cloudinary); volume menjaga file
+      # tetap ada walau container dibuat ulang saat deploy.
+      - antareja-uploads:/app/uploads
     networks:
       - proxy
       - postgresql-wsnb_default
@@ -31,3 +35,6 @@ networks:
     external: true
   postgresql-wsnb_default:
     external: true
+
+volumes:
+  antareja-uploads:

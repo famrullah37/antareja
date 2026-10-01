@@ -4,6 +4,9 @@
 _private/
 prd_lkbb_antareja.md
 
+# file upload lokal (Juklak)
+/uploads/
+
 # dependencies
 /node_modules
 /.pnp

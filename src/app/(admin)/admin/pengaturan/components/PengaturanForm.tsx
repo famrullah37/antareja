@@ -179,7 +179,7 @@ export default function PengaturanForm({ konfig }: { konfig: Konfig }) {
       <div className="bg-white border border-neutral-200 rounded-xl p-6 flex flex-col gap-4">
         <h2 className="font-semibold text-lg">Juklak (Petunjuk Pelaksanaan)</h2>
         <p className="text-sm text-gray-500">
-          File PDF yang muncul sebagai tombol download di halaman utama (Hero).
+          File PDF yang muncul sebagai tombol &quot;Unduh Juklak&quot; di halaman utama dan dashboard peserta. Disimpan di server, bukan Cloudinary.
         </p>
         {konfig.juklakUrl && (
           <a

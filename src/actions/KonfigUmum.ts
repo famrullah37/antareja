@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { parseWibDatetimeLocal } from "@/lib/datetime";
 import { parseVideoUrl } from "@/lib/videoUrl";
 import { imageUploader, validateUploadFile } from "./fileUploader";
+import { saveJuklakFile } from "@/lib/juklakFile";
 
 async function requireAdmin() {
   const session = await getServerSession();
@@ -85,9 +86,17 @@ export async function saveKonfigUmum(data: FormData) {
   if (juklakFile && juklakFile.size > 0) {
     const fileCheck = await validateUploadFile(juklakFile, { maxMB: 15, allowPdf: true });
     if (!fileCheck.valid) return { success: false, message: fileCheck.message };
-    const upload = await imageUploader(Buffer.from(await juklakFile.arrayBuffer()));
-    if (upload.error) return { success: false, message: upload.message };
-    juklakUrl = upload.data!.url;
+    const buffer = Buffer.from(await juklakFile.arrayBuffer());
+    if (buffer.subarray(0, 5).toString() !== "%PDF-") {
+      return { success: false, message: "File Juklak harus berupa PDF" };
+    }
+    try {
+      await saveJuklakFile(buffer);
+    } catch (e) {
+      console.error("Gagal menyimpan Juklak:", e);
+      return { success: false, message: "Gagal menyimpan file Juklak" };
+    }
+    juklakUrl = `/juklak?v=${Date.now()}`;
   }
 
   // Tanda tangan bendahara (gambar) — sama pola dengan Juklak, opsional.
