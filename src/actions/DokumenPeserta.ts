@@ -4,7 +4,7 @@ import { getServerSession } from "@/lib/next-auth";
 import prisma from "@/lib/prisma";
 import { getKonfigUmum } from "@/queries/konfigUmum.query";
 import { saveUploadFile } from "@/lib/localUpload";
-import { DOKUMEN_EXT, isDokumenKey, type DokumenPeserta } from "@/lib/dokumenPeserta";
+import { DOKUMEN_EXT, isDokumenKey, type DokumenInfo, type DokumenKey } from "@/lib/dokumenPeserta";
 import { revalidatePath } from "next/cache";
 
 const MAX_MB = 15;
@@ -22,9 +22,19 @@ async function requireAdmin() {
   if (session?.user?.role !== "ADMIN") throw new Error("Forbidden");
 }
 
-async function simpanDaftar(dokumen: DokumenPeserta) {
+// Ubah satu entri langsung di kolom JSONB (bukan baca-ubah-tulis seluruh
+// objek), supaya dua upload yang berjalan bersamaan tidak saling menimpa.
+async function setEntri(key: DokumenKey, info: DokumenInfo | null) {
   await getKonfigUmum(); // pastikan baris singleton ada
-  await prisma.konfigUmum.update({ where: { id: "singleton" }, data: { dokumenPeserta: dokumen } });
+  if (info) {
+    await prisma.$executeRaw`
+      UPDATE "KonfigUmum"
+      SET "dokumenPeserta" = COALESCE("dokumenPeserta", '{}'::jsonb) || jsonb_build_object(${key}::text, ${JSON.stringify(info)}::jsonb)
+      WHERE id = 'singleton'`;
+  } else {
+    await prisma.$executeRaw`
+      UPDATE "KonfigUmum" SET "dokumenPeserta" = "dokumenPeserta" - ${key}::text WHERE id = 'singleton'`;
+  }
   revalidatePath("/", "layout");
 }
 
@@ -46,10 +56,7 @@ export async function uploadDokumenPeserta(key: string, data: FormData) {
   try {
     const namaFile = `${key}.${ext}`;
     await saveUploadFile(namaFile, buffer);
-    const konfig = await getKonfigUmum();
-    const dokumen = (konfig.dokumenPeserta ?? {}) as DokumenPeserta;
-    dokumen[key] = { file: namaFile, nama: file.name, v: Date.now() };
-    await simpanDaftar(dokumen);
+    await setEntri(key, { file: namaFile, nama: file.name, v: Date.now() });
     return { success: true, message: "Dokumen berhasil diupload" };
   } catch (e) {
     console.error("Gagal menyimpan dokumen peserta:", e);
@@ -63,10 +70,7 @@ export async function hapusDokumenPeserta(key: string) {
   await requireAdmin();
   if (!isDokumenKey(key)) return { success: false, message: "Jenis dokumen tidak dikenal" };
   try {
-    const konfig = await getKonfigUmum();
-    const dokumen = (konfig.dokumenPeserta ?? {}) as DokumenPeserta;
-    delete dokumen[key];
-    await simpanDaftar(dokumen);
+    await setEntri(key, null);
     return { success: true, message: "Dokumen dihapus" };
   } catch {
     return { success: false, message: "Gagal menghapus dokumen" };

@@ -16,7 +16,8 @@ export async function GET(_req: Request, { params }: { params: { key: string } }
   return new Response(new Uint8Array(file), {
     headers: {
       "Content-Type": DOKUMEN_EXT[ext] ?? "application/octet-stream",
-      "Content-Disposition": `attachment; filename*=UTF-8''${encodeURIComponent(info.nama)}`,
+      // filename= (ASCII) sebagai cadangan untuk klien yang tidak paham filename*.
+      "Content-Disposition": `attachment; filename="${info.nama.replace(/[^\x20-\x7e]|"/g, "_")}"; filename*=UTF-8''${encodeURIComponent(info.nama)}`,
       // URL diberi ?v=<waktu upload>, jadi tiap upload baru melewati cache browser.
       "Cache-Control": "public, max-age=300",
     },

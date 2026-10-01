@@ -17,6 +17,9 @@ export function PrimaryLinkButton({
     <Link
       href={href!}
       target={target}
+      // Link ke tab baru dipakai untuk file (mis. /juklak); prefetch Next akan
+      // mengunduh seluruh PDF untuk setiap pengunjung yang melihat tombolnya.
+      prefetch={target === "_blank" ? false : undefined}
       className={cn(
         "bg-primary-500 drop-shadow-glow hover:opacity-75 duration-300 transition-all py-3 px-6 text-white rounded-full ",
         className
