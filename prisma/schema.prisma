@@ -66,6 +66,8 @@ model Tim {
   // diisi sendiri oleh pelatih/tim lewat dashboard, bukan upload file, supaya
   // tidak perlu jatah storage Cloudinary untuk dokumen yang jarang dibuka.
   linkRekomendasi String?
+  // Link Google Drive (atau cloud lain) ke poster tim — sama pola dengan linkRekomendasi.
+  linkPoster      String?
   has_cc          Boolean           @default(false)
   has_maskot      Boolean           @default(false)
   totalVote       Int               @default(0)
@@ -518,8 +520,6 @@ model KonfigUmum {
   juklakUrl              String?
   // Video Antareja di halaman utama (bagian Alur Pendaftaran): YouTube, Google Drive, atau file video langsung.
   videoUrl               String?
-  // Link pengumpulan poster (Google Form/Drive, dll) — tombol di dashboard peserta.
-  posterUrl              String?
   // Counter kode unik pembayaran pendaftaran tim (0-999, siklus ulang) —
   // sama pola dengan KonfigVoting.counterUrut.
   counterUrutPendaftaran Int       @default(0)

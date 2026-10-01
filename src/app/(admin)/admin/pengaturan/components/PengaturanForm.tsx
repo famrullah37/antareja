@@ -26,7 +26,6 @@ type Konfig = {
   timeline: TimelineItem[] | null;
   juklakUrl: string | null;
   videoUrl: string | null;
-  posterUrl: string | null;
   bendaharaNama: string | null;
   bendaharaTtdUrl: string | null;
 };
@@ -231,32 +230,6 @@ export default function PengaturanForm({ konfig }: { konfig: Konfig }) {
           <span className="text-xs text-gray-400">
             Untuk Google Drive, pastikan file dibagikan &ldquo;Siapa saja yang memiliki link&rdquo; agar bisa diputar pengunjung.
           </span>
-        </div>
-        <button
-          type="submit"
-          className="self-start bg-primary-500 text-white rounded-lg py-2 px-6 text-sm font-semibold hover:bg-primary-600 transition-colors"
-        >
-          Simpan
-        </button>
-      </div>
-
-      {/* Pengumpulan Poster */}
-      <div className="bg-white border border-neutral-200 rounded-xl p-6 flex flex-col gap-4">
-        <h2 className="font-semibold text-lg">Pengumpulan Poster</h2>
-        <p className="text-sm text-gray-500">
-          Link tempat peserta mengumpulkan poster (mis. Google Form atau folder Google Drive). Muncul sebagai
-          tombol di dashboard peserta. Kosongkan untuk menyembunyikan tombolnya.
-        </p>
-        <div className="flex flex-col gap-1">
-          <label htmlFor="posterUrl" className="text-sm font-medium">Link Pengumpulan Poster</label>
-          <input
-            id="posterUrl"
-            type="url"
-            name="posterUrl"
-            defaultValue={konfig.posterUrl ?? ""}
-            placeholder="https://forms.gle/..."
-            className="border border-neutral-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-primary-400"
-          />
         </div>
         <button
           type="submit"

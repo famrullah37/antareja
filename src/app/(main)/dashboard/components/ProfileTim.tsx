@@ -8,7 +8,7 @@ import { TimWithRelations } from "@/types/entityRelations";
 import { AnggotaCard } from "./parts/AnggotaCard";
 import cn from "@/lib/clsx";
 import { initials } from "@/lib/initials";
-import { updateLinkRekomendasi, updateTimForm } from "@/actions/Tim";
+import { updateLinkPoster, updateLinkRekomendasi, updateTimForm } from "@/actions/Tim";
 import Field from "../components/parts/input";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -205,12 +205,16 @@ export default function ProfileTim({
     }
   }
 
-  const [savingLink, setSavingLink] = useState(false);
-  async function submitLinkRekomendasi(formData: FormData) {
-    setSavingLink(true);
+  const [savingLink, setSavingLink] = useState<"rekomendasi" | "poster" | null>(null);
+  async function submitLink(
+    kind: "rekomendasi" | "poster",
+    action: typeof updateLinkRekomendasi,
+    formData: FormData
+  ) {
+    setSavingLink(kind);
     const toastId = toast.loading("Menyimpan link...");
-    const result = await updateLinkRekomendasi(tim.id, formData);
-    setSavingLink(false);
+    const result = await action(tim.id, formData);
+    setSavingLink(null);
     if (result.success) {
       toast.success(result.message, { id: toastId });
       router.refresh();
@@ -277,7 +281,7 @@ export default function ProfileTim({
           </div>
         )}
 
-        <form action={submitLinkRekomendasi} className="flex flex-col gap-2 mb-4">
+        <form action={(fd) => submitLink("rekomendasi", updateLinkRekomendasi, fd)} className="flex flex-col gap-2 mb-4">
           <H3>Surat Rekomendasi Kepala Sekolah</H3>
           <P className="text-sm text-gray-500">
             Tempel link Google Drive (atau cloud lain) surat rekomendasi kepala sekolah — pastikan link
@@ -304,10 +308,45 @@ export default function ProfileTim({
             />
             <button
               type="submit"
-              disabled={savingLink}
+              disabled={savingLink !== null}
               className="bg-primary-500 hover:bg-primary-600 disabled:opacity-60 text-white text-sm font-semibold px-5 py-2.5 rounded-lg transition-colors shrink-0"
             >
-              {savingLink ? "Menyimpan..." : tim.linkRekomendasi ? "Ganti Link" : "Simpan Link"}
+              {savingLink === "rekomendasi" ? "Menyimpan..." : tim.linkRekomendasi ? "Ganti Link" : "Simpan Link"}
+            </button>
+          </div>
+        </form>
+
+        <form action={(fd) => submitLink("poster", updateLinkPoster, fd)} className="flex flex-col gap-2 mb-4">
+          <H3>Poster</H3>
+          <P className="text-sm text-gray-500">
+            Tempel link Google Drive (atau cloud lain) poster tim — pastikan link bisa dibuka siapa saja
+            yang punya link (share: &quot;Siapa saja yang memiliki link&quot;).
+          </P>
+          {tim.linkPoster && (
+            <a
+              href={tim.linkPoster}
+              target="_blank"
+              rel="noreferrer"
+              className="text-primary-600 hover:underline text-sm break-all"
+            >
+              {tim.linkPoster}
+            </a>
+          )}
+          <div className="flex flex-col sm:flex-row gap-2">
+            <input
+              name="linkPoster"
+              type="url"
+              placeholder="https://drive.google.com/..."
+              defaultValue={tim.linkPoster ?? ""}
+              required
+              className="flex-1 border border-neutral-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
+            />
+            <button
+              type="submit"
+              disabled={savingLink !== null}
+              className="bg-primary-500 hover:bg-primary-600 disabled:opacity-60 text-white text-sm font-semibold px-5 py-2.5 rounded-lg transition-colors shrink-0"
+            >
+              {savingLink === "poster" ? "Menyimpan..." : tim.linkPoster ? "Ganti Link" : "Simpan Link"}
             </button>
           </div>
         </form>

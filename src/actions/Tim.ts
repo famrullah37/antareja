@@ -46,10 +46,15 @@ export async function updateTimForm(id: string, formData: FormData) {
   }
 }
 
-// Link Google Drive/cloud ke surat rekomendasi kepala sekolah — diisi
-// sendiri oleh pelatih/tim lewat dashboard (bukan upload file, lihat
-// komentar di schema.prisma). Hanya pemilik tim yang boleh mengubah.
-export async function updateLinkRekomendasi(id: string, formData: FormData) {
+// Link Google Drive/cloud ke dokumen tim (surat rekomendasi kepala sekolah,
+// poster) — diisi sendiri oleh pelatih/tim lewat dashboard (bukan upload
+// file, lihat komentar di schema.prisma). Hanya pemilik tim yang boleh mengubah.
+async function updateLinkTim(
+  id: string,
+  formData: FormData,
+  field: "linkRekomendasi" | "linkPoster",
+  label: string
+) {
   const session = await getServerSession();
   if (!session?.user?.id) return { success: false, message: "Unauthorized" };
 
@@ -57,21 +62,29 @@ export async function updateLinkRekomendasi(id: string, formData: FormData) {
   if (!tim || tim.userId !== session.user.id)
     return { success: false, message: "Forbidden" };
 
-  const linkRekomendasi = (formData.get("linkRekomendasi") as string)?.trim();
-  if (!linkRekomendasi) return { success: false, message: "Link surat rekomendasi tidak boleh kosong" };
+  const link = (formData.get(field) as string)?.trim();
+  if (!link) return { success: false, message: `Link ${label} tidak boleh kosong` };
   try {
-    new URL(linkRekomendasi);
+    new URL(link);
   } catch {
     return { success: false, message: "Link tidak valid — pastikan diawali https://" };
   }
 
   try {
-    await updateTim({ id }, { linkRekomendasi });
+    await updateTim({ id }, { [field]: link });
     revalidatePath("/", "layout");
-    return { success: true, message: "Link surat rekomendasi berhasil disimpan" };
+    return { success: true, message: `Link ${label} berhasil disimpan` };
   } catch {
-    return { success: false, message: "Gagal menyimpan link surat rekomendasi" };
+    return { success: false, message: `Gagal menyimpan link ${label}` };
   }
+}
+
+export async function updateLinkRekomendasi(id: string, formData: FormData) {
+  return updateLinkTim(id, formData, "linkRekomendasi", "surat rekomendasi");
+}
+
+export async function updateLinkPoster(id: string, formData: FormData) {
+  return updateLinkTim(id, formData, "linkPoster", "poster");
 }
 
 export async function updateTimFormAdmin(data: FormData, id: string) {

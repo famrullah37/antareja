@@ -42,7 +42,6 @@ export async function upsertKonfigUmum(data: {
   timeline?: TimelineItem[] | Prisma.NullTypes.JsonNull;
   juklakUrl?: string;
   videoUrl?: string | null;
-  posterUrl?: string | null;
   bendaharaNama?: string;
   bendaharaTtdUrl?: string;
 }) {

@@ -14,7 +14,7 @@ export default async function Heading() {
 
   return (
     <SectionWrapper id="heading">
-      <HeadingClient session={session} pengumumans={pengumumans} juklakUrl={konfig.juklakUrl} posterUrl={konfig.posterUrl} />
+      <HeadingClient session={session} pengumumans={pengumumans} juklakUrl={konfig.juklakUrl} />
       <Countdown />
     </SectionWrapper>
   );

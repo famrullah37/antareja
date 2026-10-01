@@ -234,18 +234,18 @@ function FotoUnduh({ tim }: Readonly<{ tim: TimWithRelations }>) {
   );
 }
 
-function SuratRekomendasi({ tim }: Readonly<{ tim: TimWithRelations }>) {
+function LinkTim({ judul, link }: Readonly<{ judul: string; link: string | null }>) {
   return (
     <div className="mb-10">
-      <H3 className="mb-2">Surat Rekomendasi Kepala Sekolah</H3>
-      {tim.linkRekomendasi ? (
+      <H3 className="mb-2">{judul}</H3>
+      {link ? (
         <a
-          href={tim.linkRekomendasi}
+          href={link}
           target="_blank"
           rel="noreferrer"
           className="text-primary-600 hover:underline text-sm break-all"
         >
-          {tim.linkRekomendasi}
+          {link}
         </a>
       ) : (
         <P className="text-sm text-gray-400">Belum diisi tim.</P>
@@ -259,7 +259,8 @@ export default function ProfileTim({
 }: Readonly<{ tim: TimWithRelations }>) {
   return (
     <>
-      <SuratRekomendasi tim={tim} />
+      <LinkTim judul="Surat Rekomendasi Kepala Sekolah" link={tim.linkRekomendasi} />
+      <LinkTim judul="Poster" link={tim.linkPoster} />
       <FotoUnduh tim={tim} />
       <TimLayout tim={tim} />
     </>
