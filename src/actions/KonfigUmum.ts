@@ -46,6 +46,13 @@ export async function saveKonfigUmum(data: FormData) {
   }
   const videoUrl = videoUrlRaw || null;
 
+  // Link pengumpulan poster — kosong = tombolnya disembunyikan di dashboard peserta.
+  const posterUrlRaw = ((data.get("posterUrl") as string) || "").trim();
+  if (posterUrlRaw && !/^https?:\/\//i.test(posterUrlRaw)) {
+    return { success: false, message: "Link pengumpulan poster harus diawali http:// atau https://" };
+  }
+  const posterUrl = posterUrlRaw || null;
+
   // Semua section di PengaturanForm berbagi satu <form>, jadi field timeline
   // selalu ikut terkirim apa pun tombol "Simpan" yang diklik.
   const timeline: TimelineItem[] = [];
@@ -120,6 +127,7 @@ export async function saveKonfigUmum(data: FormData) {
       biayaPurna, biayaPurnaDP,
       sdAktif, smpAktif, smaAktif, purnaAktif,
       videoUrl,
+      posterUrl,
       bankNama, bankNoRek, bankAtasNama,
       timeline,
       bendaharaNama,

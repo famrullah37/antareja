@@ -2,7 +2,7 @@
 
 import { PrimaryLinkButton } from "@/app/components/global/LinkButton";
 import { H2, H3, P } from "@/app/components/global/Text";
-import { FaDownload } from "react-icons/fa";
+import { FaDownload, FaUpload } from "react-icons/fa";
 import {
   convertTimezone,
   stringifyDate,
@@ -21,9 +21,10 @@ interface HeadingClientProps {
   session: Session | null;
   pengumumans: Pengumuman[];
   juklakUrl: string | null;
+  posterUrl: string | null;
 }
 
-export default function HeadingClient({ session, pengumumans, juklakUrl }: HeadingClientProps) {
+export default function HeadingClient({ session, pengumumans, juklakUrl, posterUrl }: HeadingClientProps) {
   return (
     <>
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 w-full mb-3">
@@ -44,6 +45,15 @@ export default function HeadingClient({ session, pengumumans, juklakUrl }: Headi
               className="inline-flex gap-2 items-center"
             >
               Unduh Juklak <FaDownload />
+            </PrimaryLinkButton>
+          )}
+          {posterUrl && (
+            <PrimaryLinkButton
+              href={posterUrl}
+              target="_blank"
+              className="inline-flex gap-2 items-center"
+            >
+              Kumpulkan Poster <FaUpload />
             </PrimaryLinkButton>
           )}
         </div>
