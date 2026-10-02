@@ -34,6 +34,34 @@ export async function getLogoPng(width = 160): Promise<Buffer | null> {
   }
 }
 
+// Lambang watermark yang sudah "dipudarkan" di pikselnya (dicampur ke putih, tanpa
+// alpha). Jangan pakai doc.opacity(): sebagian viewer PDF (HP/WhatsApp) mengabaikan
+// transparansi sehingga watermark tampil pekat menutupi isi kuitansi.
+let watermarkLogoCache: Buffer | null = null;
+async function getWatermarkLogoPng(kepekatan: number): Promise<Buffer | null> {
+  if (watermarkLogoCache) return watermarkLogoCache;
+  const logo = await getLogoPng(600);
+  if (!logo) return null;
+  try {
+    const { data, info } = await sharp(logo)
+      .flatten({ background: "#ffffff" })
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    for (let i = 0; i < data.length; i++) {
+      data[i] = Math.round(255 - (255 - data[i]) * kepekatan);
+    }
+    watermarkLogoCache = await sharp(data, {
+      raw: { width: info.width, height: info.height, channels: info.channels },
+    })
+      .png()
+      .toBuffer();
+    return watermarkLogoCache;
+  } catch (e) {
+    console.error("Gagal buat watermark logo kuitansi:", e);
+    return null;
+  }
+}
+
 // Tanda tangan bendahara diupload admin lewat Pengaturan, disimpan sebagai
 // URL Cloudinary — perlu di-fetch dulu jadi Buffer sebelum bisa ditempel ke PDF.
 async function fetchImageBuffer(url: string): Promise<Buffer | null> {
@@ -123,6 +151,8 @@ export type KuitansiData = {
 // Watermark di belakang isi (digambar paling awal): lambang besar samar di tengah +
 // teks "LPKBB ANTAREJA" berulang diagonal supaya kuitansi tampak asli & sulit ditiru.
 // Kuitansi DP ditambah cap besar "SEMENTARA".
+// Semua warna watermark sudah dicampur ke putih (teks hitam 10%, lambang 10%, cap
+// merah 20% — cukup tebal supaya tetap tercetak di printer biasa) — bukan transparansi PDF, lihat getWatermarkLogoPng.
 function drawWatermark(doc: PDFKit.PDFDocument, logoBesar: Buffer | null, isDP: boolean) {
   const W = doc.page.width;
   const H = doc.page.height;
@@ -130,14 +160,14 @@ function drawWatermark(doc: PDFKit.PDFDocument, logoBesar: Buffer | null, isDP: 
   doc.save();
   if (logoBesar) {
     try {
-      doc.opacity(0.07).image(logoBesar, W / 2 - 135, H / 2 - 135, { width: 270 });
+      doc.image(logoBesar, W / 2 - 135, H / 2 - 135, { width: 270 });
     } catch {
       // Watermark gagal bukan alasan menggagalkan kuitansi.
     }
   }
 
   doc.rotate(-30, { origin: [W / 2, H / 2] });
-  doc.opacity(0.055).fillColor("#000000").font("Helvetica-Bold").fontSize(14);
+  doc.fillColor("#E6E6E6").font("Helvetica-Bold").fontSize(14);
   for (let y = -H, row = 0; y < H * 2; y += 56, row++) {
     for (let x = -W; x < W * 2; x += 150) {
       doc.text("LPKBB ANTAREJA", x + (row % 2 ? 75 : 0), y, { lineBreak: false });
@@ -145,7 +175,7 @@ function drawWatermark(doc: PDFKit.PDFDocument, logoBesar: Buffer | null, isDP: 
   }
 
   if (isDP) {
-    doc.opacity(0.14).fillColor("#D9001B").fontSize(58);
+    doc.fillColor("#F7CCD1").fontSize(58);
     doc.text("SEMENTARA", 0, H / 2 - 30, { width: W, align: "center", lineBreak: false });
   }
   doc.restore();
@@ -158,7 +188,7 @@ function drawWatermark(doc: PDFKit.PDFDocument, logoBesar: Buffer | null, isDP: 
 export async function buildKuitansiPdf(data: KuitansiData): Promise<Buffer> {
   const [logo, logoBesar, ttd] = await Promise.all([
     getLogoPng(160),
-    getLogoPng(600),
+    getWatermarkLogoPng(0.1),
     data.bendaharaTtdUrl
       ? fetchImageBuffer(data.bendaharaTtdUrl).then((b) => (b ? prepareTtdPng(b) : null))
       : Promise.resolve(null),
