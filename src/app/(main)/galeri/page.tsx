@@ -9,7 +9,7 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "Galeri Foto",
-  description: "Galeri foto dokumentasi LKBB Antareja: lihat foto aksi tim peserta dan unduh foto favoritmu.",
+  description: "Galeri foto dokumentasi LPKBB Antareja: lihat foto aksi tim peserta dan unduh foto favoritmu.",
 };
 
 export default async function GaleriPage() {
@@ -30,13 +30,13 @@ export default async function GaleriPage() {
       <div className="bg-primary-500 text-white px-6 py-14 lg:py-20">
         <div className="max-w-5xl mx-auto flex flex-col gap-4">
           <div className="text-xs font-semibold tracking-widest uppercase opacity-70">
-            LKBB Antareja 2026 — SMK Telkom Malang
+            LPKBB Antareja 2026 — SMK Telkom Malang
           </div>
           <h1 className="text-3xl lg:text-5xl font-bold leading-tight">
             Galeri Foto
           </h1>
           <p className="text-white/80 max-w-xl text-sm lg:text-base">
-            Dokumentasi lengkap LKBB Antareja 2026. Foto gratis dapat diunduh
+            Dokumentasi lengkap LPKBB Antareja 2026. Foto gratis dapat diunduh
             langsung; foto berbayar tersedia resolusi penuh setelah pembelian.
           </p>
           <div className="flex gap-6 mt-2">

@@ -54,7 +54,7 @@ export default async function Juri() {
             Dewan Juri
           </span>
           <h2 className="text-3xl sm:text-4xl font-extrabold text-white leading-tight">
-            Juri LKBB{" "}
+            Juri LPKBB{" "}
             <span className="text-primary-400">Antareja 2026</span>
           </h2>
           <p className="text-gray-400 max-w-md">

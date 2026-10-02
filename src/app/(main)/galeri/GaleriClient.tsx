@@ -242,7 +242,7 @@ export default function GaleriClient({
               <div className="relative aspect-square bg-neutral-100">
                 <Image
                   src={isGratis ? foto.pathAsli : foto.pathWatermark}
-                  alt={foto.tagTim ?? "Foto LKBB Antareja"}
+                  alt={foto.tagTim ?? "Foto LPKBB Antareja"}
                   fill
                   className="object-cover group-hover:scale-105 transition-transform duration-300"
                   sizes="(max-width: 640px) 50vw, 25vw"

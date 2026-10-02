@@ -29,7 +29,7 @@ function buildWAMessage(tr: TransaksiWithRelations) {
     .map((q, i) => `Tiket ${i + 1}${q.bundle ? ` (+ ${tr.bundleIsi})` : ""}: ${q.token}`)
     .join("\n");
   const msg = [
-    `✅ *Tiket LKBB Antareja 2026 Terverifikasi!*`,
+    `✅ *Tiket LPKBB Antareja 2026 Terverifikasi!*`,
     ``,
     `Halo *${tr.nama}*,`,
     `Tiket *${tr.tiket.jenis}* (${tr.jumlah} tiket) sudah diverifikasi.`,
@@ -39,7 +39,7 @@ function buildWAMessage(tr: TransaksiWithRelations) {
     tokens || "(belum ada token)",
     ``,
     `Tunjukkan token ini di pintu masuk.`,
-    `— LKBB Antareja 2026, SMK Telkom Malang`,
+    `— LPKBB Antareja 2026, SMK Telkom Malang`,
   ].join("\n");
   const no = tr.noHp.replace(/^0/, "62").replace(/\D/g, "");
   return `https://wa.me/${no}?text=${encodeURIComponent(msg)}`;

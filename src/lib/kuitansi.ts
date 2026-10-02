@@ -121,7 +121,7 @@ export type KuitansiData = {
 };
 
 // Watermark di belakang isi (digambar paling awal): lambang besar samar di tengah +
-// teks "LKBB ANTAREJA" berulang diagonal supaya kuitansi tampak asli & sulit ditiru.
+// teks "LPKBB ANTAREJA" berulang diagonal supaya kuitansi tampak asli & sulit ditiru.
 // Kuitansi DP ditambah cap besar "SEMENTARA".
 function drawWatermark(doc: PDFKit.PDFDocument, logoBesar: Buffer | null, isDP: boolean) {
   const W = doc.page.width;
@@ -140,7 +140,7 @@ function drawWatermark(doc: PDFKit.PDFDocument, logoBesar: Buffer | null, isDP: 
   doc.opacity(0.055).fillColor("#000000").font("Helvetica-Bold").fontSize(14);
   for (let y = -H, row = 0; y < H * 2; y += 56, row++) {
     for (let x = -W; x < W * 2; x += 150) {
-      doc.text("LKBB ANTAREJA", x + (row % 2 ? 75 : 0), y, { lineBreak: false });
+      doc.text("LPKBB ANTAREJA", x + (row % 2 ? 75 : 0), y, { lineBreak: false });
     }
   }
 
@@ -194,7 +194,7 @@ export async function buildKuitansiPdf(data: KuitansiData): Promise<Buffer> {
     if (data.isDP) {
       doc.fontSize(11).text("Pembayaran Uang Muka (DP 50%)", { align: "center" });
     }
-    doc.fontSize(11).font("Helvetica").text("LKBB Antareja 2026 - SMK Telkom Malang", { align: "center" });
+    doc.fontSize(11).font("Helvetica").text("LPKBB Antareja 2026 - SMK Telkom Malang", { align: "center" });
     doc.moveDown(1.5);
 
     const rows: [string, string][] = [

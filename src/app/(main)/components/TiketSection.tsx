@@ -22,10 +22,10 @@ export default async function TiketSection() {
               Tiket Penonton
             </span>
             <h2 className="text-3xl sm:text-4xl font-extrabold text-black leading-tight">
-              Tiket LKBB <span className="text-primary-500">Antareja</span>
+              Tiket LPKBB <span className="text-primary-500">Antareja</span>
             </h2>
             <p className="text-gray-500 max-w-md">
-              Saksikan kemegahan LKBB Antareja Season 4 — SMK Telkom Malang.
+              Saksikan kemegahan LPKBB Antareja Season 4 — SMK Telkom Malang.
             </p>
           </div>
           {available.length > 0 && (

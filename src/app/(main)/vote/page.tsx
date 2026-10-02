@@ -16,7 +16,7 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "Dukung Tim Favorit",
-  description: "Berikan dukunganmu untuk tim favorit di LKBB Antareja 2026 dan pantau papan peringkat dukungan secara langsung.",
+  description: "Berikan dukunganmu untuk tim favorit di LPKBB Antareja 2026 dan pantau papan peringkat dukungan secara langsung.",
 };
 
 export default async function VotePage() {
@@ -42,7 +42,7 @@ export default async function VotePage() {
     <section className="max-w-3xl mx-auto py-12 px-4">
       <h1 className="text-3xl font-bold mb-2">Dukung Tim Favoritmu</h1>
       <p className="text-gray-500 mb-8">
-        Berikan dukungan berbayar untuk tim LKBB Antareja 2026 favoritmu. Setiap dukungan yang terverifikasi dihitung sebagai 1 suara.
+        Berikan dukungan berbayar untuk tim LPKBB Antareja 2026 favoritmu. Setiap dukungan yang terverifikasi dihitung sebagai 1 suara.
       </p>
 
       {!konfig?.aktif ? (

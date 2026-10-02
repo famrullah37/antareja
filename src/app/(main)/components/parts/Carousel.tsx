@@ -49,7 +49,7 @@ const galleryItems: GalleryItemProps[] = [
   {
     image: "/image/galeri/image-8.jpg",
     title: "Apel Pembukaan",
-    description: "Apel pembukaan LKBB Antareja 2023",
+    description: "Apel pembukaan LPKBB Antareja 2023",
   },
   {
     image: "/image/galeri/image-9.jpg",

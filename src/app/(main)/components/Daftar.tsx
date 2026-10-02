@@ -29,7 +29,7 @@ export default function Daftar() {
               <span className="text-primary-400">bersama Antareja</span>
             </h2>
             <p className="text-gray-300 text-sm sm:text-base leading-relaxed max-w-md">
-              Daftarkan tim terbaikmu dan raih penghargaan di ajang LKBB paling bergengsi
+              Daftarkan tim terbaikmu dan raih penghargaan di ajang LPKBB paling bergengsi
               se-Jawa Timur.
             </p>
           </div>

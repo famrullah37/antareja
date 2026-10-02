@@ -392,7 +392,7 @@ export async function verifikasiTiket(transaksiId: string) {
     try {
       await sendMailTo({
         to: transaksi.email,
-        subject: `✅ Tiket LKBB Antareja 2026 — ${transaksi.tiket.jenis}`,
+        subject: `✅ Tiket LPKBB Antareja 2026 — ${transaksi.tiket.jenis}`,
         html: `
           <div style="font-family:sans-serif;max-width:520px;margin:auto">
             <h2 style="color:#F70048">Tiket Anda Terverifikasi!</h2>
@@ -406,7 +406,7 @@ export async function verifikasiTiket(transaksiId: string) {
               </div>
               <p style="margin:12px 0 0;font-size:12px;color:#888">Screenshot email ini atau tunjukkan langsung di pintu masuk.</p>
             </div>
-            <p style="font-size:12px;color:#aaa">LKBB Antareja 2026 — SMK Telkom Malang</p>
+            <p style="font-size:12px;color:#aaa">LPKBB Antareja 2026 — SMK Telkom Malang</p>
           </div>
         `,
       });

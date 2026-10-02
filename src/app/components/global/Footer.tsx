@@ -39,7 +39,7 @@ export default function Footer() {
               className="w-14 h-[19px] lg:w-[125px] lg:h-[44px]"
             />
             <P className="text-base text-wrap text-neutral-200">
-              Website resmi LKBB Antareja tingkat Jawa Timur yang
+              Website resmi LPKBB Antareja tingkat Jawa Timur yang
               diselenggarakan oleh SMK Telkom Malang.
             </P>
             <a

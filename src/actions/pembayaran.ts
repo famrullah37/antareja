@@ -145,7 +145,7 @@ async function generateDanKirimKuitansi(timId: string, hargaDasar: number) {
     try {
       await sendMailTo({
         to: tim.user.email,
-        subject: `${tim.pembayaran.isDP ? "Kuitansi Sementara (DP)" : "Kuitansi Pembayaran"} Pendaftaran - LKBB Antareja 2026 (${terbit.nomor})`,
+        subject: `${tim.pembayaran.isDP ? "Kuitansi Sementara (DP)" : "Kuitansi Pembayaran"} Pendaftaran - LPKBB Antareja 2026 (${terbit.nomor})`,
         html: `<p>Halo ${escapeHtml(tim.pelatih)},</p><p>Pembayaran pendaftaran tim <b>${escapeHtml(tim.nama_tim)}</b> (${escapeHtml(tim.asal_sekolah)}) sudah terverifikasi${tim.pembayaran.isDP ? " (DP 50%)" : " (Lunas)"}. ${tim.pembayaran.isDP ? "Kuitansi <b>sementara</b> (DP) terlampir; akan digantikan kuitansi resmi setelah pelunasan." : "Kuitansi terlampir sebagai bukti resmi."}</p><p>No. Kuitansi: <b>${terbit.nomor}</b></p><p>Terima kasih.</p>`,
         fileAttachments: [{ filename: namaFile, content: pdfBuffer, contentType: "application/pdf" }],
       });

@@ -40,7 +40,7 @@ export type mailMetaData = {
 export const sendMailTo = async (metadata: mailMetaData) => {
   try {
     return await transporter.sendMail({
-    from: `"LKBB Antareja 2026" <${smtpUser}>`,
+    from: `"LPKBB Antareja 2026" <${smtpUser}>`,
     to: metadata.to,
     subject: metadata.subject,
     text: metadata.text,

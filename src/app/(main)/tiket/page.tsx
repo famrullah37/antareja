@@ -6,7 +6,7 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "Tiket Penonton",
-  description: "Beli tiket penonton LKBB Antareja 2026 dan saksikan langsung aksi tim-tim terbaik se-Jawa Timur.",
+  description: "Beli tiket penonton LPKBB Antareja 2026 dan saksikan langsung aksi tim-tim terbaik se-Jawa Timur.",
 };
 
 export default async function TiketPage() {
@@ -20,7 +20,7 @@ export default async function TiketPage() {
     <section className="max-w-3xl mx-auto py-12 px-4">
       <h1 className="text-3xl font-bold mb-2">Beli Tiket</h1>
       <p className="text-gray-500 mb-8">
-        Tiket LKBB Antareja 2026 — SMK Telkom Malang, 15 November 2026
+        Tiket LPKBB Antareja 2026 — SMK Telkom Malang, 15 November 2026
       </p>
 
       {tikets.length === 0 ? (

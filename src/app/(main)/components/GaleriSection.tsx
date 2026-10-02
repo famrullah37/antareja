@@ -18,7 +18,7 @@ export default async function GaleriSection() {
         <div className="flex flex-col gap-2">
           <H2>Galeri Foto</H2>
           <P className="text-gray-500">
-            Dokumentasi LKBB Antareja 2026 — SMK Telkom Malang
+            Dokumentasi LPKBB Antareja 2026 — SMK Telkom Malang
           </P>
         </div>
 
@@ -32,7 +32,7 @@ export default async function GaleriSection() {
               >
                 <Image
                   src={isGratis ? foto.pathAsli : foto.pathWatermark}
-                  alt={foto.tagTim ?? "Foto LKBB Antareja"}
+                  alt={foto.tagTim ?? "Foto LPKBB Antareja"}
                   fill
                   className="object-cover group-hover:scale-105 transition-transform duration-300"
                   sizes="(max-width: 640px) 50vw, 25vw"

@@ -2,22 +2,22 @@
 // tidak menambah kolom/query di tiap halaman. Ubah di sini lalu deploy. Video Antareja tetap
 // diatur admin lewat Pengaturan karena memang sering diganti.
 export const siteConfig = {
-  name: "LKBB Antareja",
-  title: "LKBB Antareja 2026 | Lomba Baris Berbaris SMK Telkom Malang",
+  name: "LPKBB Antareja",
+  title: "LPKBB Antareja 2026 | Lomba Baris Berbaris SMK Telkom Malang",
   description:
-    "Website resmi LKBB Antareja 2026, lomba keterampilan baris-berbaris tingkat Jawa Timur yang diselenggarakan SMK Telkom Malang. Daftarkan tim, lihat jadwal dan kategori lomba, galeri foto, serta dukung tim favoritmu.",
+    "Website resmi LPKBB Antareja 2026, lomba keterampilan baris-berbaris tingkat Jawa Timur yang diselenggarakan SMK Telkom Malang. Daftarkan tim, lihat jadwal dan kategori lomba, galeri foto, serta dukung tim favoritmu.",
   keywords: [
-    "LKBB Antareja",
+    "LPKBB Antareja",
     "Antareja",
     "lomba baris berbaris",
-    "LKBB Jawa Timur",
+    "LPKBB Jawa Timur",
     "lomba paskibra",
     "PBB",
     "SMK Telkom Malang",
-    "pendaftaran LKBB",
+    "pendaftaran LPKBB",
     "PASKI",
     "PASKIBRA",
-    "LKBB",
+    "LPKBB",
     "LPKBB",
     "pasukan pengibar bendera",
     "ekstrakurikuler paskibra",
@@ -26,7 +26,7 @@ export const siteConfig = {
     "lomba paskibra 2026",
     "lomba paskibra Malang",
     "lomba paskibra Jawa Timur",
-    "LKBB SMK Telkom Malang",
+    "LPKBB SMK Telkom Malang",
     "juara paskibra",
     "tim paskibra sekolah",
   ],
@@ -47,6 +47,6 @@ export const siteConfig = {
   whatsapp: {
     number: "6285198240667",
     display: "+62 851-9824-0667",
-    message: "Halo Panitia LKBB Antareja, saya ingin bertanya.",
+    message: "Halo Panitia LPKBB Antareja, saya ingin bertanya.",
   },
 } as const;
