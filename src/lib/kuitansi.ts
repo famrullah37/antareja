@@ -47,6 +47,67 @@ async function fetchImageBuffer(url: string): Promise<Buffer | null> {
   }
 }
 
+// pdfkit sering salah baca alpha PNG (palette/grayscale+alpha) sehingga latar
+// transparan tanda tangan jadi kotak hitam. Normalkan ke PNG RGBA 8-bit: tinta
+// gelap di atas latar transparan, supaya watermark tetap terlihat di belakangnya.
+// - Gambar ber-alpha: pakai alpha aslinya, tinta diwarnai gelap (tinta putih/abu
+//   di file transparan tetap terbaca di kertas putih).
+// - Gambar tanpa alpha (scan/foto): alpha dari kegelapan piksel; kalau latarnya
+//   gelap (tinta terang di latar hitam), dibalik dulu.
+async function prepareTtdPng(input: Buffer): Promise<Buffer | null> {
+  try {
+    const { data, info } = await sharp(input)
+      .rotate()
+      .resize({ width: 600, height: 300, fit: "inside", withoutEnlargement: true })
+      .ensureAlpha()
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+
+    const px = info.width * info.height;
+    let transparan = 0;
+    let totalLum = 0;
+    for (let i = 0; i < px; i++) {
+      const o = i * 4;
+      if (data[o + 3] < 250) transparan++;
+      totalLum += 0.299 * data[o] + 0.587 * data[o + 1] + 0.114 * data[o + 2];
+    }
+    const pakaiAlpha = transparan > px * 0.01;
+    const latarGelap = totalLum / px < 128;
+    const lumAt = (o: number) => {
+      const l = 0.299 * data[o] + 0.587 * data[o + 1] + 0.114 * data[o + 2];
+      return latarGelap ? 255 - l : l;
+    };
+
+    // Tinta tergelap -> alpha penuh, latar (dekat putih) -> transparan, supaya
+    // tinta pudar (pensil/abu-abu) tetap tebal di kuitansi.
+    let minLum = 255;
+    if (!pakaiAlpha) for (let i = 0; i < px; i++) minLum = Math.min(minLum, lumAt(i * 4));
+    const batasLatar = Math.min(230, minLum + 0.85 * (255 - minLum));
+
+    for (let i = 0; i < px; i++) {
+      const o = i * 4;
+      let alpha: number;
+      if (pakaiAlpha) {
+        alpha = data[o + 3];
+      } else {
+        const t = (batasLatar - lumAt(o)) / Math.max(1, batasLatar - minLum);
+        alpha = Math.round(Math.max(0, Math.min(1, t)) * 255);
+      }
+      data[o] = 0x1a;
+      data[o + 1] = 0x1a;
+      data[o + 2] = 0x2e;
+      data[o + 3] = alpha;
+    }
+
+    return await sharp(data, { raw: { width: info.width, height: info.height, channels: 4 } })
+      .png({ palette: false })
+      .toBuffer();
+  } catch (e) {
+    console.error("Gagal proses tanda tangan untuk kuitansi:", e);
+    return null;
+  }
+}
+
 export type KuitansiData = {
   nomor: string;
   namaTim: string;
@@ -98,7 +159,9 @@ export async function buildKuitansiPdf(data: KuitansiData): Promise<Buffer> {
   const [logo, logoBesar, ttd] = await Promise.all([
     getLogoPng(160),
     getLogoPng(600),
-    data.bendaharaTtdUrl ? fetchImageBuffer(data.bendaharaTtdUrl) : Promise.resolve(null),
+    data.bendaharaTtdUrl
+      ? fetchImageBuffer(data.bendaharaTtdUrl).then((b) => (b ? prepareTtdPng(b) : null))
+      : Promise.resolve(null),
   ]);
 
   return new Promise((resolve, reject) => {
@@ -174,16 +237,18 @@ export async function buildKuitansiPdf(data: KuitansiData): Promise<Buffer> {
     );
     doc.text("Bendahara,", signX, doc.y, { width: 160, align: "center" });
 
+    // Ruang tanda tangan dihitung eksplisit (bukan moveDown) supaya gambar
+    // tidak menimpa nama bendahara di bawahnya.
+    const ttdTop = doc.y + 4;
+    const ttdH = 50;
     if (ttd) {
       try {
-        doc.image(ttd, signX + 30, doc.y + 4, { width: 100, height: 50, fit: [100, 50] });
-        doc.moveDown(4);
+        doc.image(ttd, signX + 30, ttdTop, { fit: [100, ttdH], align: "center", valign: "center" });
       } catch {
-        doc.moveDown(4);
+        // Tanda tangan gagal ditempel bukan alasan gagalkan kuitansi.
       }
-    } else {
-      doc.moveDown(4);
     }
+    doc.y = ttdTop + ttdH + 6;
 
     doc.font("Helvetica-Bold").text(data.bendaharaNama || "(________________)", signX, doc.y, {
       width: 160,
