@@ -12,6 +12,7 @@ import { findSertifikatByTim } from "@/queries/sertifikat.query";
 import TiketSayaSection from "./components/TiketSayaSection";
 import NilaiAkhirSection from "./components/NilaiAkhirSection";
 import SertifikatSection from "./components/SertifikatSection";
+import UjiCobaSection from "./components/UjiCobaSection";
 import { biayaPendaftaran } from "@/actions/pembayaran";
 import { getKonfigUmum } from "@/queries/konfigUmum.query";
 import {
@@ -56,6 +57,7 @@ export default async function TimDashboard() {
     <>
       <Heading />
       <ProfileTim tim={tim} penilaian={tim.penilaian ?? null} biayaDasar={biayaDasar} dokumen={dokumen} />
+      <UjiCobaSection timId={tim.id} confirmed={tim.confirmed} batas={konfig.ujiCobaBatas} />
       <NilaiAkhirSection penilaianBaru={penilaianBaru as any} />
       <SertifikatSection sertifikat={sertifikat as any} />
       <TiketSayaSection transaksis={transaksiTikets as any} />

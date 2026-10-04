@@ -13,6 +13,7 @@ const SIE_LOMBA_ROUTES = [
   "/admin/penghargaan",
   "/admin/sertifikat",
   "/admin/pengumuman",
+  "/admin/uji-coba",
 ];
 
 const STAFF_ROUTES: Record<string, string[]> = {

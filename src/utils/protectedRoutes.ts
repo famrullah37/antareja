@@ -10,6 +10,7 @@ export const protectedRoutes: ProtectedRoutes[] = [
   { title: "Tim", path: "/admin/tim", roles: ["ADMIN", "SIE_LOMBA"] },
   { title: "Pembayaran", path: "/admin/pembayaran", roles: ["ADMIN", "BENDAHARA"] },
   { title: "Pengumuman", path: "/admin/pengumuman", roles: ["ADMIN", "SIE_LOMBA"] },
+  { title: "Uji Coba Lapangan", path: "/admin/uji-coba", roles: ["ADMIN", "SIE_LOMBA"] },
   { title: "Juri", path: "/admin/juri", roles: ["ADMIN", "SIE_LOMBA"] },
   { title: "Penghargaan", path: "/admin/penghargaan", roles: ["ADMIN", "SIE_LOMBA"] },
   { title: "Galeri", path: "/admin/galeri", roles: ["ADMIN"] },

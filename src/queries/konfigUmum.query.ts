@@ -50,6 +50,7 @@ export async function upsertKonfigUmum(data: {
   videoUrl?: string | null;
   bendaharaNama?: string;
   bendaharaTtdUrl?: string;
+  ujiCobaBatas?: Date | null;
 }) {
   return prisma.konfigUmum.upsert({
     where: { id: SINGLETON_ID },
