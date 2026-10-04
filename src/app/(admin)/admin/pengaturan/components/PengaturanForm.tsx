@@ -119,6 +119,9 @@ export default function PengaturanForm({ konfig }: { konfig: Konfig }) {
         <h2 className="font-semibold text-lg">Timeline Perlombaan</h2>
         <p className="text-sm text-gray-500">
           4 tahap yang ditampilkan di section Timeline halaman utama. Judul & tanggal wajib diisi.
+          Tanggal & jam Tahap 4 (Pelaksanaan Lomba) juga dipakai di halaman tiket dan data
+          acara untuk Google — tulis tanggal seperti &quot;14 November 2026&quot; dan jam seperti
+          &quot;06.00 WIB&quot; supaya terbaca.
         </p>
         {(konfig.timeline && konfig.timeline.length === 4 ? konfig.timeline : defaultTimelineForForm).map(
           (item, idx) => (
@@ -145,15 +148,26 @@ export default function PengaturanForm({ konfig }: { konfig: Konfig }) {
                   />
                 </div>
               </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium text-gray-500">Tanggal</label>
-                <input
-                  name={`timelineDate${idx + 1}`}
-                  defaultValue={item.dateString}
-                  placeholder="1 Sep – 8 Nov 2026"
-                  required
-                  className="border border-neutral-300 rounded-lg px-3 py-2 text-sm"
-                />
+              <div className="grid sm:grid-cols-[1fr_200px] gap-3">
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium text-gray-500">Tanggal</label>
+                  <input
+                    name={`timelineDate${idx + 1}`}
+                    defaultValue={item.dateString}
+                    placeholder="1 Sep – 8 Nov 2026"
+                    required
+                    className="border border-neutral-300 rounded-lg px-3 py-2 text-sm"
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium text-gray-500">Jam (opsional)</label>
+                  <input
+                    name={`timelineJam${idx + 1}`}
+                    defaultValue={item.jam ?? ""}
+                    placeholder="06.00 WIB – selesai"
+                    className="border border-neutral-300 rounded-lg px-3 py-2 text-sm"
+                  />
+                </div>
               </div>
               <div className="flex flex-col gap-1">
                 <label className="text-xs font-medium text-gray-500">Deskripsi</label>

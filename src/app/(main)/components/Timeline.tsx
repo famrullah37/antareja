@@ -18,13 +18,15 @@ const defaultTimeline: TimelineItem[] = [
   {
     title: "Uji Coba Lapangan",
     dateString: "13 November 2026",
+    jam: "15.00–22.30 WIB",
     description: "15.00–18.00 WIB (Malang) · 19.00–22.30 WIB (Luar Malang)",
     icon: "🏃",
   },
   {
     title: "Pelaksanaan Lomba",
     dateString: "14 November 2026",
-    description: "06.00 WIB – selesai di SMK Telkom Malang",
+    jam: "06.00 WIB – selesai",
+    description: "Dilaksanakan di SMK Telkom Malang",
     icon: "🏆",
   },
 ];
@@ -68,7 +70,10 @@ export default function Timeline({ items }: { items?: TimelineItem[] | null }) {
                   <span className="text-xl">{item.icon}</span>
                   <span className="font-bold text-gray-800">{item.title}</span>
                 </div>
-                <span className="text-primary-500 font-semibold text-sm">{item.dateString}</span>
+                <span className="text-primary-500 font-semibold text-sm">
+                  {item.dateString}
+                  {item.jam && <span className="font-medium"> · {item.jam}</span>}
+                </span>
                 <span className="text-gray-500 text-sm leading-relaxed">{item.description}</span>
               </div>
             </div>
@@ -94,6 +99,9 @@ export default function Timeline({ items }: { items?: TimelineItem[] | null }) {
                 <div className="inline-flex px-2.5 py-1 bg-primary-50 text-primary-600 text-xs font-bold rounded-lg w-fit">
                   {item.dateString}
                 </div>
+                {item.jam && (
+                  <span className="text-primary-600 text-xs font-semibold -mt-1">{item.jam}</span>
+                )}
                 <p className="font-bold text-gray-800 text-sm leading-snug">{item.title}</p>
                 <p className="text-gray-500 text-xs leading-relaxed">{item.description}</p>
               </div>

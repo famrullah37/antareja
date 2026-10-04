@@ -62,29 +62,6 @@ const jsonLd = {
       inLanguage: "id-ID",
       publisher: { "@id": `${siteConfig.url}/#organisasi` },
     },
-    {
-      "@type": "SportsEvent",
-      "@id": `${siteConfig.url}/#acara`,
-      name: siteConfig.event.name,
-      description: siteConfig.description,
-      url: siteConfig.url,
-      image: [ogImageUrl],
-      startDate: siteConfig.event.startDate,
-      endDate: siteConfig.event.endDate,
-      eventStatus: "https://schema.org/EventScheduled",
-      eventAttendanceMode: "https://schema.org/OfflineEventAttendanceMode",
-      location: {
-        "@type": "Place",
-        name: siteConfig.event.venue,
-        address: { "@type": "PostalAddress", ...siteConfig.event.address },
-      },
-      organizer: { "@id": `${siteConfig.url}/#organisasi` },
-      offers: {
-        "@type": "Offer",
-        url: `${siteConfig.url}/tiket`,
-        availability: "https://schema.org/InStock",
-      },
-    },
   ],
 };
 

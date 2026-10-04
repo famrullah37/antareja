@@ -39,13 +39,9 @@ export const siteConfig = {
   ogImage: "/og-image.jpg",
   logo: "/icon-512.png",
   organizer: "SMK Telkom Malang",
-  // Data acara untuk schema.org Event (hasil pencarian Google bisa menampilkan
-  // tanggal & lokasi). Perbarui tiap season.
+  // Lokasi acara untuk schema.org Event (lihat EventJsonLd). Tanggal & jamnya
+  // TIDAK di sini — diambil dari tahap terakhir timeline di Pengaturan admin.
   event: {
-    name: "LPKBB Antareja 2026",
-    // Mulai 06.00 WIB (sesuai timeline), selesainya tidak pasti → endDate cukup tanggal.
-    startDate: "2026-11-14T06:00:00+07:00",
-    endDate: "2026-11-14",
     venue: "SMK Telkom Malang",
     address: {
       streetAddress: "Jl. Danau Ranau, Sawojajar",

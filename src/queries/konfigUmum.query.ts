@@ -7,6 +7,8 @@ const SINGLETON_ID = "singleton";
 export type TimelineItem = {
   title: string;
   dateString: string;
+  // Opsional (ditambahkan belakangan, data lama tidak punya), teks bebas mis. "06.00 WIB – selesai".
+  jam?: string;
   description: string;
   icon: string;
 };

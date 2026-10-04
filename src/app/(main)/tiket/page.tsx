@@ -1,6 +1,9 @@
 import { findTikets, findKonfigTiket } from "@/queries/tiket.query";
 import { getServerSession } from "@/lib/next-auth";
 import BeliTiketForm from "./BeliTiketForm";
+import { getKonfigUmum, type TimelineItem } from "@/queries/konfigUmum.query";
+import { getInfoAcara } from "@/lib/acara";
+import { siteConfig } from "@/config/site";
 
 import type { Metadata } from "next";
 
@@ -10,17 +13,22 @@ export const metadata: Metadata = {
 };
 
 export default async function TiketPage() {
-  const [tikets, session, konfig] = await Promise.all([
+  const [tikets, session, konfig, konfigUmum] = await Promise.all([
     findTikets(),
     getServerSession(),
     findKonfigTiket(),
+    getKonfigUmum(),
   ]);
+  // Tanggal & jam dari tahap terakhir timeline di Pengaturan (lihat lib/acara.ts).
+  const acara = getInfoAcara(konfigUmum.timeline as TimelineItem[] | null);
 
   return (
     <section className="max-w-3xl mx-auto py-12 px-4">
       <h1 className="text-3xl font-bold mb-2">Beli Tiket</h1>
       <p className="text-gray-500 mb-8">
-        Tiket LPKBB Antareja 2026 — SMK Telkom Malang, 14 November 2026
+        Tiket {siteConfig.name} — {siteConfig.event.venue}
+        {acara && `, ${acara.tanggalTeks}`}
+        {acara?.jamTeks && ` · ${acara.jamTeks}`}
       </p>
 
       {tikets.length === 0 ? (

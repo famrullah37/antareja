@@ -52,12 +52,13 @@ export async function saveKonfigUmum(data: FormData) {
   for (let i = 1; i <= 4; i++) {
     const title = ((data.get(`timelineTitle${i}`) as string) || "").trim();
     const dateString = ((data.get(`timelineDate${i}`) as string) || "").trim();
+    const jam = ((data.get(`timelineJam${i}`) as string) || "").trim();
     const description = ((data.get(`timelineDesc${i}`) as string) || "").trim();
     const icon = ((data.get(`timelineIcon${i}`) as string) || "").trim();
     if (!title || !dateString) {
       return { success: false, message: `Judul & tanggal tahap ${i} timeline wajib diisi` };
     }
-    timeline.push({ title, dateString, description, icon: icon || "📌" });
+    timeline.push({ title, dateString, ...(jam ? { jam } : {}), description, icon: icon || "📌" });
   }
 
   const countdownTarget = parseWibDatetimeLocal(countdownRaw);
