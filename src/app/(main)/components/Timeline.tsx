@@ -17,13 +17,13 @@ const defaultTimeline: TimelineItem[] = [
   },
   {
     title: "Uji Coba Lapangan",
-    dateString: "14 November 2026",
+    dateString: "13 November 2026",
     description: "15.00–18.00 WIB (Malang) · 19.00–22.30 WIB (Luar Malang)",
     icon: "🏃",
   },
   {
     title: "Pelaksanaan Lomba",
-    dateString: "15 November 2026",
+    dateString: "14 November 2026",
     description: "06.00 WIB – selesai di SMK Telkom Malang",
     icon: "🏆",
   },

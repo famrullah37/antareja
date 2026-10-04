@@ -18,7 +18,9 @@ export const siteConfig = {
     "PASKI",
     "PASKIBRA",
     "LPKBB",
-    "LPKBB",
+    // Nama lama (sebelum jadi LPKBB) — masih banyak dicari orang.
+    "LKBB Antareja",
+    "LKBB",
     "pasukan pengibar bendera",
     "ekstrakurikuler paskibra",
     "kompetisi paskibra",
@@ -37,6 +39,22 @@ export const siteConfig = {
   ogImage: "/og-image.jpg",
   logo: "/icon-512.png",
   organizer: "SMK Telkom Malang",
+  // Data acara untuk schema.org Event (hasil pencarian Google bisa menampilkan
+  // tanggal & lokasi). Perbarui tiap season.
+  event: {
+    name: "LPKBB Antareja 2026",
+    // Mulai 06.00 WIB (sesuai timeline), selesainya tidak pasti → endDate cukup tanggal.
+    startDate: "2026-11-14T06:00:00+07:00",
+    endDate: "2026-11-14",
+    venue: "SMK Telkom Malang",
+    address: {
+      streetAddress: "Jl. Danau Ranau, Sawojajar",
+      addressLocality: "Kota Malang",
+      addressRegion: "Jawa Timur",
+      postalCode: "65139",
+      addressCountry: "ID",
+    },
+  },
   social: {
     tiktok: "https://www.tiktok.com/@lpkbb.antareja",
     instagram: "https://www.instagram.com/lpkbb.antareja",

@@ -1,5 +1,6 @@
 import prisma from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
+import { cache } from "react";
 
 const SINGLETON_ID = "singleton";
 
@@ -10,11 +11,14 @@ export type TimelineItem = {
   icon: string;
 };
 
-export async function getKonfigUmum() {
+// cache() = satu query per request: beranda memanggil ini dari page, Hero,
+// Kategori & Video sekaligus. Hanya berlaku dalam satu request (bukan cache
+// lintas pengunjung), jadi perubahan dari Pengaturan tetap langsung terlihat.
+export const getKonfigUmum = cache(async () => {
   const config = await prisma.konfigUmum.findUnique({ where: { id: SINGLETON_ID } });
   if (config) return config;
   return prisma.konfigUmum.create({ data: { id: SINGLETON_ID } });
-}
+});
 
 export async function upsertKonfigUmum(data: {
   countdownTarget?: Date;

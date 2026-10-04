@@ -51,15 +51,16 @@ export default async function Hero() {
               </span>
             </div>
 
-            <div className="flex flex-col gap-2">
-              <h1 className="text-5xl sm:text-6xl lg:text-7xl font-extrabold text-white leading-[1.05] tracking-tight">
-                AKSI TELKOM
-              </h1>
-              <h1 className="text-5xl sm:text-6xl lg:text-7xl font-extrabold leading-[1.05] tracking-tight">
+            {/* Satu h1 per halaman. Nama acara (sr-only) ikut di h1 supaya mesin
+                pencari membaca judul utama "LPKBB Antareja 2026", bukan slogan saja. */}
+            <h1 className="flex flex-col gap-2 text-5xl sm:text-6xl lg:text-7xl font-extrabold leading-[1.05] tracking-tight">
+              <span className="sr-only">LPKBB Antareja 2026: </span>
+              <span className="text-white">AKSI TELKOM</span>
+              <span>
                 <span className="text-white">BARISAN </span>
                 <span className="italic text-primary-400">JAWARA</span>
-              </h1>
-            </div>
+              </span>
+            </h1>
 
             <p className="text-white/70 text-base sm:text-lg max-w-lg leading-relaxed">
               Selamat datang di website resmi Lomba Ketangkasan Baris Berbaris

@@ -38,11 +38,13 @@ export default function ComingSoon({ target }: { target: Date | null }) {
       </div>
 
       <h1 className="text-4xl sm:text-6xl font-extrabold text-white leading-tight tracking-tight mb-4">
+        <span className="sr-only">LPKBB Antareja 2026 </span>
         Segera <span className="italic text-primary-400">Hadir</span>
       </h1>
       <p className="text-white/70 text-base sm:text-lg max-w-xl leading-relaxed mb-10">
-        Kami sedang menyiapkan sesuatu yang seru untuk Lomba Ketangkasan Baris
-        Berbaris. Nantikan pengumuman resmi kami segera.
+        Kami sedang menyiapkan sesuatu yang seru untuk LPKBB Antareja 2026, lomba
+        baris-berbaris tingkat Jawa Timur di SMK Telkom Malang. Nantikan pengumuman
+        resmi kami segera.
       </p>
 
       {target && (

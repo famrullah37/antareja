@@ -20,7 +20,7 @@ export default async function TiketPage() {
     <section className="max-w-3xl mx-auto py-12 px-4">
       <h1 className="text-3xl font-bold mb-2">Beli Tiket</h1>
       <p className="text-gray-500 mb-8">
-        Tiket LPKBB Antareja 2026 — SMK Telkom Malang, 15 November 2026
+        Tiket LPKBB Antareja 2026 — SMK Telkom Malang, 14 November 2026
       </p>
 
       {tikets.length === 0 ? (
