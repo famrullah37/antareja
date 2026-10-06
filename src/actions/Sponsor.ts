@@ -11,7 +11,7 @@ import { revalidatePath } from "next/cache";
 
 async function requireAdmin() {
   const session = await getServerSession();
-  if (session?.user?.role !== "ADMIN") throw new Error("Forbidden");
+  if (!["ADMIN", "SIE_HUMAS"].includes(session?.user?.role ?? "")) throw new Error("Forbidden");
 }
 
 export async function createSponsorForm(data: FormData) {

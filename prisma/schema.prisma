@@ -579,6 +579,23 @@ model Sponsor {
   aktif   Boolean @default(true)
 }
 
+// Berita/blog publik (/berita), dikelola ADMIN & SIE_HUMAS. Beda dengan
+// Pengumuman (khusus peserta, dikelola SIE_LOMBA). konten teks biasa: paragraf
+// dipisah baris kosong. slug unik disimpan supaya URL tetap walau judul diedit.
+model Berita {
+  id          String    @id @default(uuid())
+  judul       String
+  slug        String    @unique
+  ringkasan   String?
+  konten      String
+  coverUrl    String?
+  publish     Boolean   @default(false)
+  publishedAt DateTime?
+  penulis     String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
 // ─── Sertifikat ───────────────────────────────────────────────────────────────
 
 model Sertifikat {
@@ -623,6 +640,7 @@ enum Role {
   TIKET
   BENDAHARA
   SIE_LOMBA
+  SIE_HUMAS
 }
 
 enum Tipe {

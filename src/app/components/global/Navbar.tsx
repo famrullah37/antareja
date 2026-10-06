@@ -24,6 +24,7 @@ const PublicNav: NavOption[] = [
   { label: "Juri", href: "/#juri" },
   { label: "Tiket", href: "/#tiket" },
   { label: "Galeri", href: "/galeri" },
+  { label: "Berita", href: "/berita" },
   { label: "Vote", href: "/vote" },
 ];
 
@@ -35,6 +36,7 @@ function memberNav(role?: string): NavOption[] {
     role === "USER" ? { label: "Dashboard", href: "/dashboard" } : { label: "Admin Panel", href: "/admin" },
     { label: "Tiket", href: "/#tiket" },
     { label: "Galeri", href: "/galeri" },
+    { label: "Berita", href: "/berita" },
     { label: "Vote", href: "/vote" },
   ];
 }

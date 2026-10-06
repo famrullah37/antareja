@@ -5,6 +5,7 @@ import { siteConfig } from "@/config/site";
 const routes: { path: string; priority: number; changeFrequency: "daily" | "weekly" | "monthly" }[] = [
   { path: "/", priority: 1, changeFrequency: "weekly" },
   { path: "/galeri", priority: 0.8, changeFrequency: "weekly" },
+  { path: "/berita", priority: 0.8, changeFrequency: "weekly" },
   { path: "/vote", priority: 0.7, changeFrequency: "daily" },
   { path: "/tiket", priority: 0.7, changeFrequency: "weekly" },
   { path: "/auth/register", priority: 0.6, changeFrequency: "monthly" },

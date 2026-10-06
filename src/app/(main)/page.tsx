@@ -1,6 +1,7 @@
 export const dynamic = "force-dynamic";
 import Kategori from "./components/Kategori";
 import Sponsor from "./components/Sponsor";
+import BeritaSection from "./components/BeritaSection";
 import Video from "./components/Video";
 import Daftar from "./components/Daftar";
 import Hero from "./components/Hero";
@@ -53,6 +54,9 @@ export default async function LandingPage() {
       </RevealSection>
       <RevealSection delay={0}>
         <Daftar />
+      </RevealSection>
+      <RevealSection delay={0}>
+        <BeritaSection />
       </RevealSection>
       <RevealSection delay={0}>
         <Sponsor />

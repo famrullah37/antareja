@@ -21,6 +21,7 @@ export default function UserForm({
     { label: "USER — Peserta", value: "USER" },
     { label: "ADMIN — Administrator", value: "ADMIN" },
     { label: "SIE_LOMBA — Sie Lomba", value: "SIE_LOMBA" },
+    { label: "SIE_HUMAS — Sie Humas", value: "SIE_HUMAS" },
     { label: "JURI — Juri Penilaian", value: "JURI" },
     { label: "TIKET — Petugas Tiket", value: "TIKET" },
     { label: "BENDAHARA — Bendahara", value: "BENDAHARA" },

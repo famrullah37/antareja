@@ -5,6 +5,7 @@ const JURI_ROUTES = ["/admin/penilaian", "/admin/penilaian-baru"];
 const TIKET_ROUTES = ["/admin/tiket"];
 const BENDAHARA_ROUTES = ["/admin/kas", "/admin/pembayaran", "/admin/voting"];
 const FOTOGRAFER_ROUTES = ["/admin/galeri"];
+const SIE_HUMAS_ROUTES = ["/admin/sponsor", "/admin/berita"];
 const SIE_LOMBA_ROUTES = [
   "/admin/tim",
   "/admin/juri",
@@ -22,6 +23,7 @@ const STAFF_ROUTES: Record<string, string[]> = {
   BENDAHARA: BENDAHARA_ROUTES,
   FOTOGRAFER: FOTOGRAFER_ROUTES,
   SIE_LOMBA: SIE_LOMBA_ROUTES,
+  SIE_HUMAS: SIE_HUMAS_ROUTES,
 };
 
 // Halaman awal staf = route pertama yang boleh dia buka. "/admin" (dashboard)
@@ -33,6 +35,7 @@ const STAFF_HOME: Record<string, string> = {
   BENDAHARA: "/admin/pembayaran",
   FOTOGRAFER: "/admin/galeri",
   SIE_LOMBA: "/admin/tim",
+  SIE_HUMAS: "/admin/sponsor",
 };
 
 // Sengaja tidak memakai withAuth: redirect bawaannya menambah
