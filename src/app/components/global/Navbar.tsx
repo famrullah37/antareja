@@ -114,7 +114,7 @@ export default function Navbar() {
           {/* Selama status sesi belum diketahui, tautan disembunyikan (tempat tetap) supaya
               menu lengkap tidak sempat berkedip lalu mengecil untuk user yang sudah login. */}
           <div
-            className={`hidden lg:flex items-center gap-6 flex-1 justify-center transition-opacity duration-200 ${
+            className={`hidden lg:flex items-center gap-4 xl:gap-6 flex-1 justify-center transition-opacity duration-200 ${
               status === "loading" ? "opacity-0" : "opacity-100"
             }`}
           >
@@ -122,7 +122,7 @@ export default function Navbar() {
               <Link
                 href={nav.href}
                 key={nav.label}
-                className={`text-sm font-medium transition-all duration-200 ${
+                className={`text-sm font-medium whitespace-nowrap transition-all duration-200 ${
                   isActive(nav.href) ? "text-primary-500 font-semibold" : navText
                 }`}
               >

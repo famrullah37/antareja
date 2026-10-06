@@ -6,10 +6,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next-nprogress-bar";
 import { toast } from "sonner";
-
-function formatTanggal(d: Date | null) {
-  return d ? new Date(d).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" }) : "-";
-}
+import { formatTanggalBerita } from "@/lib/berita";
 
 export default function BeritaTable({ data }: { data: Berita[] }) {
   const router = useRouter();
@@ -66,7 +63,7 @@ export default function BeritaTable({ data }: { data: Berita[] }) {
                   {b.publish ? "Terbit" : "Draf"}
                 </span>
                 <span>{b.penulis}</span>
-                <span>{formatTanggal(b.publishedAt ?? b.createdAt)}</span>
+                <span>{formatTanggalBerita(b.publishedAt ?? b.createdAt, "short")}</span>
                 {b.publish && (
                   <Link href={`/berita/${b.slug}`} target="_blank" className="text-blue-500 hover:underline">
                     Lihat
