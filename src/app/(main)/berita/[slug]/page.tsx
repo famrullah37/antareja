@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { formatTanggalBerita } from "@/lib/berita";
+import { siteConfig } from "@/config/site";
 
 import type { Metadata } from "next";
 
@@ -17,15 +18,28 @@ export async function generateMetadata({ params }: { params: { slug: string } })
   const berita = await getBerita(params.slug);
   if (!berita) return { title: "Berita tidak ditemukan" };
   const description = berita.ringkasan ?? berita.konten.slice(0, 160);
+  const image = berita.coverUrl ?? `${siteConfig.url}${siteConfig.ogImage}`;
   return {
     title: berita.judul,
     description,
+    // openGraph/twitter halaman menggantikan (bukan menggabung) milik layout,
+    // jadi siteName/locale/gambar default diisi ulang di sini.
     openGraph: {
+      type: "article",
+      siteName: siteConfig.name,
+      locale: siteConfig.locale,
       title: berita.judul,
       description,
-      type: "article",
       publishedTime: berita.publishedAt?.toISOString(),
-      images: berita.coverUrl ? [berita.coverUrl] : undefined,
+      modifiedTime: berita.updatedAt.toISOString(),
+      authors: [berita.penulis],
+      images: [image],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: berita.judul,
+      description,
+      images: [image],
     },
   };
 }
@@ -35,9 +49,32 @@ export default async function BeritaDetailPage({ params }: { params: { slug: str
   if (!berita) return notFound();
 
   const paragraf = berita.konten.split(/\n\s*\n/).filter((p) => p.trim());
+  const url = `${siteConfig.url}/berita/${berita.slug}`;
+
+  // Data terstruktur artikel: membantu Google menampilkan judul, tanggal &
+  // gambar berita di hasil pencarian.
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "NewsArticle",
+    mainEntityOfPage: url,
+    url,
+    headline: berita.judul.slice(0, 110),
+    description: berita.ringkasan ?? berita.konten.slice(0, 160),
+    image: [berita.coverUrl ?? `${siteConfig.url}${siteConfig.ogImage}`],
+    datePublished: berita.publishedAt?.toISOString(),
+    dateModified: berita.updatedAt.toISOString(),
+    author: { "@type": "Person", name: berita.penulis },
+    publisher: { "@id": `${siteConfig.url}/#organisasi` },
+    inLanguage: "id-ID",
+  };
 
   return (
     <article className="max-w-3xl mx-auto px-4 py-10 lg:py-16 flex flex-col gap-6">
+      <script
+        type="application/ld+json"
+        // "<" di-escape supaya isi berita tidak bisa menutup tag <script>.
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }}
+      />
       <Link href="/berita" className="text-sm text-primary-500 hover:underline w-fit">
         &larr; Semua berita
       </Link>

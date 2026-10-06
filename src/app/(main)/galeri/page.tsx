@@ -8,7 +8,7 @@ import GaleriClient from "./GaleriClient";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Galeri Foto",
+  title: "Galeri Foto Lomba Paskibra",
   description: "Galeri foto dokumentasi LPKBB Antareja: lihat foto aksi tim peserta dan unduh foto favoritmu.",
 };
 

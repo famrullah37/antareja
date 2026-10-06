@@ -8,7 +8,7 @@ import { siteConfig } from "@/config/site";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Tiket Penonton",
+  title: "Tiket Penonton Lomba Paskibra",
   description: "Beli tiket penonton LPKBB Antareja 2026 dan saksikan langsung aksi tim-tim terbaik se-Jawa Timur.",
 };
 

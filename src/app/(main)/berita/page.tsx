@@ -6,8 +6,9 @@ import BeritaCard from "./BeritaCard";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Berita",
-  description: "Berita dan kabar terbaru seputar LPKBB Antareja — SMK Telkom Malang.",
+  title: "Berita Lomba Paskibra",
+  description:
+    "Berita dan kabar terbaru LPKBB Antareja 2026, lomba paskibra & baris-berbaris (LKBB) tingkat Jawa Timur di SMK Telkom Malang: pendaftaran, jadwal, hasil, dan liputan acara.",
 };
 
 export default async function BeritaListPage() {

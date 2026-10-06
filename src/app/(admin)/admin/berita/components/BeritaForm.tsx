@@ -42,7 +42,10 @@ export default function BeritaForm({ data }: { data?: Berita }) {
       <div className="flex flex-col gap-1">
         <label className="text-sm font-medium">
           Ringkasan
-          <span className="text-xs text-gray-400 font-normal ml-1">tampil di daftar berita &amp; pratinjau tautan</span>
+          <span className="text-xs text-gray-400 font-normal ml-1">
+            tampil di hasil Google &amp; pratinjau tautan — ±150 karakter, sebut kata yang dicari orang (mis.
+            &quot;lomba paskibra Malang&quot;)
+          </span>
         </label>
         <textarea name="ringkasan" rows={2} maxLength={300} defaultValue={data?.ringkasan ?? ""} className={inputClass} />
       </div>

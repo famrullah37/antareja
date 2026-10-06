@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Daftar Akun",
+  title: "Pendaftaran Lomba Paskibra",
   description: "Buat akun LPKBB Antareja 2026 lalu daftarkan tim terbaikmu untuk ikut lomba baris-berbaris tingkat Jawa Timur.",
 };
 

@@ -15,8 +15,8 @@ import VotingCountdownBanner from "./VotingCountdownBanner";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Dukung Tim Favorit",
-  description: "Berikan dukunganmu untuk tim favorit di LPKBB Antareja 2026 dan pantau papan peringkat dukungan secara langsung.",
+  title: "Vote Tim Paskibra Favorit",
+  description: "Vote dan dukung tim paskibra favoritmu di LPKBB Antareja 2026 dan pantau papan peringkat dukungan secara langsung.",
 };
 
 export default async function VotePage() {
