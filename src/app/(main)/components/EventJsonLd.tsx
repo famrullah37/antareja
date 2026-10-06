@@ -28,11 +28,8 @@ export default function EventJsonLd({ timeline }: { timeline: TimelineItem[] | n
       address: { "@type": "PostalAddress", ...siteConfig.event.address },
     },
     organizer: { "@id": `${siteConfig.url}/#organisasi` },
-    offers: {
-      "@type": "Offer",
-      url: `${siteConfig.url}/tiket`,
-      availability: "https://schema.org/InStock",
-    },
+    // Tanpa "availability": penjualan tiket belum tentu dibuka, jangan klaim tersedia.
+    offers: { "@type": "Offer", url: `${siteConfig.url}/tiket` },
   };
 
   return (
