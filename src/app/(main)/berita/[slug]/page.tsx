@@ -73,7 +73,7 @@ export default async function BeritaDetailPage({ params }: { params: { slug: str
 
   return (
     <>
-      <article className="max-w-3xl mx-auto px-4 py-10 lg:py-16 flex flex-col gap-6">
+      <article className="max-w-3xl mx-auto px-4 py-8 sm:py-10 lg:py-16 flex flex-col gap-5 sm:gap-6">
         <script
           type="application/ld+json"
           // "<" di-escape supaya isi berita tidak bisa menutup tag <script>.
@@ -83,17 +83,17 @@ export default async function BeritaDetailPage({ params }: { params: { slug: str
           &larr; Semua berita
         </Link>
         <header className="flex flex-col gap-3">
-          <h1 className="text-3xl lg:text-4xl font-bold leading-tight">{berita.judul}</h1>
+          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold leading-tight">{berita.judul}</h1>
           <div className="text-sm text-gray-400">
             {formatTanggalBerita(berita.publishedAt)} · {berita.penulis}
           </div>
         </header>
         {berita.coverUrl && (
-          <div className="relative aspect-video rounded-2xl overflow-hidden bg-neutral-100">
+          <div className="relative aspect-video rounded-2xl overflow-hidden bg-gray-100">
             <Image src={berita.coverUrl} alt={berita.judul} fill priority sizes="(max-width: 768px) 100vw, 768px" className="object-cover" />
           </div>
         )}
-        <div className="flex flex-col gap-4 text-neutral-700 leading-relaxed">
+        <div className="flex flex-col gap-4 text-[15px] sm:text-base text-neutral-700 leading-relaxed break-words">
           {paragraf.map((p, i) => (
             <p key={i} className="whitespace-pre-line">
               {p.trim()}

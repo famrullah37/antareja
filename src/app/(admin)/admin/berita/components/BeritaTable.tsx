@@ -47,8 +47,8 @@ export default function BeritaTable({ data }: { data: Berita[] }) {
       <div className="px-6 py-4 border-b border-neutral-100 font-semibold">Daftar Berita ({data.length})</div>
       <div className="divide-y divide-neutral-100">
         {data.map((b) => (
-          <div key={b.id} className="flex items-center gap-4 px-6 py-4 flex-wrap sm:flex-nowrap">
-            <div className="relative w-24 h-16 bg-neutral-100 rounded-lg flex-shrink-0 overflow-hidden">
+          <div key={b.id} className="flex items-center gap-3 sm:gap-4 px-4 sm:px-6 py-4 flex-wrap sm:flex-nowrap">
+            <div className="relative w-20 h-14 sm:w-24 sm:h-16 bg-gray-100 rounded-lg flex-shrink-0 overflow-hidden">
               {b.coverUrl && <Image src={b.coverUrl} alt={b.judul} fill sizes="96px" className="object-cover" />}
             </div>
 
@@ -72,16 +72,16 @@ export default function BeritaTable({ data }: { data: Berita[] }) {
               </div>
             </div>
 
-            <div className="flex items-center gap-2 flex-shrink-0">
+            <div className="grid grid-cols-3 gap-2 w-full sm:flex sm:w-auto sm:flex-shrink-0">
               <Link
                 href={`/admin/berita/${b.id}`}
-                className="px-3 py-1.5 text-xs rounded-lg font-medium bg-blue-100 text-blue-700 hover:bg-blue-200 transition-colors"
+                className="px-3 py-2.5 sm:py-1.5 text-center text-xs rounded-lg font-medium bg-blue-100 text-blue-700 hover:bg-blue-200 transition-colors"
               >
                 Edit
               </Link>
               <button
                 onClick={() => handleToggle(b.id, b.publish)}
-                className={`px-3 py-1.5 text-xs rounded-lg font-medium transition-colors ${
+                className={`px-3 py-2.5 sm:py-1.5 text-center text-xs rounded-lg font-medium transition-colors ${
                   b.publish
                     ? "bg-yellow-100 text-yellow-700 hover:bg-yellow-200"
                     : "bg-green-100 text-green-700 hover:bg-green-200"
@@ -91,7 +91,7 @@ export default function BeritaTable({ data }: { data: Berita[] }) {
               </button>
               <button
                 onClick={() => handleDelete(b.id, b.judul)}
-                className="px-3 py-1.5 text-xs rounded-lg font-medium bg-red-100 text-red-600 hover:bg-red-200 transition-colors"
+                className="px-3 py-2.5 sm:py-1.5 text-center text-xs rounded-lg font-medium bg-red-100 text-red-600 hover:bg-red-200 transition-colors"
               >
                 Hapus
               </button>

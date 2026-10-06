@@ -29,7 +29,7 @@ export default function BeritaForm({ data }: { data?: Berita }) {
   }
 
   return (
-    <form action={handleSubmit} className="bg-white rounded-2xl border border-neutral-200 p-6 flex flex-col gap-4">
+    <form action={handleSubmit} className="bg-white rounded-2xl border border-neutral-200 p-4 sm:p-6 flex flex-col gap-4">
       {data && <input type="hidden" name="id" value={data.id} />}
 
       <div className="flex flex-col gap-1">
@@ -86,7 +86,7 @@ export default function BeritaForm({ data }: { data?: Berita }) {
         Terbitkan (tampil di halaman publik)
       </label>
 
-      <div className="flex justify-end gap-2">
+      <div className="grid grid-cols-2 gap-2 sm:flex sm:justify-end">
         <button
           type="button"
           onClick={() => router.push("/admin/berita")}
