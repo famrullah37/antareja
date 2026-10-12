@@ -39,10 +39,10 @@ export default async function Kategori() {
   // posisi/warna cuma karena admin toggle jenjang lain — jenjang yang mati
   // difilter belakangan, bukan dihapus dari susunan dasarnya.
   const jenjangList = [
-    { label: "SD", full: "Jenjang SD", harga: konfig.biayaSD, dp: konfig.biayaSDDP, aktif: konfig.sdAktif },
-    { label: "SMP", full: "Jenjang SMP / Club U-15", harga: konfig.biayaSMP, dp: konfig.biayaSMPDP, aktif: konfig.smpAktif },
-    { label: "SMA", full: "Jenjang SMA / Club U-19", harga: konfig.biayaSMA, dp: konfig.biayaSMADP, aktif: konfig.smaAktif },
-    { label: "Purna", full: "Jenjang Purna", harga: konfig.biayaPurna, dp: konfig.biayaPurnaDP, aktif: konfig.purnaAktif },
+    { label: "SD", full: "Jenjang SD", club: "", harga: konfig.biayaSD, dp: konfig.biayaSDDP, aktif: konfig.sdAktif },
+    { label: "SMP", full: "Jenjang SMP", club: "Club U-15", harga: konfig.biayaSMP, dp: konfig.biayaSMPDP, aktif: konfig.smpAktif },
+    { label: "SMA", full: "Jenjang SMA", club: "Club U-19", harga: konfig.biayaSMA, dp: konfig.biayaSMADP, aktif: konfig.smaAktif },
+    { label: "Purna", full: "Jenjang Purna", club: "", harga: konfig.biayaPurna, dp: konfig.biayaPurnaDP, aktif: konfig.purnaAktif },
   ]
     .map((j, i) => ({ ...j, meta: JENJANG_META[i] }))
     .filter((j) => j.aktif);
@@ -81,8 +81,10 @@ export default async function Kategori() {
 
                 <div className="p-7 flex flex-col gap-6">
                   {/* Badge */}
-                  <span className={`inline-flex items-center text-xs font-bold px-3 py-1.5 rounded-full border w-fit ${meta.badge}`}>
-                    Paskibra {j.full}
+                  {/* Patah baris hanya boleh di " / ", jangan di tengah "U-19" */}
+                  <span className={`inline-flex flex-wrap items-center gap-x-1 text-xs font-bold px-3 py-1.5 rounded-full border w-fit ${meta.badge}`}>
+                    <span className="whitespace-nowrap">Paskibra {j.full}</span>
+                    {j.club && <span className="whitespace-nowrap">/ {j.club}</span>}
                   </span>
 
                   {/* Price */}
