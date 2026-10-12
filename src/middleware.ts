@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 const JURI_ROUTES = ["/admin/penilaian", "/admin/penilaian-baru"];
 const TIKET_ROUTES = ["/admin/tiket"];
-const BENDAHARA_ROUTES = ["/admin/kas", "/admin/pembayaran", "/admin/voting"];
+const BENDAHARA_ROUTES = ["/admin/kas", "/admin/pembayaran", "/admin/voting", "/admin/merchandise"];
 const FOTOGRAFER_ROUTES = ["/admin/galeri"];
 const SIE_HUMAS_ROUTES = ["/admin/sponsor", "/admin/berita"];
 const SIE_LOMBA_ROUTES = [

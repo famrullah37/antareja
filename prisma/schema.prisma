@@ -22,6 +22,7 @@ model User {
   tims              Tim[]
   juri              Juri?
   transaksiTiket    TransaksiTiket[]
+  pesananMerch      PesananMerch[]
   transaksiFoto     TransaksiFoto[]
   transaksiVoting   TransaksiVoting[]
   activityLogs      ActivityLog[]
@@ -437,6 +438,55 @@ model KonfigPaketFoto {
   harga  Int
   aktif  Boolean @default(true)
   urutan Int     @default(0)
+}
+
+// ─── Merchandise (Pre-Order) ─────────────────────────────────────────────────
+
+// Pembayaran pakai rekening & QRIS yang sama dengan Tiket (KonfigTiket).
+model Merchandise {
+  id        String   @id @default(uuid())
+  nama      String
+  deskripsi String?
+  harga     Int
+  // Bisa lebih dari satu (depan/belakang/detail) — foto pertama = sampul.
+  fotos     String[] @default([])
+  // Pilihan ukuran dipisah koma, mis. "S,M,L,XL". Kosong = tanpa ukuran.
+  ukuran    String?
+  aktif     Boolean  @default(true)
+  urutan    Int      @default(0)
+  createdAt DateTime @default(now())
+}
+
+model KonfigMerch {
+  id              String    @id @default("singleton")
+  poAktif         Boolean   @default(false)
+  // Batas akhir PO — lewat dari ini form pemesanan otomatis tutup.
+  tutupPada       DateTime?
+  // Info pengambilan/estimasi jadi, ditampilkan di halaman & email.
+  infoPengambilan String?
+  counterUrut     Int       @default(0)
+}
+
+model PesananMerch {
+  id               String    @id @default(uuid())
+  userId           String?
+  nama             String
+  email            String
+  noHp             String
+  // Snapshot saat pesan: [{merchId, nama, ukuran, harga, jumlah}] — harga di
+  // master bisa berubah, nominal yang sudah dibayar tidak boleh ikut berubah.
+  items            Json
+  subtotal         Int
+  kodeUnik         String
+  totalBayar       Int
+  metodePembayaran String    @default("TRANSFER")
+  bukti            String?
+  // PENDING | VERIFIED | REJECTED | DIAMBIL
+  status           String    @default("PENDING")
+  catatanAdmin     String?
+  diambilAt        DateTime?
+  createdAt        DateTime  @default(now())
+  user             User?     @relation(fields: [userId], references: [id])
 }
 
 // ─── Kas ─────────────────────────────────────────────────────────────────────
