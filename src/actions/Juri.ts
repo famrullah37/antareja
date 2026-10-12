@@ -61,7 +61,11 @@ export async function updateJuriForm(data: FormData, id: string) {
       if (upload.error) return { success: false, message: upload.message };
       updateData.foto = upload.data!.url;
     }
-    await updateJuri({ id }, updateData);
+    // Email berubah → putuskan hubungan ke akun lama; akun JURI dengan email
+    // baru akan terhubung otomatis saat login (lihat findOrLinkJuriByUser).
+    const lama = await prisma.juri.findUnique({ where: { id }, select: { email: true } });
+    const gantiEmail = !!email && lama?.email.toLowerCase() !== email.toLowerCase();
+    await updateJuri({ id }, { ...updateData, ...(gantiEmail ? { user: { disconnect: true } } : {}) });
     await syncJuriKategori(id, data);
     revalidatePath("/", "layout");
     return { success: true };

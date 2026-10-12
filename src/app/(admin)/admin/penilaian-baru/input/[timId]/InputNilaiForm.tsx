@@ -1,6 +1,7 @@
 "use client";
 
 import { hapusPelanggaranTim, inputNilaiJuri, inputPelanggaranTim } from "@/actions/PenilaianBaru";
+import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -55,6 +56,8 @@ function predikatDari(nilai: number, masters: NilaiDiskrit[], kategori: string) 
 export default function InputNilaiForm({
   tim,
   juriAktif,
+  modeStaf = false,
+  daftarJuri = [],
   subKategoris,
   nilaiMasters,
   pelanggarans,
@@ -63,6 +66,9 @@ export default function InputNilaiForm({
 }: {
   tim: Tim;
   juriAktif: Juri | null;
+  // Sie Lomba/Admin: memasukkan nilai atas nama juri yang dipilih (dari lembar kertas).
+  modeStaf?: boolean;
+  daftarJuri?: { id: string; nama: string; slug: string }[];
   subKategoris: SubKategori[];
   nilaiMasters: NilaiDiskrit[];
   pelanggarans: Pelanggaran[];
@@ -75,6 +81,8 @@ export default function InputNilaiForm({
   const [scores, setScores] = useState<Record<string, Skor>>({});
   const [catatanTerbuka, setCatatanTerbuka] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(false);
+  const router = useRouter();
+  const pathname = usePathname();
   const terkunci = !!existing?.published;
 
   const kategoriJuri = juriKategoris
@@ -112,7 +120,8 @@ export default function InputNilaiForm({
     }
     setLoading(true);
     const toastId = toast.loading("Menyimpan nilai...");
-    const result = await inputNilaiJuri(tim.id, entries);
+    // Juri yang dipilih hanya dipakai server untuk Sie Lomba/Admin; akun juri selalu dirinya sendiri.
+    const result = await inputNilaiJuri(tim.id, entries, juriAktif?.id);
     setLoading(false);
     if (result.success) {
       toast.success("Nilai berhasil disimpan!", { id: toastId });
@@ -150,24 +159,60 @@ export default function InputNilaiForm({
     else toast.error(result.message ?? "Gagal menghapus", { id: toastId });
   }
 
-  if (!juriAktif) {
+  const pilihJuri = modeStaf && (
+    <div className="bg-white border border-neutral-200 rounded-xl p-5">
+      <h2 className="font-semibold">Masukkan nilai atas nama juri</h2>
+      <p className="text-xs text-gray-500 mb-3">
+        Untuk memasukkan nilai dari lembar penilaian juri. Tercatat di log aktivitas atas nama Anda.
+      </p>
+      <div className="flex flex-wrap gap-2">
+        {daftarJuri.map((j) => (
+          <button
+            key={j.id}
+            type="button"
+            onClick={() => {
+              if (adaPerubahan && !confirm("Nilai yang belum disimpan akan hilang. Ganti juri?")) return;
+              setScores({});
+              router.push(`${pathname}?juri=${j.slug}`);
+            }}
+            className={`px-4 h-11 rounded-lg border-2 text-sm font-medium ${
+              juriAktif?.id === j.id
+                ? "border-primary-500 bg-primary-50 text-primary-700"
+                : "border-neutral-200 hover:border-neutral-400"
+            }`}
+          >
+            {j.nama}
+          </button>
+        ))}
+        {daftarJuri.length === 0 && <p className="text-sm text-gray-400">Belum ada data juri.</p>}
+      </div>
+    </div>
+  );
+
+  if (!juriAktif && !modeStaf) {
     return (
       <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 rounded-xl p-5 text-sm">
-        Akun ini belum terhubung ke data Juri, jadi tidak bisa memberi nilai. Hubungkan akun di menu Juri
-        (admin), lalu login sebagai juri tersebut.
+        Akun ini belum terhubung ke data Juri, jadi tidak bisa memberi nilai. Minta admin memastikan email
+        akun ini sama dengan email di menu Juri.
       </div>
     );
   }
 
   return (
     <div className="flex flex-col gap-6 pb-28">
+      {pilihJuri}
+
       {/* Identitas juri + ringkasan */}
       <div className="bg-white border border-neutral-200 rounded-xl p-5 flex flex-wrap items-center gap-x-8 gap-y-3">
         <div>
-          <div className="text-xs text-gray-400">Juri</div>
-          <div className="font-bold text-lg">{juriAktif.nama}</div>
+          <div className="text-xs text-gray-400">{modeStaf ? "Nilai atas nama juri" : "Juri"}</div>
+          <div className="font-bold text-lg">{juriAktif?.nama ?? "— pilih juri di atas —"}</div>
           <div className="text-xs text-gray-500">
-            {kategoriJuri.length ? `Kategori: ${kategoriJuri.join(", ")}` : "Belum ditugaskan ke kategori"}
+            {!juriAktif
+              ? "Pelanggaran tetap bisa dicatat tanpa memilih juri"
+              : kategoriJuri.length
+                ? `Kategori: ${kategoriJuri.join(", ")}`
+                : "Belum ditugaskan ke kategori"}
           </div>
         </div>
         {existing && (

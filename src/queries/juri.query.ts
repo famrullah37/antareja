@@ -35,3 +35,20 @@ export async function updateJuri(
 export async function deleteJuri(where: Prisma.JuriWhereUniqueInput) {
   return prisma.juri.delete({ where });
 }
+
+// Juri untuk akun yang login. Data Juri (menu Juri) dan akun login (menu User)
+// dibuat terpisah dan dulu tidak pernah terhubung — kini dihubungkan otomatis
+// sekali lewat email yang sama (tanpa beda huruf besar/kecil), lalu Juri.userId
+// dipakai seterusnya. Hanya akun ber-role JURI yang dihubungkan otomatis.
+export async function findOrLinkJuriByUser(userId: string) {
+  const sudah = await prisma.juri.findUnique({ where: { userId }, include: { juriKategori: true } });
+  if (sudah) return sudah;
+
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { email: true, role: true } });
+  if (!user || user.role !== "JURI") return null;
+  const juri = await prisma.juri.findFirst({
+    where: { email: { equals: user.email, mode: "insensitive" }, userId: null },
+  });
+  if (!juri) return null;
+  return prisma.juri.update({ where: { id: juri.id }, data: { userId }, include: { juriKategori: true } });
+}

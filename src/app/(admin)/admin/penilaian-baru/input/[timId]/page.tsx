@@ -1,6 +1,7 @@
 import { findTim, findTimByNoUrutParam } from "@/queries/tim.query";
-import { isUuid, noUrutSlug } from "@/lib/timSlug";
+import { isUuid, makeSlug, noUrutSlug } from "@/lib/timSlug";
 import { getServerSession } from "@/lib/next-auth";
+import { findOrLinkJuriByUser } from "@/queries/juri.query";
 import prisma from "@/lib/prisma";
 import {
   findNilaiDiskritMasters,
@@ -13,8 +14,10 @@ import InputNilaiForm from "./InputNilaiForm";
 
 export default async function InputNilaiPage({
   params,
+  searchParams,
 }: {
   params: { timId: string };
+  searchParams?: { juri?: string };
 }) {
   const timParam = await findTimByNoUrutParam(params.timId);
   if (!timParam) return notFound();
@@ -24,11 +27,28 @@ export default async function InputNilaiPage({
 
   const session = await getServerSession();
   const isJuri = session?.user?.role === "JURI";
+  // Sie Lomba/Admin memasukkan nilai ATAS NAMA juri yang dipilih (?juri=<slug>),
+  // mis. dari lembar penilaian kertas. Juri selalu memakai akunnya sendiri.
+  const modeStaf = !isJuri;
 
-  // Juri pemberi nilai = akun yang login (lihat juriDariSesi di actions/PenilaianBaru).
-  const juriAktif = session?.user?.id
-    ? await prisma.juri.findUnique({ where: { userId: session.user.id }, select: { id: true, nama: true } })
-    : null;
+  // Hanya id/nama/slug — props ini terkirim ke browser.
+  const daftarJuri = modeStaf
+    ? (await prisma.juri.findMany({ select: { id: true, nama: true }, orderBy: { nama: "asc" } })).map((j) => ({
+        ...j,
+        slug: makeSlug(j.nama, j.id, "juri"),
+      }))
+    : [];
+
+  // Juri pemberi nilai (lihat juriPenilai di actions/PenilaianBaru).
+  const juriAktif = isJuri
+    ? await (async () => {
+        const j = session?.user?.id ? await findOrLinkJuriByUser(session.user.id) : null;
+        return j && { id: j.id, nama: j.nama };
+      })()
+    : (() => {
+        const j = daftarJuri.find((d) => d.slug === searchParams?.juri || d.id === searchParams?.juri);
+        return j ? { id: j.id, nama: j.nama } : null;
+      })();
 
   const [tim, subKategoris, nilaiMasters, pelanggarans, juriKategoris] =
     await Promise.all([
@@ -90,6 +110,8 @@ export default async function InputNilaiPage({
       <InputNilaiForm
         tim={{ id: tim.id }}
         juriAktif={juriAktif}
+        modeStaf={modeStaf}
+        daftarJuri={daftarJuri.map(({ id, nama, slug }) => ({ id, nama, slug }))}
         subKategoris={subKategoris}
         nilaiMasters={nilaiMasters as any}
         pelanggarans={pelanggarans}

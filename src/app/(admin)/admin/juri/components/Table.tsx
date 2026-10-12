@@ -47,6 +47,21 @@ export default function JuriTable({ data }: { data: Juri[] }) {
       sortable: true,
     },
     {
+      name: "Akun Login",
+      cell: (row: Juri) =>
+        row.userId ? (
+          <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">Terhubung</span>
+        ) : (
+          <span
+            className="px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700"
+            title="Buat akun role JURI di menu User dengan email yang sama; terhubung otomatis saat juri login"
+          >
+            Belum terhubung
+          </span>
+        ),
+      width: "150px",
+    },
+    {
       name: "Aksi",
       cell: (row: Juri) => (
         <button

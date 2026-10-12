@@ -28,6 +28,10 @@ export default async function InputNilaiIndexPage({
     ? juris.find((j) => j.id === juriParam || makeSlug(j.nama, j.id, "juri") === juriParam)?.id
     : undefined;
 
+  // Juri yang dipilih di filter ikut dibawa ke form (Sie Lomba input atas nama juri itu).
+  const juriDipilih = juris.find((j) => j.id === juriIdDipilih);
+  const juriSlug = juriDipilih ? makeSlug(juriDipilih.nama, juriDipilih.id, "juri") : "";
+
   const jenjangList = [...new Set((tims as any[]).map((t) => t.jenjang))].sort();
 
   const filtered = (tims as any[]).filter((t) => {
@@ -70,7 +74,7 @@ export default async function InputNilaiIndexPage({
             return (
               <Link
                 key={tim.id}
-                href={`/admin/penilaian-baru/input/${noUrutSlug(tim)}`}
+                href={`/admin/penilaian-baru/input/${noUrutSlug(tim)}${juriSlug && !isJuri ? `?juri=${juriSlug}` : ""}`}
                 className="bg-white border border-neutral-200 rounded-xl p-4 hover:border-primary-400 transition-colors"
               >
                 <div className="font-bold text-lg">

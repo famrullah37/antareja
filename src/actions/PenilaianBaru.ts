@@ -15,6 +15,7 @@ import {
 } from "@/queries/penilaianBaru.query";
 import prisma from "@/lib/prisma";
 import { catatLog } from "@/lib/activityLog";
+import { findOrLinkJuriByUser } from "@/queries/juri.query";
 
 async function requireAdmin() {
   const session = await getServerSession();
@@ -99,15 +100,23 @@ export async function tugaskanJuriKategori(juriId: string, kategori: string) {
   } catch { return { success: false }; }
 }
 
-// Juri pemberi nilai SELALU diambil dari sesi (akun yang login → Juri.userId),
-// tidak pernah dari klien — supaya tidak ada yang bisa mengisi atas nama juri lain.
-async function juriDariSesi() {
+// Siapa juri pemberi nilai:
+// - JURI: selalu juri milik akun yang login (Juri.userId) — pilihan dari klien
+//   diabaikan, jadi juri tidak bisa mengisi atas nama juri lain.
+// - ADMIN / SIE_LOMBA: memasukkan nilai ATAS NAMA juri yang dipilih (mis. dari
+//   lembar penilaian kertas); `oleh` = nama petugas, dicatat di log aktivitas.
+async function juriPenilai(juriIdDipilih?: string) {
   const session = await getServerSession();
-  if (!["ADMIN", "SIE_LOMBA", "JURI"].includes(session?.user?.role ?? "")) throw new Error("Forbidden");
-  return prisma.juri.findUnique({
-    where: { userId: session!.user!.id },
-    include: { juriKategori: true },
-  });
+  const role = session?.user?.role ?? "";
+  if (!["ADMIN", "SIE_LOMBA", "JURI"].includes(role)) throw new Error("Forbidden");
+
+  if (role === "JURI") {
+    const juri = await findOrLinkJuriByUser(session!.user!.id);
+    return juri ? { juri, oleh: null } : { error: "Akun tidak terhubung ke data Juri" };
+  }
+  if (!juriIdDipilih) return { error: "Pilih juri yang nilainya akan dimasukkan" };
+  const juri = await prisma.juri.findUnique({ where: { id: juriIdDipilih }, include: { juriKategori: true } });
+  return juri ? { juri, oleh: session!.user!.nama } : { error: "Juri tidak ditemukan" };
 }
 
 // Tim harus terkonfirmasi & nilainya belum dipublish (FINAL) — setelah publish,
@@ -124,10 +133,12 @@ const MAKS_CATATAN = 500;
 
 export async function inputNilaiJuri(
   timId: string,
-  scores: { subKategoriId: string; nilai: number; catatan?: string }[]
+  scores: { subKategoriId: string; nilai: number; catatan?: string }[],
+  juriIdDipilih?: string
 ) {
-  const juri = await juriDariSesi();
-  if (!juri) return { success: false, message: "Akun tidak terhubung ke data Juri" };
+  const penilai = await juriPenilai(juriIdDipilih);
+  if (!penilai.juri) return { success: false, message: penilai.error };
+  const { juri, oleh } = penilai;
   if (!Array.isArray(scores) || scores.length === 0 || scores.length > 200)
     return { success: false, message: "Data nilai tidak valid" };
 
@@ -178,7 +189,10 @@ export async function inputNilaiJuri(
       )
     );
     await recalcPenilaianBaru(penilaian.id);
-    await catatLog("INPUT_NILAI", `${juri.nama}: ${valid.length} sub-kategori (tim ${timId.slice(0, 8)})`);
+    await catatLog(
+      "INPUT_NILAI",
+      `${juri.nama}${oleh ? ` (dimasukkan oleh ${oleh})` : ""}: ${valid.length} sub-kategori (tim ${timId.slice(0, 8)})`
+    );
     revalidatePath("/admin/penilaian-baru", "layout");
     return { success: true };
   } catch (e) {
@@ -191,9 +205,18 @@ const MAKS_KEJADIAN = 50;
 
 // Poin pengurangan diambil dari master pelanggaran di database — dulu dikirim
 // klien, sehingga bisa dimanipulasi (dan jumlah kejadian negatif malah MENAMBAH nilai).
+// Pelanggaran dicatat per tim (bukan per juri): JURI wajib akun terhubung,
+// ADMIN/SIE_LOMBA boleh langsung (pelaku tercatat di log aktivitas).
 export async function inputPelanggaranTim(timId: string, pelanggaranId: string, jumlahKejadian: number) {
-  const juri = await juriDariSesi();
-  if (!juri) return { success: false, message: "Akun tidak terhubung ke data Juri" };
+  const session = await getServerSession();
+  const role = session?.user?.role ?? "";
+  if (!["ADMIN", "SIE_LOMBA", "JURI"].includes(role)) throw new Error("Forbidden");
+  let pelaku = session!.user!.nama;
+  if (role === "JURI") {
+    const juri = await findOrLinkJuriByUser(session!.user!.id);
+    if (!juri) return { success: false, message: "Akun tidak terhubung ke data Juri" };
+    pelaku = juri.nama;
+  }
 
   const jumlah = Number(jumlahKejadian);
   if (!Number.isInteger(jumlah) || jumlah < 1 || jumlah > MAKS_KEJADIAN)
@@ -209,7 +232,7 @@ export async function inputPelanggaranTim(timId: string, pelanggaranId: string, 
     const penilaian = await upsertPenilaianBaru(timId);
     await createPelanggaranTim(penilaian.id, pelanggaran.id, jumlah, pelanggaran.poinPengurangan);
     await recalcPenilaianBaru(penilaian.id);
-    await catatLog("INPUT_PELANGGARAN", `${juri.nama}: [${pelanggaran.kode}] × ${jumlah} (tim ${timId.slice(0, 8)})`);
+    await catatLog("INPUT_PELANGGARAN", `${pelaku}: [${pelanggaran.kode}] × ${jumlah} (tim ${timId.slice(0, 8)})`);
     revalidatePath("/admin/penilaian-baru", "layout");
     return { success: true };
   } catch (e) {
@@ -225,7 +248,7 @@ export async function hapusPelanggaranTim(pelanggaranTimId: string) {
   const role = session?.user?.role ?? "";
   if (!["ADMIN", "SIE_LOMBA", "JURI"].includes(role)) throw new Error("Forbidden");
   if (role === "JURI") {
-    const juri = await prisma.juri.findUnique({ where: { userId: session!.user!.id } });
+    const juri = await findOrLinkJuriByUser(session!.user!.id);
     if (!juri) return { success: false, message: "Akun tidak terhubung ke data Juri" };
   }
 
