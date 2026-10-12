@@ -1,6 +1,6 @@
 "use client";
 
-import { inputNilaiJuri, inputPelanggaranTim } from "@/actions/PenilaianBaru";
+import { hapusPelanggaranTim, inputNilaiJuri, inputPelanggaranTim } from "@/actions/PenilaianBaru";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -20,44 +20,41 @@ type NilaiDiskrit = {
   urutan: number;
 };
 type Juri = { id: string; nama: string };
-type JuriKat = { id: string; juriId: string; kategori: string; juri: Juri };
+type JuriKat = { id: string; juriId: string; kategori: string };
 type Pelanggaran = { id: string; kode: string; nama: string; poinPengurangan: number };
-type Tim = { id: string; nama_tim: string };
+type Tim = { id: string };
 type Existing = {
   id: string;
   nilaiKotor: number;
   totalPengurang: number;
   nilaiAkhir: number;
+  published: boolean;
   nilaiJuri: {
     subKategoriId: string;
     juriId: string;
     nilaiDipilih: number;
     predikat: string;
+    catatan: string | null;
+  }[];
+  pelanggaranTim: {
+    id: string;
+    jumlahKejadian: number;
+    totalPengurang: number;
+    pelanggaran: { kode: string; nama: string };
   }[];
 } | null;
 
-const PREDIKAT_COLORS: Record<string, string> = {
-  SANGAT_BAGUS: "#22c55e",
-  BAGUS: "#84cc16",
-  CUKUP_BAGUS: "#eab308",
-  CUKUP: "#f97316",
-  KURANG: "#ef4444",
-  SANGAT_KURANG: "#991b1b",
-};
+type Skor = { nilai: number; catatan: string };
 
-function getNilaiPredikat(nilai: number, masters: NilaiDiskrit[], kategori: string) {
-  const filtered = masters.filter((m) => m.kategori.toLowerCase() === kategori.toLowerCase());
-  for (const m of filtered) {
-    if ((m.nilai as number[]).includes(nilai)) {
-      return { predikat: m.predikat, warna: m.warna };
-    }
-  }
-  return { predikat: "KURANG", warna: "#ef4444" };
+function predikatDari(nilai: number, masters: NilaiDiskrit[], kategori: string) {
+  return masters.find(
+    (m) => m.kategori.toLowerCase() === kategori.toLowerCase() && (m.nilai as number[]).includes(nilai)
+  );
 }
 
 export default function InputNilaiForm({
   tim,
-  juris,
+  juriAktif,
   subKategoris,
   nilaiMasters,
   pelanggarans,
@@ -65,61 +62,52 @@ export default function InputNilaiForm({
   existing,
 }: {
   tim: Tim;
-  juris: Juri[];
+  juriAktif: Juri | null;
   subKategoris: SubKategori[];
   nilaiMasters: NilaiDiskrit[];
   pelanggarans: Pelanggaran[];
   juriKategoris: JuriKat[];
   existing: Existing;
 }) {
-  const [selectedJuriId, setSelectedJuriId] = useState<string>("");
-  const [scores, setScores] = useState<
-    Record<string, { nilai: number; predikat: string; catatan: string }>
-  >({});
+  // Nilai lama milik juri INI saja — dulu dicari per sub-kategori tanpa juriId,
+  // sehingga juri B bisa melihat (dan mengira) nilai juri A sebagai nilainya.
+  const nilaiLama = (existing?.nilaiJuri ?? []).filter((nj) => nj.juriId === juriAktif?.id);
+  const [scores, setScores] = useState<Record<string, Skor>>({});
+  const [catatanTerbuka, setCatatanTerbuka] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(false);
+  const terkunci = !!existing?.published;
 
-  const selectedJuriKats = juriKategoris.filter(
-    (jk) => jk.juriId === selectedJuriId
-  );
-  const assignedKategoris = selectedJuriKats.map((jk) => jk.kategori.toLowerCase());
-  const mySubKategoris = subKategoris.filter((s) =>
-    assignedKategoris.includes(s.kategori.toLowerCase())
-  );
+  const kategoriJuri = juriKategoris
+    .filter((jk) => jk.juriId === juriAktif?.id)
+    .map((jk) => jk.kategori);
+  const kategoriKecil = kategoriJuri.map((k) => k.toLowerCase());
+  const subSaya = subKategoris.filter((s) => kategoriKecil.includes(s.kategori.toLowerCase()));
 
-  // Group sub-kategoris by kategori (normalized key → original label dari juriKat)
-  const grouped = mySubKategoris.reduce<Record<string, SubKategori[]>>(
-    (acc, sub) => {
-      const key = selectedJuriKats.find(
-        (jk) => jk.kategori.toLowerCase() === sub.kategori.toLowerCase()
-      )?.kategori ?? sub.kategori;
-      if (!acc[key]) acc[key] = [];
-      acc[key].push(sub);
-      return acc;
-    },
-    {}
-  );
+  const grouped = subSaya.reduce<Record<string, SubKategori[]>>((acc, sub) => {
+    const key = kategoriJuri.find((k) => k.toLowerCase() === sub.kategori.toLowerCase()) ?? sub.kategori;
+    (acc[key] ??= []).push(sub);
+    return acc;
+  }, {});
 
-  function handleNilaiClick(subId: string, nilai: number, kategori: string) {
-    const { predikat } = getNilaiPredikat(nilai, nilaiMasters, kategori);
-    setScores((prev) => ({
-      ...prev,
-      [subId]: { nilai, predikat, catatan: prev[subId]?.catatan ?? "" },
-    }));
+  function nilaiTampil(subId: string) {
+    return scores[subId]?.nilai ?? nilaiLama.find((n) => n.subKategoriId === subId)?.nilaiDipilih;
+  }
+  function catatanTampil(subId: string) {
+    return scores[subId]?.catatan ?? nilaiLama.find((n) => n.subKategoriId === subId)?.catatan ?? "";
   }
 
+  const terisi = subSaya.filter((s) => nilaiTampil(s.id) !== undefined).length;
+  const total = subSaya.reduce((sum, s) => sum + (nilaiTampil(s.id) ?? 0), 0);
+  const adaPerubahan = Object.keys(scores).length > 0;
+
   async function handleSubmit() {
-    if (!selectedJuriId) {
-      toast.error("Pilih juri terlebih dahulu");
-      return;
-    }
     const entries = Object.entries(scores).map(([subKategoriId, v]) => ({
       subKategoriId,
       nilai: v.nilai,
-      predikat: v.predikat,
       catatan: v.catatan || undefined,
     }));
     if (entries.length === 0) {
-      toast.error("Belum ada nilai yang diinput");
+      toast.error("Belum ada nilai yang diubah");
       return;
     }
     setLoading(true);
@@ -127,316 +115,288 @@ export default function InputNilaiForm({
     const result = await inputNilaiJuri(tim.id, entries);
     setLoading(false);
     if (result.success) {
-      toast.success("Nilai berhasil disimpan & dihitung ulang!", { id: toastId });
+      toast.success("Nilai berhasil disimpan!", { id: toastId });
+      setScores({});
     } else {
-      toast.error("Gagal menyimpan nilai", { id: toastId });
+      toast.error(result.message ?? "Gagal menyimpan nilai", { id: toastId });
     }
   }
 
-  // Pelanggaran state
   const [pelId, setPelId] = useState("");
   const [kejadian, setKejadian] = useState(1);
 
   async function handleAddPelanggaran() {
-    if (!pelId) return;
     const pel = pelanggarans.find((p) => p.id === pelId);
-    if (!pel) return;
+    if (!pel) {
+      toast.error("Pilih jenis pelanggaran");
+      return;
+    }
+    if (!confirm(`Tambah pelanggaran [${pel.kode}] ${pel.nama} × ${kejadian} (−${pel.poinPengurangan * kejadian} poin)?`))
+      return;
     const toastId = toast.loading("Menambah pelanggaran...");
-    const result = await inputPelanggaranTim(
-      tim.id,
-      pelId,
-      kejadian,
-      pel.poinPengurangan
-    );
-    if (result.success) toast.success("Pelanggaran ditambahkan!", { id: toastId });
-    else toast.error("Gagal", { id: toastId });
+    const result = await inputPelanggaranTim(tim.id, pel.id, kejadian);
+    if (result.success) {
+      toast.success("Pelanggaran ditambahkan", { id: toastId });
+      setPelId("");
+      setKejadian(1);
+    } else toast.error(result.message ?? "Gagal", { id: toastId });
   }
 
-  const totalScore = Object.values(scores).reduce((s, v) => s + v.nilai, 0);
+  async function handleHapusPelanggaran(id: string, label: string) {
+    if (!confirm(`Hapus pelanggaran ${label}?`)) return;
+    const toastId = toast.loading("Menghapus...");
+    const result = await hapusPelanggaranTim(id);
+    if (result.success) toast.success("Pelanggaran dihapus", { id: toastId });
+    else toast.error(result.message ?? "Gagal menghapus", { id: toastId });
+  }
+
+  if (!juriAktif) {
+    return (
+      <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 rounded-xl p-5 text-sm">
+        Akun ini belum terhubung ke data Juri, jadi tidak bisa memberi nilai. Hubungkan akun di menu Juri
+        (admin), lalu login sebagai juri tersebut.
+      </div>
+    );
+  }
 
   return (
-    <div className="flex flex-col gap-8">
-      {/* Ringkasan nilai akhir existing */}
-      {existing && (
-        <div className="bg-white border border-neutral-200 rounded-xl p-5 flex gap-6">
-          <div className="text-center">
-            <div className="text-2xl font-bold">{existing.nilaiKotor}</div>
-            <div className="text-xs text-gray-400">Nilai Kotor</div>
-          </div>
-          <div className="text-center text-red-500">
-            <div className="text-2xl font-bold">-{existing.totalPengurang}</div>
-            <div className="text-xs text-gray-400">Pengurang</div>
-          </div>
-          <div className="text-center text-primary-600">
-            <div className="text-2xl font-bold">{existing.nilaiAkhir}</div>
-            <div className="text-xs text-gray-400">Nilai Akhir</div>
+    <div className="flex flex-col gap-6 pb-28">
+      {/* Identitas juri + ringkasan */}
+      <div className="bg-white border border-neutral-200 rounded-xl p-5 flex flex-wrap items-center gap-x-8 gap-y-3">
+        <div>
+          <div className="text-xs text-gray-400">Juri</div>
+          <div className="font-bold text-lg">{juriAktif.nama}</div>
+          <div className="text-xs text-gray-500">
+            {kategoriJuri.length ? `Kategori: ${kategoriJuri.join(", ")}` : "Belum ditugaskan ke kategori"}
           </div>
         </div>
-      )}
-
-      {/* Pilih Juri */}
-      <div className="bg-white border border-neutral-200 rounded-xl p-5">
-        <h2 className="font-semibold mb-3">Pilih Juri yang Input Nilai</h2>
-        <div className="flex gap-3 flex-wrap">
-          {juris.map((j) => (
-            <button
-              key={j.id}
-              type="button"
-              onClick={() => {
-                setSelectedJuriId(j.id);
-                setScores({});
-              }}
-              className={`px-4 py-2 rounded-lg border-2 text-sm font-medium transition-colors ${
-                selectedJuriId === j.id
-                  ? "border-primary-500 bg-primary-50 text-primary-700"
-                  : "border-neutral-200 hover:border-neutral-400"
-              }`}
-            >
-              {j.nama}
-            </button>
-          ))}
-        </div>
-        {selectedJuriId && assignedKategoris.length > 0 && (
-          <p className="text-xs text-gray-400 mt-2">
-            Kategori: {assignedKategoris.join(", ")}
-          </p>
-        )}
-        {selectedJuriId && assignedKategoris.length === 0 && (
-          <p className="text-xs text-yellow-600 mt-2">
-            Juri ini belum ditugaskan ke kategori manapun.
-          </p>
+        {existing && (
+          <div className="flex gap-6 ml-auto">
+            <div className="text-center">
+              <div className="text-2xl font-bold">{existing.nilaiKotor}</div>
+              <div className="text-xs text-gray-400">Nilai Kotor</div>
+            </div>
+            <div className="text-center text-red-500">
+              <div className="text-2xl font-bold">-{existing.totalPengurang}</div>
+              <div className="text-xs text-gray-400">Pengurang</div>
+            </div>
+            <div className="text-center text-primary-600">
+              <div className="text-2xl font-bold">{existing.nilaiAkhir}</div>
+              <div className="text-xs text-gray-400">Nilai Akhir</div>
+            </div>
+          </div>
         )}
       </div>
 
-      {/* Form Nilai Diskrit per Kategori */}
-      {selectedJuriId && Object.keys(grouped).length > 0 && (
-        <div className="flex flex-col gap-6">
-          {Object.entries(grouped).map(([kategori, subs]) => {
-            const masters = nilaiMasters
-              .filter((m) => m.kategori.toLowerCase() === kategori.toLowerCase())
-              .sort((a, b) => a.urutan - b.urutan);
+      {terkunci && (
+        <div className="bg-blue-50 border border-blue-200 text-blue-800 rounded-xl p-4 text-sm">
+          Nilai tim ini sudah dipublish — tidak bisa diubah. Hubungi admin bila perlu koreksi.
+        </div>
+      )}
 
-            return (
-              <div
-                key={kategori}
-                className="bg-white border border-neutral-200 rounded-xl p-5"
-              >
-                <h3 className="font-bold text-lg mb-4">
-                  [{kategori}] — {kategori}
-                </h3>
-
-                {/* Palet Nilai Diskrit */}
-                <div className="flex flex-wrap gap-2 mb-5 p-3 bg-neutral-50 rounded-lg">
-                  {masters.map((m) => (
-                    <div key={m.id} className="flex flex-col gap-1">
-                      <span
-                        className="text-[10px] px-1 rounded text-white text-center"
-                        style={{ backgroundColor: m.warna }}
-                      >
-                        {m.predikat.replace(/_/g, " ")}
-                      </span>
-                      <div className="flex gap-1">
-                        {(m.nilai as number[]).map((n) => (
-                          <button
-                            key={n}
-                            type="button"
-                            onClick={() => {
-                              // Apply nilai ini ke sub yang sedang di-focus (last clicked)
-                            }}
-                            className="px-3 py-1.5 rounded-lg border-2 border-neutral-300 text-sm font-bold hover:border-primary-400 transition-colors bg-white"
-                            style={{ borderColor: m.warna + "66" }}
-                            title={`Nilai: ${n} (${m.predikat})`}
-                          >
-                            {n}
-                          </button>
-                        ))}
+      {/* Kartu per sub-kategori — tombol besar untuk layar sentuh */}
+      {Object.entries(grouped).map(([kategori, subs]) => {
+        const masters = nilaiMasters
+          .filter((m) => m.kategori.toLowerCase() === kategori.toLowerCase())
+          .sort((a, b) => a.urutan - b.urutan);
+        return (
+          <section key={kategori} className="flex flex-col gap-3">
+            <h2 className="font-bold text-lg">Kategori {kategori}</h2>
+            <div className="grid xl:grid-cols-2 gap-3">
+              {subs.map((sub, idx) => {
+                const dipilih = nilaiTampil(sub.id);
+                const pred = dipilih !== undefined ? predikatDari(dipilih, nilaiMasters, kategori) : undefined;
+                const berubah = scores[sub.id] !== undefined;
+                return (
+                  <div
+                    key={sub.id}
+                    className={`bg-white rounded-xl border-2 p-4 flex flex-col gap-3 ${
+                      berubah ? "border-primary-300" : "border-neutral-200"
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="font-semibold">
+                          {idx + 1}. {sub.nama}
+                        </div>
+                        <div className="text-xs text-gray-400 font-mono">
+                          {sub.kode} · maks {sub.maxNilai}
+                        </div>
                       </div>
+                      {dipilih !== undefined && (
+                        <span
+                          className="px-3 py-1 rounded-full text-white text-sm font-bold whitespace-nowrap"
+                          style={{ backgroundColor: pred?.warna ?? "#888" }}
+                        >
+                          {dipilih} · {(pred?.predikat ?? "").replace(/_/g, " ")}
+                        </span>
+                      )}
                     </div>
-                  ))}
-                </div>
 
-                {/* Tabel Sub-Kategori */}
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead className="bg-neutral-50">
-                      <tr>
-                        <th className="px-3 py-2 text-left w-16">No</th>
-                        <th className="px-3 py-2 text-left">Sub-Kategori</th>
-                        <th className="px-3 py-2 text-left w-20">Maks</th>
-                        <th className="px-3 py-2 text-left w-44">Pilih Nilai</th>
-                        <th className="px-3 py-2 text-left w-24">Predikat</th>
-                        <th className="px-3 py-2 text-left">Catatan</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-neutral-100">
-                      {subs.map((sub, idx) => {
-                        const current = scores[sub.id];
-                        const existingScore = existing?.nilaiJuri.find(
-                          (nj) => nj.subKategoriId === sub.id
-                        );
-                        const displayNilai = current?.nilai ?? existingScore?.nilaiDipilih;
-                        const displayPredikat = current?.predikat ?? existingScore?.predikat;
-
-                        return (
-                          <tr key={sub.id} className="align-top">
-                            <td className="px-3 py-2 text-gray-400">{idx + 1}</td>
-                            <td className="px-3 py-2">
-                              <div className="font-medium">{sub.nama}</div>
-                              <div className="text-xs text-gray-400 font-mono">{sub.kode}</div>
-                            </td>
-                            <td className="px-3 py-2 text-gray-500">{sub.maxNilai}</td>
-                            <td className="px-3 py-2">
-                              <div className="flex flex-wrap gap-1">
-                                {masters.map((m) =>
-                                  (m.nilai as number[]).map((n) => (
-                                    <button
-                                      key={`${sub.id}-${n}`}
-                                      type="button"
-                                      onClick={() =>
-                                        handleNilaiClick(sub.id, n, kategori)
-                                      }
-                                      className={`px-2 py-1 rounded text-xs font-bold border-2 transition-all ${
-                                        displayNilai === n
-                                          ? "text-white shadow-md scale-105"
-                                          : "bg-white hover:scale-105"
-                                      }`}
-                                      style={{
-                                        borderColor: m.warna,
-                                        backgroundColor:
-                                          displayNilai === n ? m.warna : undefined,
-                                      }}
-                                    >
-                                      {n}
-                                    </button>
-                                  ))
-                                )}
-                              </div>
-                            </td>
-                            <td className="px-3 py-2">
-                              {displayPredikat && (
-                                <span
-                                  className="px-2 py-0.5 rounded-full text-white text-[10px] font-medium whitespace-nowrap"
-                                  style={{
-                                    backgroundColor:
-                                      PREDIKAT_COLORS[displayPredikat] ?? "#888",
-                                  }}
-                                >
-                                  {displayPredikat.replace(/_/g, " ")}
-                                </span>
-                              )}
-                            </td>
-                            <td className="px-3 py-2">
-                              <input
-                                type="text"
-                                placeholder="Catatan..."
-                                value={current?.catatan ?? ""}
-                                onChange={(e) =>
+                    <div className="flex flex-col gap-2">
+                      {masters.map((m) => (
+                        <div key={m.id} className="flex flex-wrap items-center gap-2">
+                          <span className="w-28 shrink-0 text-xs font-semibold" style={{ color: m.warna }}>
+                            {m.predikat.replace(/_/g, " ")}
+                          </span>
+                          {(m.nilai as number[]).map((n) => {
+                            const aktif = dipilih === n;
+                            return (
+                              <button
+                                key={n}
+                                type="button"
+                                disabled={terkunci}
+                                onClick={() =>
                                   setScores((prev) => ({
                                     ...prev,
-                                    [sub.id]: {
-                                      ...prev[sub.id],
-                                      catatan: e.target.value,
-                                    },
+                                    [sub.id]: { nilai: n, catatan: prev[sub.id]?.catatan ?? catatanTampil(sub.id) },
                                   }))
                                 }
-                                className="border border-neutral-200 rounded px-2 py-1 text-xs w-full"
-                              />
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                    <tfoot>
-                      <tr className="bg-neutral-50 font-bold">
-                        <td colSpan={3} className="px-3 py-2 text-right">
-                          Total sesi ini:
-                        </td>
-                        <td className="px-3 py-2 text-primary-600 text-lg">
-                          {Object.entries(scores)
-                            .filter(([id]) =>
-                              subs.some((s) => s.id === id)
-                            )
-                            .reduce((s, [, v]) => s + v.nilai, 0)}
-                        </td>
-                        <td colSpan={2} />
-                      </tr>
-                    </tfoot>
-                  </table>
-                </div>
-              </div>
-            );
-          })}
+                                className="min-w-[3rem] h-12 px-3 rounded-lg border-2 text-base font-bold transition-colors disabled:opacity-50"
+                                style={{
+                                  borderColor: m.warna,
+                                  backgroundColor: aktif ? m.warna : "white",
+                                  color: aktif ? "white" : undefined,
+                                }}
+                              >
+                                {n}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      ))}
+                    </div>
 
-          <div className="flex items-center justify-between bg-white border border-neutral-200 rounded-xl p-4">
-            <div className="text-sm text-gray-500">
-              Total nilai sesi ini:{" "}
-              <span className="font-bold text-black text-lg">{totalScore}</span>
+                    {catatanTerbuka[sub.id] || catatanTampil(sub.id) ? (
+                      <input
+                        type="text"
+                        maxLength={500}
+                        disabled={terkunci}
+                        placeholder="Catatan untuk sub-kategori ini..."
+                        value={catatanTampil(sub.id)}
+                        onChange={(e) => {
+                          const n = nilaiTampil(sub.id);
+                          if (n === undefined) {
+                            toast.error("Pilih nilai dulu sebelum menulis catatan");
+                            return;
+                          }
+                          const catatan = e.target.value;
+                          setScores((prev) => ({ ...prev, [sub.id]: { nilai: n, catatan } }));
+                        }}
+                        className="border border-neutral-300 rounded-lg px-3 py-2.5 text-sm w-full"
+                      />
+                    ) : (
+                      !terkunci && (
+                        <button
+                          type="button"
+                          onClick={() => setCatatanTerbuka((p) => ({ ...p, [sub.id]: true }))}
+                          className="self-start text-sm text-primary-500 font-medium py-1"
+                        >
+                          + Catatan
+                        </button>
+                      )
+                    )}
+                  </div>
+                );
+              })}
             </div>
-            <button
-              type="button"
-              onClick={handleSubmit}
-              disabled={loading}
-              className="bg-primary-500 text-white px-6 py-2 rounded-lg font-semibold hover:bg-primary-600 transition-colors disabled:opacity-60"
-            >
-              {loading ? "Menyimpan..." : "Simpan Nilai"}
-            </button>
-          </div>
-        </div>
+          </section>
+        );
+      })}
+
+      {Object.keys(grouped).length === 0 && kategoriJuri.length > 0 && (
+        <p className="text-sm text-gray-400">Belum ada sub-kategori aktif untuk kategori Anda.</p>
       )}
 
-      {/* Input Pelanggaran */}
+      {/* Pelanggaran */}
       <div className="bg-white border border-neutral-200 rounded-xl p-5">
-        <h2 className="font-semibold mb-3">Input Pelanggaran / Pengurangan</h2>
-        {pelanggarans.length === 0 ? (
-          <p className="text-sm text-gray-400">
-            Belum ada master pelanggaran. Tambah di halaman utama penilaian.
-          </p>
-        ) : (
-          <div className="flex flex-wrap gap-3 items-end">
-            <div className="flex flex-col gap-1">
-              <label className="text-sm">Jenis Pelanggaran</label>
-              <select
-                value={pelId}
-                onChange={(e) => setPelId(e.target.value)}
-                className="border border-neutral-300 rounded-lg px-3 py-2 text-sm"
-              >
-                <option value="">-- Pilih --</option>
-                {pelanggarans.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    [{p.kode}] {p.nama} (-{p.poinPengurangan} poin)
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-sm">Jumlah Kejadian</label>
-              <input
-                type="number"
-                min={1}
-                value={kejadian}
-                onChange={(e) => setKejadian(parseInt(e.target.value))}
-                className="border border-neutral-300 rounded-lg px-3 py-2 text-sm w-24"
-              />
-            </div>
-            <button
-              type="button"
-              onClick={handleAddPelanggaran}
-              className="bg-red-500 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-red-600 transition-colors"
-            >
-              Tambah Pelanggaran
-            </button>
-          </div>
+        <h2 className="font-semibold mb-3">Pelanggaran / Pengurangan</h2>
+        {existing && existing.pelanggaranTim.length > 0 && (
+          <ul className="mb-4 text-sm divide-y divide-neutral-100">
+            {existing.pelanggaranTim.map((p) => (
+              <li key={p.id} className="flex items-center gap-3 py-2">
+                <span className="flex-1">
+                  [{p.pelanggaran.kode}] {p.pelanggaran.nama} × {p.jumlahKejadian}
+                </span>
+                <span className="text-red-500 font-semibold">-{p.totalPengurang}</span>
+                {!terkunci && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      handleHapusPelanggaran(p.id, `[${p.pelanggaran.kode}] × ${p.jumlahKejadian}`)
+                    }
+                    className="text-xs text-red-600 bg-red-50 hover:bg-red-100 rounded-lg px-3 py-2"
+                  >
+                    Hapus
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
         )}
-
-        {existing && existing.nilaiJuri.length > 0 && (
-          <div className="mt-4 text-sm text-gray-500">
-            Nilai akhir setelah pengurangan:{" "}
-            <span className="font-bold text-black text-base">
-              {existing.nilaiAkhir}
-            </span>
-          </div>
+        {pelanggarans.length === 0 ? (
+          <p className="text-sm text-gray-400">Belum ada master pelanggaran.</p>
+        ) : (
+          !terkunci && (
+            <div className="flex flex-wrap gap-3 items-end">
+              <div className="flex flex-col gap-1 flex-1 min-w-[14rem]">
+                <label className="text-sm">Jenis Pelanggaran</label>
+                <select
+                  value={pelId}
+                  onChange={(e) => setPelId(e.target.value)}
+                  className="border border-neutral-300 rounded-lg px-3 py-3 text-sm"
+                >
+                  <option value="">-- Pilih --</option>
+                  {pelanggarans.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      [{p.kode}] {p.nama} (-{p.poinPengurangan} poin)
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-sm">Jumlah Kejadian</label>
+                <input
+                  type="number"
+                  min={1}
+                  max={50}
+                  value={kejadian}
+                  onChange={(e) => setKejadian(Math.max(1, parseInt(e.target.value) || 1))}
+                  className="border border-neutral-300 rounded-lg px-3 py-3 text-sm w-24"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={handleAddPelanggaran}
+                className="bg-red-500 text-white px-5 py-3 rounded-lg text-sm font-semibold hover:bg-red-600 transition-colors"
+              >
+                Tambah Pelanggaran
+              </button>
+            </div>
+          )
         )}
       </div>
+
+      {/* Bar simpan — selalu terlihat saat menggulir di tablet */}
+      {!terkunci && subSaya.length > 0 && (
+        <div className="fixed bottom-0 left-0 right-0 lg:left-80 z-30 bg-white/95 backdrop-blur border-t border-neutral-200 px-4 sm:px-8 py-3 flex items-center gap-4">
+          <div className="text-sm text-gray-600">
+            Terisi{" "}
+            <b className={terisi === subSaya.length ? "text-green-600" : "text-black"}>
+              {terisi}/{subSaya.length}
+            </b>{" "}
+            · Total <b className="text-black text-lg">{total}</b>
+          </div>
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={loading || !adaPerubahan}
+            className="ml-auto bg-primary-500 text-white px-8 h-12 rounded-xl font-semibold hover:bg-primary-600 transition-colors disabled:opacity-50"
+          >
+            {loading ? "Menyimpan..." : adaPerubahan ? "Simpan Nilai" : "Tersimpan"}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

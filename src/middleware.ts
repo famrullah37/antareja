@@ -1,7 +1,9 @@
 import { getToken } from "next-auth/jwt";
 import { NextRequest, NextResponse } from "next/server";
 
-const JURI_ROUTES = ["/admin/penilaian", "/admin/penilaian-baru"];
+// Juri hanya halaman input nilai — "/admin/penilaian-baru" (konfigurasi + ranking
+// semua tim) dan "/admin/penilaian" (sistem lama) memuat nama sekolah & nilai juri lain.
+const JURI_ROUTES = ["/admin/penilaian-baru/input"];
 const TIKET_ROUTES = ["/admin/tiket"];
 const BENDAHARA_ROUTES = ["/admin/kas", "/admin/pembayaran", "/admin/voting", "/admin/merchandise"];
 const FOTOGRAFER_ROUTES = ["/admin/galeri"];

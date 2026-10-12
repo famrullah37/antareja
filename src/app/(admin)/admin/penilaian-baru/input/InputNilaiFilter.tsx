@@ -14,12 +14,14 @@ export default function InputNilaiFilter({
   juriKategoris,
   kategoriLombas,
   defaultValues,
+  sembunyikanSekolah = false,
 }: {
   jenjangList: string[];
   juris: Juri[];
   juriKategoris: JuriKat[];
   kategoriLombas: KategoriLomba[];
   defaultValues: { jenjang?: string; sekolah?: string; juriId?: string; kategori?: string };
+  sembunyikanSekolah?: boolean;
 }) {
   const router = useRouter();
   const [jenjang, setJenjang] = useState(defaultValues.jenjang ?? "");
@@ -34,7 +36,7 @@ export default function InputNilaiFilter({
   function handleFilter() {
     const params = new URLSearchParams();
     if (jenjang) params.set("jenjang", jenjang);
-    if (sekolah) params.set("sekolah", sekolah);
+    if (sekolah && !sembunyikanSekolah) params.set("sekolah", sekolah);
     const juriDipilih = juris.find((j) => j.id === juriId);
     if (juriDipilih) params.set("juri", makeSlug(juriDipilih.nama, juriDipilih.id, "juri"));
     if (kategori) params.set("kategori", kategori);
@@ -65,6 +67,7 @@ export default function InputNilaiFilter({
           </select>
         </div>
 
+        {!sembunyikanSekolah && (
         <div className="flex flex-col gap-1">
           <label className="text-xs text-gray-500">Nama Sekolah</label>
           <input
@@ -74,6 +77,7 @@ export default function InputNilaiFilter({
             className="border border-neutral-300 rounded-lg px-3 py-2 text-sm"
           />
         </div>
+        )}
 
         <div className="flex flex-col gap-1">
           <label className="text-xs text-gray-500">Juri</label>

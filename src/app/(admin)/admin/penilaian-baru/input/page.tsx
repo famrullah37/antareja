@@ -5,12 +5,16 @@ import { findJuriKategoris, findKategoriLombas } from "@/queries/penilaianBaru.q
 import Link from "next/link";
 import { makeSlug, noUrutSlug } from "@/lib/timSlug";
 import InputNilaiFilter from "./InputNilaiFilter";
+import { getServerSession } from "@/lib/next-auth";
 
 export default async function InputNilaiIndexPage({
   searchParams,
 }: {
   searchParams?: { jenjang?: string; sekolah?: string; juri?: string; juriId?: string; kategori?: string };
 }) {
+  const session = await getServerSession();
+  // Juri tidak boleh melihat/mencari nama sekolah — penilaian netral berdasarkan no. urut.
+  const isJuri = session?.user?.role === "JURI";
   const [tims, juris, juriKategoris, kategoriLombas] = await Promise.all([
     findTims({ confirmed: true }),
     findJuris(),
@@ -28,7 +32,7 @@ export default async function InputNilaiIndexPage({
 
   const filtered = (tims as any[]).filter((t) => {
     if (searchParams?.jenjang && t.jenjang !== searchParams.jenjang) return false;
-    if (searchParams?.sekolah && !t.asal_sekolah.toLowerCase().includes(searchParams.sekolah.toLowerCase())) return false;
+    if (!isJuri && searchParams?.sekolah && !t.asal_sekolah.toLowerCase().includes(searchParams.sekolah.toLowerCase())) return false;
     if (juriIdDipilih) {
       const kats = juriKategoris.filter((jk) => jk.juriId === juriIdDipilih).map((jk) => jk.kategori);
       if (searchParams?.kategori && !kats.includes(searchParams.kategori)) return false;
@@ -47,10 +51,12 @@ export default async function InputNilaiIndexPage({
 
       <InputNilaiFilter
         jenjangList={jenjangList}
-        juris={juris as any[]}
-        juriKategoris={juriKategoris as any[]}
+        // Hanya id/nama/kategori — props ini terkirim ke browser (tanpa email & no. HP juri).
+        juris={juris.map((j) => ({ id: j.id, nama: j.nama }))}
+        juriKategoris={juriKategoris.map((jk) => ({ id: jk.id, juriId: jk.juriId, kategori: jk.kategori }))}
         kategoriLombas={kategoriLombas}
         defaultValues={{ ...searchParams, juriId: juriIdDipilih }}
+        sembunyikanSekolah={isJuri}
       />
 
       <div>
@@ -73,7 +79,7 @@ export default async function InputNilaiIndexPage({
                     : "Belum ada No. Urut"}
                 </div>
                 <div className="text-sm text-gray-400">
-                  {tim.asal_sekolah} — {tim.jenjang}
+                  {isJuri ? `Jenjang ${tim.jenjang}` : `${tim.asal_sekolah} — ${tim.jenjang}`}
                 </div>
               </Link>
             );
