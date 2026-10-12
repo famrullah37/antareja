@@ -1,3 +1,6 @@
+// Data tiket (stok, harga) dari database — harus dirender per request, bukan saat build
+// (saat build tidak ada DATABASE_URL). Dulu dinamis "kebetulan" karena membaca sesi.
+export const dynamic = "force-dynamic";
 import { findTikets, findKonfigTiket } from "@/queries/tiket.query";
 import BeliTiketForm from "./BeliTiketForm";
 import { getKonfigUmum, type TimelineItem } from "@/queries/konfigUmum.query";
