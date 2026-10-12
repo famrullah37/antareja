@@ -282,31 +282,42 @@ async function setStatusPembayaran(timId: string, confirmed: boolean, isDP: bool
   // selisihnya dicatat sebagai entri "Pelunasan". Serializable supaya dua
   // approve yang terkirim bersamaan tidak sama-sama mencatat.
   const kodeInfo = pembayaran?.kodeUnik ? ` [#${pembayaran.kodeUnik}]` : "";
-  await prisma.$transaction(
-    async (tx) => {
-      const tercatat = await tx.kasTransaksi.aggregate({
-        where: { sumber: "PENDAFTARAN", referensiId: timId },
-        _sum: { jumlah: true },
-        _count: true,
-      });
-      const sudah = tercatat._sum.jumlah ?? 0;
-      if (sudah >= totalBayar) return;
-      await tx.kasTransaksi.create({
-        data: {
-          tipe: "PEMASUKAN",
-          keterangan:
-            tercatat._count === 0
-              ? `Pendaftaran Tim ${tim.nama_tim} — ${tim.asal_sekolah}${kodeInfo}`
-              : `Pelunasan Pendaftaran Tim ${tim.nama_tim} — ${tim.asal_sekolah}${kodeInfo}`,
-          jumlah: totalBayar - sudah,
-          kategori: "PENDAFTARAN_TIM",
-          sumber: "PENDAFTARAN",
-          referensiId: timId,
+  // Serializable menolak (P2034) request yang bentrok — coba ulang: percobaan
+  // berikutnya melihat entri yang sudah tercatat dan tidak menambah apa-apa,
+  // jadi klik ganda tidak lagi tampil "gagal" ke admin.
+  for (let percobaan = 1; ; percobaan++) {
+    try {
+      await prisma.$transaction(
+        async (tx) => {
+          const tercatat = await tx.kasTransaksi.aggregate({
+            where: { sumber: "PENDAFTARAN", referensiId: timId },
+            _sum: { jumlah: true },
+            _count: true,
+          });
+          const sudah = tercatat._sum.jumlah ?? 0;
+          if (sudah >= totalBayar) return;
+          await tx.kasTransaksi.create({
+            data: {
+              tipe: "PEMASUKAN",
+              keterangan:
+                tercatat._count === 0
+                  ? `Pendaftaran Tim ${tim.nama_tim} — ${tim.asal_sekolah}${kodeInfo}`
+                  : `Pelunasan Pendaftaran Tim ${tim.nama_tim} — ${tim.asal_sekolah}${kodeInfo}`,
+              jumlah: totalBayar - sudah,
+              kategori: "PENDAFTARAN_TIM",
+              sumber: "PENDAFTARAN",
+              referensiId: timId,
+            },
+          });
         },
-      });
-    },
-    { isolationLevel: "Serializable" }
-  );
+        { isolationLevel: "Serializable" }
+      );
+      break;
+    } catch (e) {
+      if ((e as { code?: string })?.code !== "P2034" || percobaan >= 5) throw e;
+      await new Promise((r) => setTimeout(r, 50 * percobaan));
+    }
+  }
 
   return kirimKuitansiJikaBelum(timId, jumlah);
 }
