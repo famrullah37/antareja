@@ -1,4 +1,5 @@
 "use server";
+import { batasiAksi } from "@/lib/rateLimit";
 import { Jenjang, Tipe } from "@prisma/client";
 import { imageUploader, validateUploadFile } from "./fileUploader";
 import { revalidatePath } from "next/cache";
@@ -31,6 +32,8 @@ async function getKuotaJenjang(
 // begitu jenjang & tipe pembayaran dipilih, supaya nominal yang ditampilkan
 // (biaya + kode unik) sudah pasti sebelum uang benar-benar ditransfer.
 export async function reserveKodePendaftaran(jenjang: Jenjang, isDP: boolean) {
+  const dibatasi = await batasiAksi("kode", 120, 10 * 60 * 1000);
+  if (dibatasi) return { success: false, message: dibatasi };
   if (!VALID_JENJANG.includes(jenjang)) return { success: false, message: "Jenjang tidak valid" };
 
   const kuota = await getKuotaJenjang(prisma, jenjang);
@@ -55,6 +58,8 @@ export async function reserveKodePendaftaran(jenjang: Jenjang, isDP: boolean) {
 }
 
 export default async function submitFormRegistrasi(data: FormData) {
+  const dibatasi = await batasiAksi("daftarTim", 20, 60 * 60 * 1000);
+  if (dibatasi) return { success: false, message: dibatasi };
   const session = await getServerSession();
   if (!session?.user?.id) return { success: false, message: "Anda harus login terlebih dahulu" };
   const userId = session.user.id;

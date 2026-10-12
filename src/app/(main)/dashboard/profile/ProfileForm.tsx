@@ -70,11 +70,25 @@ export default function ProfileForm({
 
         <div className="flex flex-col gap-1">
           <label className="text-sm font-medium text-neutral-700">
+            Password Lama <span className="text-gray-400 font-normal">(wajib jika mengganti password)</span>
+          </label>
+          <input
+            name="passwordLama"
+            type="password"
+            autoComplete="current-password"
+            placeholder="Masukkan password saat ini"
+            className="border border-neutral-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-300"
+          />
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <label className="text-sm font-medium text-neutral-700">
             Password Baru <span className="text-gray-400 font-normal">(kosongkan jika tidak ingin ubah)</span>
           </label>
           <input
             name="password"
             type="password"
+            autoComplete="new-password"
             placeholder="Masukkan password baru"
             className="border border-neutral-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-300"
           />

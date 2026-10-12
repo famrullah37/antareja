@@ -13,7 +13,7 @@ async function requireAdmin() {
   if (!["ADMIN", "SIE_LOMBA"].includes(session?.user?.role ?? "")) throw new Error("Forbidden");
 }
 
-export async function createPenilaianForm(data: FormData, userId: string) {
+export async function createPenilaianForm(data: FormData) {
   const timId = data.get("tim") as string;
   const pbb = parseInt(data.get("pbb") as string);
   const variasi = parseInt(data.get("variasi") as string);
@@ -27,6 +27,8 @@ export async function createPenilaianForm(data: FormData, userId: string) {
 
   try {
     await requireAdmin();
+    // Penilai = akun yang login, bukan userId kiriman klien.
+    const userId = (await getServerSession())!.user!.id;
     await createPenilaian({
       tim: { connect: { id: timId } },
       pbb: pbb,

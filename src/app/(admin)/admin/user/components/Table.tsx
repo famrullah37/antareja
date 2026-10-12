@@ -104,7 +104,7 @@ export default function TimTable({ data }: { data: User[] }) {
                       const toastId = toast.loading("Mengubah role...");
                       const result = await updateRoleUser(user.id, e.target.value as any);
                       if (result.success) toast.success("Role diperbarui!", { id: toastId });
-                      else toast.error("Gagal ubah role", { id: toastId });
+                      else toast.error(result.message ?? "Gagal ubah role", { id: toastId });
                     }}
                   >
                     <option value="USER">USER</option>
@@ -124,7 +124,7 @@ export default function TimTable({ data }: { data: User[] }) {
                       const toastId = toast.loading("Menghapus...");
                       const result = await deleteUserForm(user.id);
                       if (result.success) toast.success("User dihapus!", { id: toastId });
-                      else toast.error("Gagal menghapus!", { id: toastId });
+                      else toast.error(result.message ?? "Gagal menghapus!", { id: toastId });
                     }}
                     className="text-gray-400 hover:text-red-500 transition-colors"
                   >

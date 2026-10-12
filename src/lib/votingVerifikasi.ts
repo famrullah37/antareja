@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import prisma from "@/lib/prisma";
 import { catatLog } from "@/lib/activityLog";
 import { sendMailTo } from "@/lib/mailer";
-import { findTransaksiVoting, updateTransaksiVoting } from "@/queries/voting.query";
+import { findTransaksiVoting } from "@/queries/voting.query";
 import { escapeHtml } from "@/lib/escapeHtml";
 
 // Dipisah dari src/actions/Voting.ts: semua export di file "use server"
@@ -21,7 +21,13 @@ export async function markVotingVerified(transaksiId: string) {
   if (!transaksi) return { success: false };
   if (transaksi.status === "VERIFIED") return { success: false, message: "Dukungan sudah diverifikasi sebelumnya" };
 
-  await updateTransaksiVoting({ id: transaksiId }, { status: "VERIFIED" });
+  // Klaim atomik: hanya satu request yang bisa mengubah status ke VERIFIED —
+  // cek-lalu-update biasa lolos dua kali bila tombol terkirim ganda (suara & kas dobel).
+  const klaim = await prisma.transaksiVoting.updateMany({
+    where: { id: transaksiId, status: "PENDING" },  // hanya PENDING: transaksi DITOLAK tidak bisa diverifikasi ulang (kode unik-nya mungkin sudah dipakai transaksi lain)
+    data: { status: "VERIFIED" },
+  });
+  if (klaim.count === 0) return { success: false, message: "Dukungan sudah diproses (diverifikasi/ditolak) sebelumnya" };
 
   // "tim_favorit" tetap lewat Tim.totalVote (leaderboard lama, tidak
   // diubah) — kategori tambahan dihitung lewat VotingTally per kategori.

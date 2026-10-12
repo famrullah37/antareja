@@ -7,7 +7,6 @@ import {
   getKategoriList,
 } from "@/queries/voting.query";
 import { findKonfigTiket } from "@/queries/tiket.query";
-import { getServerSession } from "@/lib/next-auth";
 import { cekJendelaVoting } from "@/actions/Voting";
 import VoteForm from "./VoteForm";
 import VotingCountdownBanner from "./VotingCountdownBanner";
@@ -20,9 +19,8 @@ export const metadata: Metadata = {
 };
 
 export default async function VotePage() {
-  const [tims, session, konfigVoting, dantonMap, tallyMap, konfigTiket] = await Promise.all([
+  const [tims, konfigVoting, dantonMap, tallyMap, konfigTiket] = await Promise.all([
     findTimsForVoting(),
-    getServerSession(),
     findKonfigVoting(),
     findDantonMap(),
     findVotingTallyMap(),
@@ -62,7 +60,6 @@ export default async function VotePage() {
           )}
           <VoteForm
             tims={tims}
-            userId={session?.user?.id}
             konfig={konfig}
             kategoriList={kategoriList}
             dantonMap={dantonMap}

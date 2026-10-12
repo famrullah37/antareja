@@ -489,6 +489,17 @@ model PesananMerch {
   user             User?     @relation(fields: [userId], references: [id])
 }
 
+// Penghitung pembatas laju (rate limit) & percobaan login gagal — di database,
+// bukan memori proses, supaya tetap berlaku walau container restart.
+// key mis. "login:<email>" atau "aksi:pesanMerch:<ip>".
+model RateLimit {
+  key     String   @id
+  count   Int      @default(0)
+  resetAt DateTime
+
+  @@index([resetAt])
+}
+
 // ─── Kas ─────────────────────────────────────────────────────────────────────
 
 model KasTransaksi {

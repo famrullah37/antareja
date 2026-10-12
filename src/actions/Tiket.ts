@@ -1,5 +1,7 @@
 "use server";
+import { batasiAksi } from "@/lib/rateLimit";
 
+import { cekDataPemesan } from "@/lib/validasi";
 import { getServerSession } from "@/lib/next-auth";
 import { revalidatePath } from "next/cache";
 import { sendMailTo } from "@/lib/mailer";
@@ -124,6 +126,8 @@ export async function saveKonfigTiket(data: FormData) {
 // ─── Publik: QRIS Dinamis (dipakai Tiket & Galeri Foto Premium) ──────────────
 
 export async function getDynamicQrisTiket(amount: number) {
+  const dibatasi = await batasiAksi("qris", 200, 10 * 60 * 1000);
+  if (dibatasi) return { success: false, message: dibatasi };
   if (!Number.isFinite(amount) || amount <= 0) return { success: false };
   try {
     const konfig = await findKonfigTiket();
@@ -153,6 +157,8 @@ export async function deleteTiketAdmin(id: string) {
 // form begitu jenis tiket & jumlah dipilih, supaya nominal yang ditampilkan
 // (harga + kode unik) sudah pasti sebelum user membayar.
 export async function reserveKodeTiket() {
+  const dibatasi = await batasiAksi("kode", 120, 10 * 60 * 1000);
+  if (dibatasi) return { success: false, message: dibatasi };
   try {
     const updated = await incrementCounterUrutTiket();
     const kodeUnik = String(updated.counterUrutTiket % 1000).padStart(3, "0");
@@ -163,7 +169,12 @@ export async function reserveKodeTiket() {
   }
 }
 
-export async function beliTiket(data: FormData, userId?: string) {
+export async function beliTiket(data: FormData) {
+  const dibatasi = await batasiAksi("beli", 40, 10 * 60 * 1000);
+  if (dibatasi) return { success: false, message: dibatasi };
+  // userId dari sesi, bukan dari klien — kalau dari klien, siapa pun bisa
+  // menempelkan transaksinya ke akun orang lain.
+  const userId = (await getServerSession())?.user?.id;
   const tiketId = data.get("tiketId") as string;
   const jumlah = parseInt(data.get("jumlah") as string);
   const bundleJumlah = parseInt((data.get("bundleJumlah") as string) || "0");
@@ -177,6 +188,10 @@ export async function beliTiket(data: FormData, userId?: string) {
   if (metodePembayaran !== "TRANSFER" && metodePembayaran !== "QRIS") {
     return { success: false, message: "Metode pembayaran online hanya QRIS atau Transfer" };
   }
+  if (!Number.isInteger(jumlah) || jumlah < 1 || jumlah > 100)
+    return { success: false, message: "Jumlah tiket tidak valid (1–100)" };
+  const salahData = cekDataPemesan({ nama, email, noHp });
+  if (salahData) return { success: false, message: salahData };
 
   // Bukti wajib untuk transfer manual (admin tidak punya cara lain
   // memverifikasi) — untuk QRIS opsional karena nominal sudah unik lewat
@@ -187,6 +202,12 @@ export async function beliTiket(data: FormData, userId?: string) {
   if (!kodeUnik || !/^\d{3}$/.test(kodeUnik)) {
     return { success: false, message: "Kode pembayaran tidak valid, silakan pilih ulang jumlah tiket" };
   }
+
+  // Cek tiket & stok SEBELUM upload — jangan buang kuota Cloudinary untuk pembelian
+  // yang pasti gagal (stok tetap dicek ulang secara atomik di transaksi bawah).
+  const tiketCek = await prisma.tiket.findUnique({ where: { id: tiketId }, select: { sisa: true } });
+  if (!tiketCek) return { success: false, message: "Tiket tidak ditemukan" };
+  if (tiketCek.sisa < jumlah) return { success: false, message: "Stok tiket tidak mencukupi" };
 
   // Upload bukti dulu sebelum transaksi DB
   let buktiUrl: string | undefined;
@@ -338,7 +359,13 @@ export async function verifikasiTiket(transaksiId: string) {
     if (!transaksi) return { success: false };
     if (transaksi.status === "VERIFIED") return { success: false, message: "Tiket sudah diverifikasi sebelumnya" };
 
-    await updateTransaksiTiket({ id: transaksiId }, { status: "VERIFIED" });
+    // Klaim atomik: hanya satu request yang bisa mengubah status ke VERIFIED —
+    // cek-lalu-update biasa lolos dua kali bila tombol terkirim ganda (kas dobel).
+    const klaim = await prisma.transaksiTiket.updateMany({
+      where: { id: transaksiId, status: "PENDING" },  // hanya PENDING: transaksi DITOLAK tidak bisa diverifikasi ulang (kode unik-nya mungkin sudah dipakai transaksi lain)
+      data: { status: "VERIFIED" },
+    });
+    if (klaim.count === 0) return { success: false, message: "Tiket sudah diproses (diverifikasi/ditolak) sebelumnya" };
 
     await prisma.qRTiket.createMany({
       data: Array.from({ length: transaksi.jumlah }, (_, i) => ({
@@ -426,7 +453,10 @@ export async function rejectTiket(transaksiId: string) {
   await requireAdminOrTiket();
   try {
     const transaksi = await findTransaksiTiket({ id: transaksiId });
-    await updateTransaksiTiket({ id: transaksiId }, { status: "REJECTED" });
+    // Hanya yang masih PENDING — menolak transaksi yang sudah VERIFIED akan
+    // meninggalkan entri kas/suara/QR yang sudah tercatat.
+    const tolak = await prisma.transaksiTiket.updateMany({ where: { id: transaksiId, status: "PENDING" }, data: { status: "REJECTED" } });
+    if (tolak.count === 0) return { success: false, message: "Transaksi sudah diproses sebelumnya" };
     if (transaksi) {
       await catatLog("TOLAK_TIKET", `Tiket ${transaksi.tiket.jenis} × ${transaksi.jumlah} (${transaksi.nama})`);
     }

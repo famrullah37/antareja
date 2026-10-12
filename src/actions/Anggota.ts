@@ -10,6 +10,7 @@ import { findTimsByUser } from "@/queries/tim.query";
 import { Kelas, Posisi } from "@prisma/client";
 import { compressPhoto, imageUploader, validateUploadFile } from "./fileUploader";
 import { revalidatePath } from "next/cache";
+import { isHttpUrl } from "@/lib/safeUrl";
 
 export async function upsertAnggotaForm(
   data: FormData,
@@ -30,7 +31,9 @@ export async function upsertAnggotaForm(
   const nisn = data.get("nisn") as string | undefined;
   const foto = data.get("foto") as File;
   const kelas = data.get("kelas") as Kelas | undefined;
-  const link_ig = data.get("link_ig") as string | undefined;
+  // null (bukan undefined) supaya link yang dikosongkan benar-benar terhapus saat update.
+  const link_ig = ((data.get("link_ig") as string) || "").trim() || null;
+  if (link_ig && !isHttpUrl(link_ig)) return { success: false, message: "Link Instagram harus diawali https://" };
   const tglLahirRaw = data.get("tanggal_lahir") as string | null;
   // Input type="date" mengirim "YYYY-MM-DD"; simpan sebagai tengah malam UTC
   // supaya kolom DATE tidak geser sehari karena zona waktu.
@@ -38,6 +41,9 @@ export async function upsertAnggotaForm(
     tglLahirRaw && /^\d{4}-\d{2}-\d{2}$/.test(tglLahirRaw)
       ? new Date(`${tglLahirRaw}T00:00:00.000Z`)
       : undefined;
+  const siswa = posisi !== "OFFICIAL" && posisi !== "PELATIH";
+  if (!Object.values(Posisi).includes(posisi)) return { success: false, message: "Posisi tidak valid" };
+  if (siswa && !tanggal_lahir) return { success: false, message: "Tanggal lahir wajib diisi" };
 
   const tryFindAnggota = await findAnggota({ id });
   // id anggota dikirim dari klien — pastikan anggota yang mau diedit memang

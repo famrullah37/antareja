@@ -1,6 +1,7 @@
 "use server";
 
 import { getServerSession } from "@/lib/next-auth";
+import { isHttpUrl } from "@/lib/safeUrl";
 import { imageUploader, validateUploadFile } from "./fileUploader";
 import {
   createSponsor,
@@ -17,7 +18,8 @@ async function requireAdmin() {
 export async function createSponsorForm(data: FormData) {
   await requireAdmin();
   const nama = data.get("nama") as string;
-  const linkUrl = (data.get("linkUrl") as string) || undefined;
+  const linkUrl = ((data.get("linkUrl") as string) || "").trim() || undefined;
+  if (linkUrl && !isHttpUrl(linkUrl)) return { success: false, message: "Link harus diawali https://" };
   const tipe = (data.get("tipe") as string) || "SPONSOR";
   const urutan = parseInt((data.get("urutan") as string) || "0");
   const logo = data.get("logo") as File;

@@ -2,7 +2,6 @@ export const dynamic = "force-dynamic";
 
 import { findAlbums, findFotos } from "@/queries/galeri.query";
 import { findKonfigTiket } from "@/queries/tiket.query";
-import { getServerSession } from "@/lib/next-auth";
 import GaleriClient from "./GaleriClient";
 
 import type { Metadata } from "next";
@@ -13,12 +12,20 @@ export const metadata: Metadata = {
 };
 
 export default async function GaleriPage() {
-  const [albums, fotos, session, konfig] = await Promise.all([
+  const [albums, fotos, konfig] = await Promise.all([
     findAlbums({ statusPublish: true }),
     findFotos({ statusPublish: true }),
-    getServerSession(),
     findKonfigTiket(),
   ]);
+
+  // URL resolusi penuh (pathAsli) foto BERBAYAR tidak boleh ikut ke browser —
+  // props komponen klien terbaca di page source, jadi foto bisa diunduh tanpa
+  // membeli. Untuk album berbayar klien hanya menerima versi watermark; file asli
+  // dibuka lewat /galeri/download/[id] setelah pembayaran diverifikasi.
+  const fotosAman = fotos.map((f) => ({
+    ...f,
+    pathAsli: f.album.tipe === "GRATIS" ? f.pathAsli : "",
+  }));
 
   const totalFoto = fotos.length;
   const totalAlbum = albums.length;
@@ -62,8 +69,7 @@ export default async function GaleriPage() {
       <div className="max-w-5xl mx-auto px-4 py-10">
         <GaleriClient
           albums={albums as any}
-          fotos={fotos as any}
-          userId={session?.user?.id}
+          fotos={fotosAman as any}
           konfig={konfig}
         />
       </div>

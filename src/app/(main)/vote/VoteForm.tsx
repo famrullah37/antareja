@@ -70,14 +70,12 @@ const PODIUM_STYLES = [
 
 export default function VoteForm({
   tims,
-  userId,
   konfig,
   kategoriList,
   dantonMap,
   tallyMap,
 }: {
   tims: TimVote[];
-  userId?: string;
   konfig: KonfigVoting;
   kategoriList: KategoriVoting[];
   dantonMap: Record<string, string>;
@@ -164,7 +162,7 @@ export default function VoteForm({
 
   async function handleSubmit(data: FormData) {
     const toastId = toast.loading("Memproses...");
-    const result = await submitVote(data, userId);
+    const result = await submitVote(data);
     if (result.success) {
       toast.success(
         "Dukungan diterima! Admin akan memverifikasi bukti pembayaranmu.",

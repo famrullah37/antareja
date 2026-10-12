@@ -1,5 +1,7 @@
 "use server";
+import { batasiAksi } from "@/lib/rateLimit";
 
+import { cekDataPemesan } from "@/lib/validasi";
 import { getServerSession } from "@/lib/next-auth";
 import { revalidatePath } from "next/cache";
 import prisma from "@/lib/prisma";
@@ -117,6 +119,8 @@ export async function saveKonfigVoting(data: FormData) {
 // admin di /admin/tiket — Voting sengaja pakai QRIS yang sama dengan Tiket/
 // Galeri Foto Premium, lihat komentar di KonfigTiket (schema.prisma).
 export async function getDynamicQrisVoting(amount: number) {
+  const dibatasi = await batasiAksi("qris", 200, 10 * 60 * 1000);
+  if (dibatasi) return { success: false, message: dibatasi };
   if (!Number.isFinite(amount) || amount <= 0) return { success: false };
   try {
     const konfig = await findKonfigTiket();
@@ -133,6 +137,8 @@ export async function getDynamicQrisVoting(amount: number) {
 // Memesan nomor urut (kode unik) pembayaran secara atomik, dipanggil saat user
 // memilih tim — sebelum mengisi form & mengunggah bukti transfer QRIS.
 export async function reserveKodeVoting() {
+  const dibatasi = await batasiAksi("kode", 120, 10 * 60 * 1000);
+  if (dibatasi) return { success: false, message: dibatasi };
   try {
     const konfig = await prisma.konfigVoting.findUnique({ where: { id: "singleton" } });
     if (!konfig) return { success: false, message: "Voting dukungan belum/tidak dibuka" };
@@ -150,7 +156,12 @@ export async function reserveKodeVoting() {
   }
 }
 
-export async function submitVote(data: FormData, userId?: string) {
+export async function submitVote(data: FormData) {
+  const dibatasi = await batasiAksi("beli", 40, 10 * 60 * 1000);
+  if (dibatasi) return { success: false, message: dibatasi };
+  // userId dari sesi, bukan dari klien — kalau dari klien, siapa pun bisa
+  // menempelkan transaksinya ke akun orang lain.
+  const userId = (await getServerSession())?.user?.id;
   const timId = data.get("timId") as string;
   const nama = data.get("nama") as string;
   const email = data.get("email") as string;
@@ -181,9 +192,11 @@ export async function submitVote(data: FormData, userId?: string) {
   if (!kodeUnik || !/^\d+$/.test(kodeUnik)) {
     return { success: false, message: "Kode pembayaran tidak valid, silakan ulangi dari pemilihan tim" };
   }
-  if (jumlahVote < 1) {
-    return { success: false, message: "Jumlah vote tidak valid" };
+  if (!Number.isInteger(jumlahVote) || jumlahVote < 1 || jumlahVote > 10000) {
+    return { success: false, message: "Jumlah vote tidak valid (1–10.000)" };
   }
+  const salahData = cekDataPemesan({ nama, email, noHp });
+  if (salahData) return { success: false, message: salahData };
 
   // Pastikan kodeUnik benar-benar pernah di-reserve (bukan dikarang klien) dan
   // belum dipakai transaksi lain — mencegah dua transaksi bertabrakan nominal
@@ -206,7 +219,7 @@ export async function submitVote(data: FormData, userId?: string) {
     if (!status.open) return { success: false, message: status.message };
 
     const tim = await prisma.tim.findUnique({ where: { id: timId } });
-    if (!tim) return { success: false, message: "Tim tidak ditemukan" };
+    if (!tim || !tim.confirmed) return { success: false, message: "Tim tidak ditemukan" };
 
     let buktiUrl: string | undefined;
     if (buktiAda) {
@@ -261,7 +274,10 @@ export async function rejectVoting(transaksiId: string) {
   await requireAdminOrBendahara();
   try {
     const transaksi = await findTransaksiVoting({ id: transaksiId });
-    await updateTransaksiVoting({ id: transaksiId }, { status: "REJECTED" });
+    // Hanya yang masih PENDING — menolak transaksi yang sudah VERIFIED akan
+    // meninggalkan entri kas/suara/QR yang sudah tercatat.
+    const tolak = await prisma.transaksiVoting.updateMany({ where: { id: transaksiId, status: "PENDING" }, data: { status: "REJECTED" } });
+    if (tolak.count === 0) return { success: false, message: "Transaksi sudah diproses sebelumnya" };
     if (transaksi) {
       await catatLog("TOLAK_VOTING", `Dukungan ${transaksi.jumlahVote}x untuk ${transaksi.tim.nama_tim} (${transaksi.nama})`);
     }

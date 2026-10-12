@@ -35,7 +35,7 @@ export default function PenilaianForm({
 
   async function Create(data: FormData) {
     const toastId = toast.loading("Loading...");
-    const result = await createPenilaianForm(data, Session?.user?.id!);
+    const result = await createPenilaianForm(data);
     if (!result.success) {
       toast.error("Gagal menambahkan penilaian!", { id: toastId });
     } else {

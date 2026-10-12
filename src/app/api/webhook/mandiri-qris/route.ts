@@ -1,5 +1,6 @@
 import { autoVerifikasiVotingByNominal } from "@/lib/votingVerifikasi";
 import { NextRequest, NextResponse } from "next/server";
+import { timingSafeEqual } from "node:crypto";
 
 // ─── Webhook callback QRIS Mandiri (KERANGKA — belum tersambung penuh) ───────
 //
@@ -31,8 +32,10 @@ export async function POST(req: NextRequest) {
   // TODO: ganti dengan skema verifikasi resmi dari dokumentasi Mandiri
   // (banyak API SNAP pakai signature di header, bukan shared secret polos
   // di body/header sederhana seperti ini) begitu dokumentasinya didapat.
-  const givenSecret = req.headers.get("x-webhook-secret");
-  if (givenSecret !== expectedSecret) {
+  const givenSecret = req.headers.get("x-webhook-secret") ?? "";
+  const a = Buffer.from(givenSecret), b = Buffer.from(expectedSecret);
+  // Bandingkan waktu-konstan supaya secret tidak bisa ditebak lewat selisih waktu respons.
+  if (a.length !== b.length || !timingSafeEqual(a, b)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

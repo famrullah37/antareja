@@ -131,12 +131,10 @@ export default function PesanMerchForm({
   produk,
   terbuka,
   konfig,
-  userId,
 }: {
   produk: Merchandise[];
   terbuka: boolean;
   konfig: KonfigBayar;
-  userId?: string;
 }) {
   const [keranjang, setKeranjang] = useState<BarisKeranjang[]>([]);
   const [metode, setMetode] = useState<"TRANSFER" | "QRIS">("TRANSFER");
@@ -192,7 +190,7 @@ export default function PesanMerchForm({
   async function handleSubmit(data: FormData) {
     data.set("items", JSON.stringify(keranjang));
     const toastId = toast.loading("Memproses pesanan...");
-    const result = await pesanMerchandise(data, userId);
+    const result = await pesanMerchandise(data);
     if (result.success) {
       toast.success("Pesanan diterima!", { id: toastId });
       setSubmitted(true);

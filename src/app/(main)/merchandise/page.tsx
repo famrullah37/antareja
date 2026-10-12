@@ -1,4 +1,3 @@
-import { getServerSession } from "@/lib/next-auth";
 import { findKonfigTiket } from "@/queries/tiket.query";
 import { findKonfigMerch, findMerchandises } from "@/queries/merchandise.query";
 import { poTerbuka } from "@/lib/merchandise";
@@ -15,11 +14,10 @@ export const metadata: Metadata = {
 };
 
 export default async function MerchandisePage() {
-  const [produk, konfigMerch, konfigBayar, session] = await Promise.all([
+  const [produk, konfigMerch, konfigBayar] = await Promise.all([
     findMerchandises({ aktif: true }),
     findKonfigMerch(),
     findKonfigTiket(),
-    getServerSession(),
   ]);
   const terbuka = poTerbuka(konfigMerch);
 
@@ -50,7 +48,6 @@ export default async function MerchandisePage() {
           produk={produk}
           terbuka={terbuka}
           konfig={konfigBayar}
-          userId={session?.user?.id}
         />
       )}
     </section>

@@ -43,12 +43,10 @@ function formatRupiah(n: number) {
 export default function GaleriClient({
   albums,
   fotos,
-  userId,
   konfig,
 }: {
   albums: AlbumItem[];
   fotos: FotoItem[];
-  userId?: string;
   konfig: KonfigTiket;
 }) {
   const [selectedAlbum, setSelectedAlbum] = useState<string>("all");
@@ -119,7 +117,7 @@ export default function GaleriClient({
   async function handleCheckout(data: FormData) {
     data.set("fotoList", JSON.stringify(Array.from(cart)));
     const toastId = toast.loading("Memproses...");
-    const result = await beliFoto(data, userId);
+    const result = await beliFoto(data);
     if (result.success) {
       toast.success("Pembelian diterima!", { id: toastId, duration: 4000 });
       setTransaksiId(result.transaksiId ?? null);

@@ -1,6 +1,8 @@
 "use server";
+import { batasiAksi } from "@/lib/rateLimit";
 
 import { getServerSession } from "@/lib/next-auth";
+import { cekDataPemesan } from "@/lib/validasi";
 import { revalidatePath } from "next/cache";
 import {
   createAlbum,
@@ -125,6 +127,8 @@ export async function deleteFotoAdmin(fotoId: string) {
 // pola dengan reserveKodeVoting/reserveKodePendaftaran/reserveKodeTiket) —
 // dipanggil dari GaleriClient begitu checkout dibuka.
 export async function reserveKodeFoto() {
+  const dibatasi = await batasiAksi("kode", 120, 10 * 60 * 1000);
+  if (dibatasi) return { success: false, message: dibatasi };
   try {
     const updated = await incrementCounterUrutFoto();
     const kodeUnik = String(updated.counterUrutFoto % 1000).padStart(3, "0");
@@ -135,7 +139,12 @@ export async function reserveKodeFoto() {
   }
 }
 
-export async function beliFoto(data: FormData, userId?: string) {
+export async function beliFoto(data: FormData) {
+  const dibatasi = await batasiAksi("beli", 40, 10 * 60 * 1000);
+  if (dibatasi) return { success: false, message: dibatasi };
+  // userId dari sesi, bukan dari klien — kalau dari klien, siapa pun bisa
+  // menempelkan transaksinya ke akun orang lain.
+  const userId = (await getServerSession())?.user?.id;
   const fotoListRaw = data.get("fotoList") as string;
   const bukti = data.get("bukti") as File | null;
   const email = (data.get("email") as string) || "";
@@ -152,13 +161,22 @@ export async function beliFoto(data: FormData, userId?: string) {
   if (!kodeUnik || !/^\d{3}$/.test(kodeUnik)) {
     return { success: false, message: "Kode pembayaran tidak valid, silakan ulangi checkout" };
   }
+  const salahData = cekDataPemesan({ nama: namaPembeli, email }, { noHpWajib: false });
+  if (salahData) return { success: false, message: salahData };
 
   try {
-    const fotoList = JSON.parse(fotoListRaw) as string[];
+    const parsed: unknown = JSON.parse(fotoListRaw || "[]");
+    if (!Array.isArray(parsed) || parsed.length === 0 || parsed.length > 500 || !parsed.every((x) => typeof x === "string"))
+      return { success: false, message: "Pilihan foto tidak valid" };
+    const fotoList = Array.from(new Set(parsed as string[]));
+    // Hanya foto yang ada & sudah dipublish (foto + album) yang boleh dibeli —
+    // fotoList inilah yang nanti dibuka di halaman unduhan setelah verifikasi.
     const fotos = await prisma.foto.findMany({
-      where: { id: { in: fotoList } },
+      where: { id: { in: fotoList }, statusPublish: true, album: { statusPublish: true } },
       select: { albumId: true, album: { select: { harga: true } } },
     });
+    if (fotos.length !== fotoList.length)
+      return { success: false, message: "Ada foto yang tidak tersedia, muat ulang halaman" };
     const uniqueAlbumPrices = Array.from(new Map(fotos.map((f) => [f.albumId, f.album.harga])).values());
     // Nominal akhir = total harga album + kode unik — kalau tidak ditambahkan,
     // dua pembelian album yang sama tercatat dengan nominal identik di
@@ -212,7 +230,13 @@ export async function verifikasiFoto(transaksiId: string) {
     if (transaksi.status === "VERIFIED") {
       return { success: false, message: "Foto sudah diverifikasi sebelumnya" };
     }
-    await updateTransaksiFoto({ id: transaksiId }, { status: "VERIFIED" });
+    // Klaim atomik: hanya satu request yang bisa mengubah status ke VERIFIED —
+    // cek-lalu-update biasa lolos dua kali bila tombol terkirim ganda (kas dobel).
+    const klaim = await prisma.transaksiFoto.updateMany({
+      where: { id: transaksiId, status: "PENDING" },  // hanya PENDING: transaksi DITOLAK tidak bisa diverifikasi ulang (kode unik-nya mungkin sudah dipakai transaksi lain)
+      data: { status: "VERIFIED" },
+    });
+    if (klaim.count === 0) return { success: false, message: "Transaksi foto sudah diproses (diverifikasi/ditolak) sebelumnya" };
     const t = transaksi as any;
     const kodeInfo = t.kodeUnik ? ` [#${t.kodeUnik}]` : "";
     const pembeliInfo = t.namaPembeli ? ` — ${t.namaPembeli}` : "";
@@ -248,7 +272,10 @@ export async function rejectFoto(transaksiId: string) {
   await requireAdmin();
   try {
     const transaksi = await prisma.transaksiFoto.findUnique({ where: { id: transaksiId } });
-    await updateTransaksiFoto({ id: transaksiId }, { status: "REJECTED" });
+    // Hanya yang masih PENDING — menolak transaksi yang sudah VERIFIED akan
+    // meninggalkan entri kas/suara/QR yang sudah tercatat.
+    const tolak = await prisma.transaksiFoto.updateMany({ where: { id: transaksiId, status: "PENDING" }, data: { status: "REJECTED" } });
+    if (tolak.count === 0) return { success: false, message: "Transaksi sudah diproses sebelumnya" };
     if (transaksi) {
       const pembeliInfo = transaksi.namaPembeli ? ` — ${transaksi.namaPembeli}` : "";
       await catatLog("TOLAK_FOTO", `Foto${pembeliInfo}`);

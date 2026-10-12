@@ -1,6 +1,7 @@
 "use server";
 
 import { getServerSession } from "@/lib/next-auth";
+import { isHttpUrl } from "@/lib/safeUrl";
 import { revalidatePath } from "next/cache";
 import { updateTim } from "@/queries/tim.query";
 import { Tipe } from "@prisma/client";
@@ -64,11 +65,8 @@ async function updateLinkTim(
 
   const link = (formData.get(field) as string)?.trim();
   if (!link) return { success: false, message: `Link ${label} tidak boleh kosong` };
-  try {
-    new URL(link);
-  } catch {
+  if (!isHttpUrl(link) || link.length > 500)
     return { success: false, message: "Link tidak valid — pastikan diawali https://" };
-  }
 
   try {
     await updateTim({ id }, { [field]: link });

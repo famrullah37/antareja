@@ -23,11 +23,9 @@ type KonfigTiket = {
 
 export default function BeliTiketForm({
   tikets,
-  userId,
   konfig,
 }: {
   tikets: Tiket[];
-  userId?: string;
   konfig: KonfigTiket;
 }) {
   const [selected, setSelected] = useState<Tiket | null>(null);
@@ -88,7 +86,7 @@ export default function BeliTiketForm({
 
   async function handleSubmit(data: FormData) {
     const toastId = toast.loading("Memproses...");
-    const result = await beliTiket(data, userId);
+    const result = await beliTiket(data);
     if (result.success) {
       toast.success(
         "Pembelian berhasil! Admin akan memverifikasi dan mengirim QR Code via email.",

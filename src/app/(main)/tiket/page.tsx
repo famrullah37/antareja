@@ -1,5 +1,4 @@
 import { findTikets, findKonfigTiket } from "@/queries/tiket.query";
-import { getServerSession } from "@/lib/next-auth";
 import BeliTiketForm from "./BeliTiketForm";
 import { getKonfigUmum, type TimelineItem } from "@/queries/konfigUmum.query";
 import { getInfoAcara } from "@/lib/acara";
@@ -13,9 +12,8 @@ export const metadata: Metadata = {
 };
 
 export default async function TiketPage() {
-  const [tikets, session, konfig, konfigUmum] = await Promise.all([
+  const [tikets, konfig, konfigUmum] = await Promise.all([
     findTikets(),
-    getServerSession(),
     findKonfigTiket(),
     getKonfigUmum(),
   ]);
@@ -36,7 +34,7 @@ export default async function TiketPage() {
           Penjualan tiket belum dibuka. Pantau terus website ini.
         </div>
       ) : (
-        <BeliTiketForm tikets={tikets} userId={session?.user?.id} konfig={konfig} />
+        <BeliTiketForm tikets={tikets} konfig={konfig} />
       )}
     </section>
   );

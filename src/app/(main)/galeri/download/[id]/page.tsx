@@ -14,8 +14,10 @@ export default async function DownloadPage({ params }: { params: { id: string } 
   if (!transaksi) return notFound();
 
   const fotoIds = transaksi.fotoList as string[];
+  // Link unduhan berlaku sampai expiredAt (30 hari sejak transaksi, lihat beliFoto).
+  const kedaluwarsa = !!transaksi.expiredAt && transaksi.expiredAt.getTime() < Date.now();
   const fotos =
-    transaksi.status === "VERIFIED"
+    transaksi.status === "VERIFIED" && !kedaluwarsa
       ? await prisma.foto.findMany({
           where: { id: { in: fotoIds } },
           select: { id: true, pathAsli: true, tagTim: true },
@@ -62,6 +64,15 @@ export default async function DownloadPage({ params }: { params: { id: string } 
             <p className="text-red-800 font-semibold">Pembayaran tidak dapat diverifikasi</p>
             <p className="text-red-700 text-sm">
               Bukti transfer tidak dapat diverifikasi. Hubungi panitia untuk informasi lebih lanjut.
+            </p>
+          </div>
+        )}
+
+        {transaksi.status === "VERIFIED" && kedaluwarsa && (
+          <div className="bg-neutral-100 border border-neutral-200 rounded-2xl p-6 text-center flex flex-col gap-2">
+            <p className="text-neutral-800 font-semibold">Link unduhan sudah kedaluwarsa</p>
+            <p className="text-neutral-600 text-sm">
+              Link berlaku 30 hari sejak pembelian. Hubungi panitia bila masih membutuhkan foto Anda.
             </p>
           </div>
         )}

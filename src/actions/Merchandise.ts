@@ -1,4 +1,5 @@
 "use server";
+import { batasiAksi } from "@/lib/rateLimit";
 
 import { getServerSession } from "@/lib/next-auth";
 import { revalidatePath } from "next/cache";
@@ -6,6 +7,7 @@ import prisma from "@/lib/prisma";
 import { catatLog } from "@/lib/activityLog";
 import { sendMailTo } from "@/lib/mailer";
 import { escapeHtml } from "@/lib/escapeHtml";
+import { cekDataPemesan } from "@/lib/validasi";
 import { parseWibDatetimeLocal } from "@/lib/datetime";
 import { daftarUkuran, labelItems, poTerbuka, type ItemPesanan } from "@/lib/merchandise";
 import { findKonfigMerch, incrementCounterUrutMerch } from "@/queries/merchandise.query";
@@ -234,6 +236,8 @@ export async function saveKonfigMerch(data: FormData) {
 
 // Kode unik 3 digit atomik, sama pola dengan reserveKodeTiket.
 export async function reserveKodeMerch() {
+  const dibatasi = await batasiAksi("kode", 120, 10 * 60 * 1000);
+  if (dibatasi) return { success: false, message: dibatasi };
   try {
     const updated = await incrementCounterUrutMerch();
     return { success: true, kodeUnik: String(updated.counterUrut % 1000).padStart(3, "0") };
@@ -243,7 +247,12 @@ export async function reserveKodeMerch() {
   }
 }
 
-export async function pesanMerchandise(data: FormData, userId?: string) {
+export async function pesanMerchandise(data: FormData) {
+  const dibatasi = await batasiAksi("beli", 40, 10 * 60 * 1000);
+  if (dibatasi) return { success: false, message: dibatasi };
+  // userId dari sesi, bukan dari klien — kalau dari klien, siapa pun bisa
+  // menempelkan transaksinya ke akun orang lain.
+  const userId = (await getServerSession())?.user?.id;
   const nama = ((data.get("nama") as string) || "").trim();
   const email = ((data.get("email") as string) || "").trim();
   const noHp = ((data.get("noHp") as string) || "").trim();
@@ -251,7 +260,8 @@ export async function pesanMerchandise(data: FormData, userId?: string) {
   const metodePembayaran = (data.get("metodePembayaran") as string) || "TRANSFER";
   const kodeUnik = data.get("kodeUnik") as string | null;
 
-  if (!nama || !email || !noHp) return { success: false, message: "Data pemesan wajib diisi lengkap" };
+  const salahData = cekDataPemesan({ nama, email, noHp });
+  if (salahData) return { success: false, message: salahData };
   if (metodePembayaran !== "TRANSFER" && metodePembayaran !== "QRIS")
     return { success: false, message: "Metode pembayaran hanya QRIS atau Transfer" };
   if (metodePembayaran === "TRANSFER" && (!bukti || bukti.size === 0))
@@ -344,7 +354,9 @@ export async function verifikasiPesananMerch(id: string) {
     const items = pesanan.items as ItemPesanan[];
     const label = labelItems(items);
     await prisma.$transaction([
-      prisma.pesananMerch.update({ where: { id }, data: { status: "VERIFIED" } }),
+      // Klaim atomik: status PENDING → VERIFIED sekali saja (tombol ganda tidak bikin kas dobel);
+      // update dengan where status gagal (P2025) bila sudah diproses request lain.
+      prisma.pesananMerch.update({ where: { id, status: "PENDING" }, data: { status: "VERIFIED" } }),
       // Nominal kas = yang benar-benar ditransfer (subtotal + kode unik).
       prisma.kasTransaksi.create({
         data: {
@@ -365,6 +377,7 @@ export async function verifikasiPesananMerch(id: string) {
     revalidatePath("/admin/kas");
     return { success: true };
   } catch (e) {
+    if ((e as { code?: string })?.code === "P2025") return { success: false, message: "Pesanan sudah diproses" };
     console.error("verifikasiPesananMerch error:", e);
     return { success: false };
   }

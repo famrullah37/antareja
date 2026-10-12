@@ -1,4 +1,5 @@
 "use server";
+import { batasiAksi } from "@/lib/rateLimit";
 
 import { generateHash } from "@/lib/hash";
 import { sendMailTo } from "@/lib/mailer";
@@ -7,6 +8,8 @@ import { verifyEmailTemplate } from "@/utils/emailTemplate";
 import { revalidatePath } from "next/cache";
 
 export default async function signUp(data: FormData) {
+  const dibatasi = await batasiAksi("daftar", 20, 60 * 60 * 1000);
+  if (dibatasi) return { success: false, message: dibatasi };
   const email = normalizeEmail((data.get("email") as string) ?? "");
   const nama = data.get("nama") as string;
   const password = data.get("password") as string;
@@ -14,8 +17,14 @@ export default async function signUp(data: FormData) {
   if (!email || !nama || !password) {
     return { success: false, message: "Data tidak lengkap" };
   }
-  if (password.length < 8) {
-    return { success: false, message: "Password minimal 8 karakter" };
+  if (password.length < 8 || password.length > 72) {
+    return { success: false, message: "Password 8–72 karakter" };
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) {
+    return { success: false, message: "Email tidak valid" };
+  }
+  if (nama.trim().length === 0 || nama.length > 100) {
+    return { success: false, message: "Nama tidak valid (maks. 100 karakter)" };
   }
 
   // Email yang sudah ada selalu ditolak, termasuk yang belum diverifikasi —
@@ -69,6 +78,8 @@ const RESEND_COOLDOWN_MS = 60 * 1000;
 // serverless instance-nya beda-beda) mencegah endpoint publik ini dipakai
 // untuk spam email verifikasi berulang-ulang ke alamat yang sama.
 export async function resendVerificationEmail(email: string) {
+  const dibatasi = await batasiAksi("kirimVerifikasi", 20, 60 * 60 * 1000);
+  if (dibatasi) return { success: false, message: dibatasi };
   if (!email) return { success: false, message: "Email wajib diisi" };
 
   // Jawaban sama untuk email yang tidak terdaftar / sudah terverifikasi,

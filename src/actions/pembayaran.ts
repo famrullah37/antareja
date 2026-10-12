@@ -276,21 +276,37 @@ async function setStatusPembayaran(timId: string, confirmed: boolean, isDP: bool
     await prisma.pembayaran.update({ where: { tim_id: timId }, data: { totalBayar } });
   }
 
-  const existing = await prisma.kasTransaksi.findFirst({
-    where: { sumber: "PENDAFTARAN", referensiId: timId },
-  });
-  if (!existing) {
-    await prisma.kasTransaksi.create({
-      data: {
-        tipe: "PEMASUKAN",
-        keterangan: `Pendaftaran Tim ${tim.nama_tim} — ${tim.asal_sekolah}${pembayaran?.kodeUnik ? ` [#${pembayaran.kodeUnik}]` : ""}`,
-        jumlah: totalBayar,
-        kategori: "PENDAFTARAN_TIM",
-        sumber: "PENDAFTARAN",
-        referensiId: timId,
-      },
-    });
-  }
+  // Kas pendaftaran = total yang SUDAH tercatat untuk tim ini dibanding total
+  // yang seharusnya. Dulu cukup "sudah ada entri → lewati", sehingga pelunasan
+  // DP → Lunas tidak pernah tercatat (kas hanya memuat nominal DP). Sekarang
+  // selisihnya dicatat sebagai entri "Pelunasan". Serializable supaya dua
+  // approve yang terkirim bersamaan tidak sama-sama mencatat.
+  const kodeInfo = pembayaran?.kodeUnik ? ` [#${pembayaran.kodeUnik}]` : "";
+  await prisma.$transaction(
+    async (tx) => {
+      const tercatat = await tx.kasTransaksi.aggregate({
+        where: { sumber: "PENDAFTARAN", referensiId: timId },
+        _sum: { jumlah: true },
+        _count: true,
+      });
+      const sudah = tercatat._sum.jumlah ?? 0;
+      if (sudah >= totalBayar) return;
+      await tx.kasTransaksi.create({
+        data: {
+          tipe: "PEMASUKAN",
+          keterangan:
+            tercatat._count === 0
+              ? `Pendaftaran Tim ${tim.nama_tim} — ${tim.asal_sekolah}${kodeInfo}`
+              : `Pelunasan Pendaftaran Tim ${tim.nama_tim} — ${tim.asal_sekolah}${kodeInfo}`,
+          jumlah: totalBayar - sudah,
+          kategori: "PENDAFTARAN_TIM",
+          sumber: "PENDAFTARAN",
+          referensiId: timId,
+        },
+      });
+    },
+    { isolationLevel: "Serializable" }
+  );
 
   return kirimKuitansiJikaBelum(timId, jumlah);
 }
