@@ -213,8 +213,11 @@ export default function Navbar() {
         </div>
 
         {/* ── Mobile menu ── */}
+        {/* Navbar fixed: menu dibatasi setinggi layar yang terlihat (dvh, bukan vh —
+            vh di HP ikut menghitung area di balik address bar) & bisa di-scroll,
+            supaya Sign Out di paling bawah tetap terjangkau di layar pendek. */}
         {isExpanded && (
-          <div className="lg:hidden border-t border-white/10 px-6 py-5 flex flex-col gap-4 bg-neutral-950/95 backdrop-blur-md">
+          <div className="lg:hidden border-t border-white/10 px-6 pt-5 pb-8 flex flex-col gap-4 bg-neutral-950/95 backdrop-blur-md max-h-[calc(100dvh-60px)] overflow-y-auto overscroll-contain">
             {navOptions.map((nav) => (
               <Link
                 key={nav.label}

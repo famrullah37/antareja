@@ -95,6 +95,7 @@ model Anggota {
   nisn    String?
   link_ig String?
   kelas   Kelas?
+  tanggal_lahir DateTime? @db.Date
   timId   String
   Tim     Tim     @relation(fields: [timId], references: [id], onDelete: Cascade)
 

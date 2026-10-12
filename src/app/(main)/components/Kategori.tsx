@@ -40,8 +40,8 @@ export default async function Kategori() {
   // difilter belakangan, bukan dihapus dari susunan dasarnya.
   const jenjangList = [
     { label: "SD", full: "Jenjang SD", harga: konfig.biayaSD, dp: konfig.biayaSDDP, aktif: konfig.sdAktif },
-    { label: "SMP", full: "Jenjang SMP", harga: konfig.biayaSMP, dp: konfig.biayaSMPDP, aktif: konfig.smpAktif },
-    { label: "SMA", full: "Jenjang SMA", harga: konfig.biayaSMA, dp: konfig.biayaSMADP, aktif: konfig.smaAktif },
+    { label: "SMP", full: "Jenjang SMP / Club U-15", harga: konfig.biayaSMP, dp: konfig.biayaSMPDP, aktif: konfig.smpAktif },
+    { label: "SMA", full: "Jenjang SMA / Club U-19", harga: konfig.biayaSMA, dp: konfig.biayaSMADP, aktif: konfig.smaAktif },
     { label: "Purna", full: "Jenjang Purna", harga: konfig.biayaPurna, dp: konfig.biayaPurnaDP, aktif: konfig.purnaAktif },
   ]
     .map((j, i) => ({ ...j, meta: JENJANG_META[i] }))

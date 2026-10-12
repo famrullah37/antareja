@@ -46,6 +46,21 @@ export default function DisplayAnggota({
           <H3>Nomor Telepon</H3>
           <P>{anggota.telp}</P>
         </div>
+        {anggota.posisi !== "OFFICIAL" && anggota.posisi !== "PELATIH" && (
+          <div className="flex flex-col gap-1">
+            <H3>Tanggal Lahir</H3>
+            <P>
+              {anggota.tanggal_lahir
+                ? new Date(anggota.tanggal_lahir).toLocaleDateString("id-ID", {
+                    day: "numeric",
+                    month: "long",
+                    year: "numeric",
+                    timeZone: "UTC",
+                  })
+                : "-"}
+            </P>
+          </div>
+        )}
         <div className="flex flex-col gap-1">
           <H3>Nisn</H3>
           <P>{anggota.nisn}</P>

@@ -56,6 +56,7 @@ export function buildDataTimWorkbook(tims: TimExport[]): string {
         Nama: a.nama,
         Email: a.email,
         "No. Telp": a.telp,
+        "Tanggal Lahir": a.tanggal_lahir ? new Date(a.tanggal_lahir).toISOString().slice(0, 10) : "",
         NISN: a.nisn ?? "",
         Kelas: a.kelas ?? "",
         "Link Instagram": a.link_ig ?? "",

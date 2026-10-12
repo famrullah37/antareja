@@ -93,6 +93,24 @@ export default function EditAnggotaForm({
           required
         />
 
+        {/* === Tanggal Lahir (hanya untuk siswa — cek kategori umur) === */}
+        {anggota.posisi !== "OFFICIAL" && anggota.posisi !== "PELATIH" && (
+          <TextField
+            id="tanggal_lahir"
+            name="tanggal_lahir"
+            placeholder="Pilih tanggal lahir"
+            type="date"
+            className="w-full"
+            value={
+              anggota.tanggal_lahir
+                ? new Date(anggota.tanggal_lahir).toISOString().slice(0, 10)
+                : ""
+            }
+            label="Tanggal Lahir"
+            required
+          />
+        )}
+
         {/* === NISN (hanya untuk siswa) === */}
         {anggota.posisi !== "OFFICIAL" && anggota.posisi !== "PELATIH" && (
           <TextField

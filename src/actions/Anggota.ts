@@ -31,6 +31,13 @@ export async function upsertAnggotaForm(
   const foto = data.get("foto") as File;
   const kelas = data.get("kelas") as Kelas | undefined;
   const link_ig = data.get("link_ig") as string | undefined;
+  const tglLahirRaw = data.get("tanggal_lahir") as string | null;
+  // Input type="date" mengirim "YYYY-MM-DD"; simpan sebagai tengah malam UTC
+  // supaya kolom DATE tidak geser sehari karena zona waktu.
+  const tanggal_lahir =
+    tglLahirRaw && /^\d{4}-\d{2}-\d{2}$/.test(tglLahirRaw)
+      ? new Date(`${tglLahirRaw}T00:00:00.000Z`)
+      : undefined;
 
   const tryFindAnggota = await findAnggota({ id });
   // id anggota dikirim dari klien — pastikan anggota yang mau diedit memang
@@ -49,7 +56,7 @@ export async function upsertAnggotaForm(
       fotoUrl = uploadedFoto.data?.url;
     }
 
-    const anggotaData = { nama, email, telp, nisn, kelas, posisi, link_ig };
+    const anggotaData = { nama, email, telp, nisn, kelas, posisi, link_ig, tanggal_lahir };
     const anggotaUpdate = { ...anggotaData, foto: fotoUrl ?? undefined };
     const anggotaCreate = {
       ...anggotaData,

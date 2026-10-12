@@ -64,7 +64,7 @@ export default function AdminLayout({
         <div
           className={`absolute left-0 top-[55px] lg:hidden w-full z-[800] bg-neutral-500 overflow-y-auto transition-all duration-300 px-6 ${
             isExpanded
-              ? "max-h-[calc(100vh-55px)] py-6 opacity-100"
+              ? "max-h-[calc(100dvh-55px)] pt-6 pb-10 opacity-100 overscroll-contain"
               : "max-h-0 py-0 opacity-0 invisible pointer-events-none"
           }`}
         >
