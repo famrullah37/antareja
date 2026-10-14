@@ -10,12 +10,14 @@ import { findKonfigTiket } from "@/queries/tiket.query";
 import { cekJendelaVoting } from "@/actions/Voting";
 import VoteForm from "./VoteForm";
 import VotingCountdownBanner from "./VotingCountdownBanner";
+import InfoHalaman from "../components/InfoHalaman";
 
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Vote Tim Paskibra Favorit",
-  description: "Vote dan dukung tim paskibra favoritmu di LPKBB Antareja 2026 dan pantau papan peringkat dukungan secara langsung.",
+  title: { absolute: "Vote Tim Favorit LPKBB Antareja 2026 | Lomba Paskibra SMK Telkom Malang" },
+  description:
+    "Dukung dan vote tim paskibra favoritmu di LPKBB Antareja 2026, SMK Telkom Malang. Pantau papan peringkat dukungan tim secara langsung.",
 };
 
 export default async function VotePage() {
@@ -37,6 +39,7 @@ export default async function VotePage() {
   const status = await cekJendelaVoting(konfig);
 
   return (
+    <>
     <section className="max-w-3xl mx-auto py-12 px-4">
       <h1 className="text-3xl font-bold mb-2">Dukung Tim Favoritmu</h1>
       <p className="text-gray-500 mb-8">
@@ -68,5 +71,17 @@ export default async function VotePage() {
         </div>
       )}
     </section>
+    <InfoHalaman path="/vote" label="Vote Tim Favorit" judul="Cara Kerja Vote Tim Favorit">
+      <p>
+        Vote Tim Favorit LPKBB Antareja 2026 adalah dukungan dari penonton, alumni, dan keluarga untuk tim paskibra
+        peserta. Pilih tim, tentukan jumlah dukungan, lalu bayar sesuai nominal yang tertera. Setiap dukungan yang
+        sudah diverifikasi panitia dihitung sebagai satu suara dan langsung masuk ke papan peringkat.
+      </p>
+      <p>
+        Vote dukungan terpisah dari penilaian juri, sehingga tidak memengaruhi nilai lomba. Selain Tim Favorit,
+        panitia dapat membuka kategori dukungan lain selama periode voting berlangsung.
+      </p>
+    </InfoHalaman>
+    </>
   );
 }

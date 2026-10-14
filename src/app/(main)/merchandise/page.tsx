@@ -3,14 +3,16 @@ import { findKonfigMerch, findMerchandises } from "@/queries/merchandise.query";
 import { poTerbuka } from "@/lib/merchandise";
 import { formatTanggalWib } from "./format";
 import PesanMerchForm from "./PesanMerchForm";
+import InfoHalaman from "../components/InfoHalaman";
 
 import type { Metadata } from "next";
 
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Merchandise",
-  description: "Pre-order merchandise resmi LPKBB Antareja 2026.",
+  title: { absolute: "Merchandise Resmi LPKBB Antareja 2026 | SMK Telkom Malang" },
+  description:
+    "Pre-order merchandise resmi LPKBB Antareja 2026, lomba paskibra SMK Telkom Malang. Pesan dan bayar online selama periode PO, ambil di lokasi acara.",
 };
 
 export default async function MerchandisePage() {
@@ -22,6 +24,7 @@ export default async function MerchandisePage() {
   const terbuka = poTerbuka(konfigMerch);
 
   return (
+    <>
     <section className="max-w-5xl mx-auto py-12 px-4">
       <span className="inline-block text-xs font-bold uppercase tracking-widest text-primary-500 bg-primary-50 rounded-full px-3 py-1 mb-3">
         Pre-Order
@@ -51,5 +54,16 @@ export default async function MerchandisePage() {
         />
       )}
     </section>
+    <InfoHalaman path="/merchandise" label="Merchandise" judul="Tentang Merchandise Antareja">
+      <p>
+        Merchandise resmi LPKBB Antareja 2026 dijual dengan sistem pre-order (PO): barang diproduksi sesuai jumlah
+        pesanan yang masuk selama periode PO. Pilih produk dan ukuran, lalu bayar melalui transfer atau QRIS.
+      </p>
+      <p>
+        Pesanan diproses setelah pembayaran diverifikasi panitia, dan bukti pemesanan dikirim ke email. Informasi
+        pengambilan barang tercantum di atas dan di email bukti pemesanan.
+      </p>
+    </InfoHalaman>
+    </>
   );
 }

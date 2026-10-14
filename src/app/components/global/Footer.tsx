@@ -17,6 +17,16 @@ const FootOptions: FootOption[] = [
   { label: "Pendaftaran", href: "/#daftar" },
 ];
 
+// Tautan ke semua halaman publik — juga membantu Google menemukan halaman-halaman ini.
+const HalamanOptions: FootOption[] = [
+  { label: "Galeri", href: "/galeri" },
+  { label: "Berita", href: "/berita" },
+  { label: "Tiket", href: "/tiket" },
+  { label: "Vote", href: "/vote" },
+  { label: "Merchandise", href: "/merchandise" },
+  { label: "Daftar Tim", href: "/auth/register" },
+];
+
 // Akun media sosial resmi: satu sumber di src/config/site.ts.
 const socials = [
   { icon: <FaTiktok />, href: siteConfig.social.tiktok, label: "TikTok" },
@@ -53,15 +63,19 @@ export default function Footer() {
             </a>
           </div>
           <div className="flex flex-col gap-6 lg:gap-[72px] items-start lg:items-end">
-            <div className="flex gap-[17px] sm:gap-10">
-              {FootOptions.map((nav) => (
-                <Link href={nav.href} key={nav.label}>
-                  <p className="text-neutral-600 text-sm hover:text-gray-400 transition-all duration-300 font-semibold">
-                    {nav.label}
-                  </p>
-                </Link>
+            <nav aria-label="Navigasi footer" className="flex flex-col gap-3 items-start lg:items-end">
+              {[FootOptions, HalamanOptions].map((grup, i) => (
+                <div key={i} className="flex flex-wrap gap-x-[17px] gap-y-2 sm:gap-x-10 lg:justify-end">
+                  {grup.map((nav) => (
+                    <Link href={nav.href} key={nav.label}>
+                      <p className="text-neutral-600 text-sm hover:text-gray-400 transition-all duration-300 font-semibold">
+                        {nav.label}
+                      </p>
+                    </Link>
+                  ))}
+                </div>
               ))}
-            </div>
+            </nav>
             {socials.length > 0 && (
               <div className="flex gap-2 sm:gap-3">
                 {socials.map((soc) => (

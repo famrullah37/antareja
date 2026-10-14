@@ -2,13 +2,16 @@ export const dynamic = "force-dynamic";
 
 import { findAlbums, findFotos } from "@/queries/galeri.query";
 import { findKonfigTiket } from "@/queries/tiket.query";
+import { siteConfig } from "@/config/site";
 import GaleriClient from "./GaleriClient";
+import InfoHalaman from "../components/InfoHalaman";
 
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Galeri Foto Lomba Paskibra",
-  description: "Galeri foto dokumentasi LPKBB Antareja: lihat foto aksi tim peserta dan unduh foto favoritmu.",
+  title: { absolute: "Galeri Foto LPKBB Antareja 2026 | Lomba Paskibra SMK Telkom Malang" },
+  description:
+    "Galeri foto resmi LPKBB Antareja 2026 di SMK Telkom Malang: dokumentasi aksi tim paskibra peserta. Foto gratis bisa langsung diunduh, foto premium resolusi penuh.",
 };
 
 export default async function GaleriPage() {
@@ -73,6 +76,19 @@ export default async function GaleriPage() {
           konfig={konfig}
         />
       </div>
+
+      <InfoHalaman path="/galeri" label="Galeri Foto" judul="Tentang Galeri Foto LPKBB Antareja">
+        <p>
+          Galeri ini berisi dokumentasi resmi LPKBB Antareja 2026, lomba keterampilan baris-berbaris (PBB) dan
+          paskibra yang diselenggarakan {siteConfig.organizer}. Foto dikelompokkan per album, mulai dari aksi tim
+          peserta di lapangan hingga momen di sekitar acara.
+        </p>
+        <p>
+          Foto di album gratis dapat diunduh langsung. Foto di album premium ditampilkan dengan watermark; versi
+          resolusi penuh tanpa watermark bisa dibeli dan diunduh setelah pembayaran diverifikasi panitia. Cari foto
+          tim sekolahmu dengan memilih album yang sesuai.
+        </p>
+      </InfoHalaman>
     </div>
   );
 }

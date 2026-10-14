@@ -3,6 +3,7 @@
 export const dynamic = "force-dynamic";
 import { findTikets, findKonfigTiket } from "@/queries/tiket.query";
 import BeliTiketForm from "./BeliTiketForm";
+import InfoHalaman from "../components/InfoHalaman";
 import { getKonfigUmum, type TimelineItem } from "@/queries/konfigUmum.query";
 import { getInfoAcara } from "@/lib/acara";
 import { siteConfig } from "@/config/site";
@@ -10,8 +11,9 @@ import { siteConfig } from "@/config/site";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Tiket Penonton Lomba Paskibra",
-  description: "Beli tiket penonton LPKBB Antareja 2026 dan saksikan langsung aksi tim-tim terbaik se-Jawa Timur.",
+  title: { absolute: "Tiket Penonton LPKBB Antareja 2026 | Lomba Paskibra SMK Telkom Malang" },
+  description:
+    "Beli tiket penonton LPKBB Antareja 2026 secara online dan saksikan langsung aksi tim paskibra se-Jawa Timur di SMK Telkom Malang. Tiket berupa QR code.",
 };
 
 export default async function TiketPage() {
@@ -24,6 +26,7 @@ export default async function TiketPage() {
   const acara = getInfoAcara(konfigUmum.timeline as TimelineItem[] | null);
 
   return (
+    <>
     <section className="max-w-3xl mx-auto py-12 px-4">
       <h1 className="text-3xl font-bold mb-2">Beli Tiket</h1>
       <p className="text-gray-500 mb-8">
@@ -40,5 +43,18 @@ export default async function TiketPage() {
         <BeliTiketForm tikets={tikets} konfig={konfig} />
       )}
     </section>
+    <InfoHalaman path="/tiket" label="Tiket Penonton" judul="Informasi Tiket Penonton">
+      <p>
+        Tiket penonton LPKBB Antareja 2026 dapat dibeli secara online di halaman ini. Setelah pembayaran
+        diverifikasi panitia, tiket berupa QR code dikirim ke email pembeli dan ditunjukkan saat masuk lokasi.
+      </p>
+      <p>
+        Lokasi acara: {siteConfig.event.venue}, {siteConfig.event.address.streetAddress},{" "}
+        {siteConfig.event.address.addressLocality}, {siteConfig.event.address.addressRegion}
+        {acara && `. Tanggal: ${acara.tanggalTeks}`}
+        {acara?.jamTeks && `, ${acara.jamTeks}`}.
+      </p>
+    </InfoHalaman>
+    </>
   );
 }

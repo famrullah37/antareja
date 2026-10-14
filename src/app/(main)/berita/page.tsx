@@ -2,11 +2,12 @@ export const dynamic = "force-dynamic";
 
 import { findBeritas } from "@/queries/berita.query";
 import BeritaCard from "./BeritaCard";
+import InfoHalaman from "../components/InfoHalaman";
 
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Berita Lomba Paskibra",
+  title: { absolute: "Berita LPKBB Antareja 2026 | Lomba Paskibra Jawa Timur" },
   description:
     "Berita dan kabar terbaru LPKBB Antareja 2026, lomba paskibra & baris-berbaris (LKBB) tingkat Jawa Timur di SMK Telkom Malang: pendaftaran, jadwal, hasil, dan liputan acara.",
 };
@@ -39,6 +40,18 @@ export default async function BeritaListPage() {
           </div>
         )}
       </div>
+
+      <InfoHalaman path="/berita" label="Berita" judul="Kabar Resmi LPKBB Antareja">
+        <p>
+          Halaman ini memuat berita dan pengumuman umum seputar LPKBB Antareja 2026 di SMK Telkom Malang: pembukaan
+          pendaftaran, kategori lomba jenjang SMP/Club U-15 dan SMA/Club U-19, jadwal acara, hingga liputan dan hasil
+          lomba.
+        </p>
+        <p>
+          Peserta yang sudah terdaftar juga menerima informasi teknis melalui dashboard tim. Untuk pertanyaan,
+          hubungi narahubung panitia yang tercantum di bagian bawah halaman.
+        </p>
+      </InfoHalaman>
     </div>
   );
 }
