@@ -1,7 +1,7 @@
 import "server-only";
 import prisma from "@/lib/prisma";
 
-// Penempatan tim ke ruangan basecamp oleh panitia (actions/Basecamp.ts). Tim
+// Penempatan tim ke ruangan basecamp oleh panitia — ADMIN/SIE_ACARA (actions/Basecamp.ts). Tim
 // tidak memilih ruangan sendiri.
 
 // Client di dalam prisma.$transaction (client Prisma kita di-extend, jadi bukan Prisma.TransactionClient).

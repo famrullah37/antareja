@@ -20,7 +20,7 @@ type Hasil = { success: boolean; message?: string };
 
 async function requireStaf() {
   const session = await getServerSession();
-  if (!["ADMIN", "SIE_LOMBA"].includes(session?.user?.role ?? "")) throw new Error("Forbidden");
+  if (!["ADMIN", "SIE_ACARA"].includes(session?.user?.role ?? "")) throw new Error("Forbidden");
 }
 
 function segarkan() {
@@ -33,7 +33,7 @@ function angka(data: FormData, key: string) {
   return Number.isInteger(n) ? n : NaN;
 }
 
-// ─── Admin / Sie Lomba ───────────────────────────────────────────────────────
+// ─── Admin / Sie Acara ───────────────────────────────────────────────────────
 
 export async function setPengaturanMenginap(data: FormData): Promise<Hasil> {
   await requireStaf();

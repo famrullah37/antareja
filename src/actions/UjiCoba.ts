@@ -13,7 +13,7 @@ type Hasil = { success: boolean; message?: string };
 
 async function requireStaf() {
   const session = await getServerSession();
-  if (!["ADMIN", "SIE_LOMBA"].includes(session?.user?.role ?? "")) throw new Error("Forbidden");
+  if (!["ADMIN", "SIE_ACARA"].includes(session?.user?.role ?? "")) throw new Error("Forbidden");
 }
 
 function segarkan() {
@@ -35,7 +35,7 @@ async function ambilSlot(sesiId: string, mulaiIso: string) {
   return { sesi, mulai };
 }
 
-// ─── Admin / Sie Lomba ───────────────────────────────────────────────────────
+// ─── Admin / Sie Acara ───────────────────────────────────────────────────────
 
 export async function createSesiUjiCoba(data: FormData): Promise<Hasil> {
   await requireStaf();

@@ -16,10 +16,10 @@ const SIE_LOMBA_ROUTES = [
   "/admin/penghargaan",
   "/admin/sertifikat",
   "/admin/pengumuman",
-  "/admin/uji-coba",
-  "/admin/menginap",
-  "/admin/basecamp",
 ];
+// Pelaksanaan acara: jadwal uji coba, akomodasi & ruangan. Sengaja tanpa
+// tim/juri/penilaian — data anggota & nilai bukan urusan Sie Acara.
+const SIE_ACARA_ROUTES = ["/admin/uji-coba", "/admin/menginap", "/admin/basecamp", "/admin/pengumuman"];
 
 const STAFF_ROUTES: Record<string, string[]> = {
   JURI: JURI_ROUTES,
@@ -28,6 +28,7 @@ const STAFF_ROUTES: Record<string, string[]> = {
   FOTOGRAFER: FOTOGRAFER_ROUTES,
   SIE_LOMBA: SIE_LOMBA_ROUTES,
   SIE_HUMAS: SIE_HUMAS_ROUTES,
+  SIE_ACARA: SIE_ACARA_ROUTES,
 };
 
 // Halaman awal staf = route pertama yang boleh dia buka. "/admin" (dashboard)
@@ -40,6 +41,7 @@ const STAFF_HOME: Record<string, string> = {
   FOTOGRAFER: "/admin/galeri",
   SIE_LOMBA: "/admin/tim",
   SIE_HUMAS: "/admin/sponsor",
+  SIE_ACARA: "/admin/menginap",
 };
 
 // Sengaja tidak memakai withAuth: redirect bawaannya menambah

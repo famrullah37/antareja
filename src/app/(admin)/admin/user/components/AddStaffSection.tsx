@@ -4,10 +4,11 @@ import { createStaffUser } from "@/actions/User";
 import { useState } from "react";
 import { toast } from "sonner";
 
-type StaffRole = "SIE_LOMBA" | "SIE_HUMAS" | "FOTOGRAFER" | "TIKET" | "BENDAHARA";
+type StaffRole = "SIE_LOMBA" | "SIE_ACARA" | "SIE_HUMAS" | "FOTOGRAFER" | "TIKET" | "BENDAHARA";
 
 const ROLES: { value: StaffRole; label: string; color: string }[] = [
   { value: "SIE_LOMBA", label: "Sie Lomba", color: "bg-pink-100 text-pink-700 border-pink-300" },
+  { value: "SIE_ACARA", label: "Sie Acara", color: "bg-indigo-100 text-indigo-700 border-indigo-300" },
   { value: "SIE_HUMAS", label: "Sie Humas", color: "bg-teal-100 text-teal-700 border-teal-300" },
   { value: "FOTOGRAFER", label: "Fotografer", color: "bg-orange-100 text-orange-700 border-orange-300" },
   { value: "TIKET", label: "Petugas Tiket", color: "bg-cyan-100 text-cyan-700 border-cyan-300" },

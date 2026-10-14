@@ -73,7 +73,7 @@ model Tim {
   has_maskot      Boolean           @default(false)
   totalVote       Int               @default(0)
   noUrut          Int?
-  // Ruangan basecamp tim saat acara — hanya ditentukan panitia (ADMIN/SIE_LOMBA)
+  // Ruangan basecamp tim saat acara — hanya ditentukan panitia (ADMIN/SIE_ACARA)
   // di /admin/basecamp, dibatasi Ruangan.kapasitas. Tampil di dashboard tim.
   ruanganId       String?
   ruangan         Ruangan?           @relation(fields: [ruanganId], references: [id], onDelete: SetNull)
@@ -691,7 +691,7 @@ model Sponsor {
 }
 
 // Berita/blog publik (/berita), dikelola ADMIN & SIE_HUMAS. Beda dengan
-// Pengumuman (khusus peserta, dikelola SIE_LOMBA). konten teks biasa: paragraf
+// Pengumuman (khusus peserta, dikelola SIE_LOMBA & SIE_ACARA). konten teks biasa: paragraf
 // dipisah baris kosong. slug unik disimpan supaya URL tetap walau judul diedit.
 model Berita {
   id          String    @id @default(uuid())
@@ -752,6 +752,7 @@ enum Role {
   BENDAHARA
   SIE_LOMBA
   SIE_HUMAS
+  SIE_ACARA
 }
 
 enum Tipe {

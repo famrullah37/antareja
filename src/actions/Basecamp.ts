@@ -13,7 +13,7 @@ const MAKS_KAPASITAS = 100;
 
 async function requireStaf() {
   const session = await getServerSession();
-  if (!["ADMIN", "SIE_LOMBA"].includes(session?.user?.role ?? "")) throw new Error("Forbidden");
+  if (!["ADMIN", "SIE_ACARA"].includes(session?.user?.role ?? "")) throw new Error("Forbidden");
 }
 
 function segarkan() {
