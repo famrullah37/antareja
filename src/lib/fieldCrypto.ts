@@ -67,6 +67,7 @@ export function decryptField(value: string): string {
 export const ENCRYPTED_FIELDS: Record<string, Record<string, boolean>> = {
   Anggota: { telp: false, nisn: false, email: true },
   Tim: { no_pelatih: false },
+  PengajuanMenginap: { noHpPj: false },
 };
 
 // Enkripsi kolom terdaftar pada objek `data` sebuah write Prisma.

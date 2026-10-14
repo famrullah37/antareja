@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from "next/server";
 // semua tim) dan "/admin/penilaian" (sistem lama) memuat nama sekolah & nilai juri lain.
 const JURI_ROUTES = ["/admin/penilaian-baru/input"];
 const TIKET_ROUTES = ["/admin/tiket"];
-const BENDAHARA_ROUTES = ["/admin/kas", "/admin/pembayaran", "/admin/voting", "/admin/merchandise"];
+const BENDAHARA_ROUTES = ["/admin/kas", "/admin/pembayaran", "/admin/voting", "/admin/merchandise", "/admin/tiket"];
 const FOTOGRAFER_ROUTES = ["/admin/galeri"];
 const SIE_HUMAS_ROUTES = ["/admin/sponsor", "/admin/berita"];
 const SIE_LOMBA_ROUTES = [
@@ -17,6 +17,8 @@ const SIE_LOMBA_ROUTES = [
   "/admin/sertifikat",
   "/admin/pengumuman",
   "/admin/uji-coba",
+  "/admin/menginap",
+  "/admin/basecamp",
 ];
 
 const STAFF_ROUTES: Record<string, string[]> = {

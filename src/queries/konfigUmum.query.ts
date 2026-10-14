@@ -51,6 +51,8 @@ export async function upsertKonfigUmum(data: {
   bendaharaNama?: string;
   bendaharaTtdUrl?: string;
   ujiCobaBatas?: Date | null;
+  menginapAktif?: boolean;
+  menginapInfo?: string | null;
 }) {
   return prisma.konfigUmum.upsert({
     where: { id: SINGLETON_ID },

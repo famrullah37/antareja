@@ -73,17 +73,23 @@ model Tim {
   has_maskot      Boolean           @default(false)
   totalVote       Int               @default(0)
   noUrut          Int?
+  // Ruangan basecamp tim saat acara — hanya ditentukan panitia (ADMIN/SIE_LOMBA)
+  // di /admin/basecamp, dibatasi Ruangan.kapasitas. Tampil di dashboard tim.
+  ruanganId       String?
+  ruangan         Ruangan?           @relation(fields: [ruanganId], references: [id], onDelete: SetNull)
   anggotas        Anggota[]
   pembayaran      Pembayaran?
   penilaian       Penilaian?
   penilaianBaru   PenilaianBaru?
   sertifikat      Sertifikat[]
   ujiCoba         UjiCobaTim?
+  menginap        PengajuanMenginap?
   transaksiVoting TransaksiVoting[]
   votingTally     VotingTally[]
   user            User              @relation(fields: [userId], references: [id])
 
   @@unique([jenjang, noUrut])
+  @@index([ruanganId])
 }
 
 model Anggota {
@@ -598,6 +604,49 @@ model KonfigUmum {
   // Batas waktu tim boleh memilih/ganti/batal slot uji coba lapangan sendiri;
   // setelahnya hanya admin. Kosong = boleh sampai slot dimulai.
   ujiCobaBatas           DateTime?
+  // Pengajuan menginap dari dashboard tim — false = form disembunyikan (tim
+  // yang sudah mengajukan tetap melihat statusnya). menginapInfo = keterangan
+  // bebas dari panitia (lokasi, fasilitas, barang yang perlu dibawa, dst).
+  menginapAktif          Boolean   @default(false)
+  menginapInfo           String?
+}
+
+// ─── Ruangan Basecamp ────────────────────────────────────────────────────────
+
+// Dibuat panitia; kapasitas = jumlah tim maksimal di ruangan itu (dicek saat
+// menempatkan tim, lihat actions/Basecamp.ts). Hapus ruangan = tim di dalamnya
+// kembali belum punya ruangan.
+model Ruangan {
+  id         String   @id @default(uuid())
+  nama       String   @unique
+  kapasitas  Int      @default(1)
+  keterangan String?
+  createdAt  DateTime @default(now())
+  tims       Tim[]
+}
+
+// ─── Pengajuan Menginap ──────────────────────────────────────────────────────
+
+// Satu tim satu pengajuan (gratis, tanpa pembayaran). Tim boleh mengubah/
+// membatalkan selama belum DISETUJUI; mengubah pengajuan yang DITOLAK
+// mengembalikannya ke PENDING. Tanggal = malam pertama (datang) s.d. hari pulang.
+model PengajuanMenginap {
+  id               String   @id @default(uuid())
+  timId            String   @unique
+  jumlahPutra      Int      @default(0)
+  jumlahPutri      Int      @default(0)
+  jumlahPendamping Int      @default(0)
+  tanggalDatang    DateTime @db.Date
+  tanggalPulang    DateTime @db.Date
+  namaPj           String
+  noHpPj           String
+  catatan          String?
+  // PENDING | DISETUJUI | DITOLAK
+  status           String   @default("PENDING")
+  catatanAdmin     String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  tim              Tim      @relation(fields: [timId], references: [id], onDelete: Cascade)
 }
 
 // ─── Uji Coba Lapangan ───────────────────────────────────────────────────────

@@ -17,6 +17,7 @@ const dryRun = process.argv.includes("--dry-run");
 const FIELDS = {
   anggota: { telp: false, nisn: false, email: true },
   tim: { no_pelatih: false },
+  pengajuanMenginap: { noHpPj: false },
 };
 
 function encrypt(key, value, deterministic) {

@@ -13,6 +13,8 @@ import TiketSayaSection from "./components/TiketSayaSection";
 import NilaiAkhirSection from "./components/NilaiAkhirSection";
 import SertifikatSection from "./components/SertifikatSection";
 import UjiCobaSection from "./components/UjiCobaSection";
+import MenginapSection from "./components/MenginapSection";
+import BasecampSection from "./components/BasecampSection";
 import { biayaPendaftaran } from "@/actions/pembayaran";
 import { getKonfigUmum } from "@/queries/konfigUmum.query";
 import {
@@ -57,7 +59,14 @@ export default async function TimDashboard() {
     <>
       <Heading />
       <ProfileTim tim={tim} penilaian={tim.penilaian ?? null} biayaDasar={biayaDasar} dokumen={dokumen} />
+      <BasecampSection timId={tim.id} ruanganId={tim.ruanganId} />
       <UjiCobaSection timId={tim.id} confirmed={tim.confirmed} batas={konfig.ujiCobaBatas} />
+      <MenginapSection
+        timId={tim.id}
+        confirmed={tim.confirmed}
+        aktif={konfig.menginapAktif}
+        info={konfig.menginapInfo}
+      />
       <NilaiAkhirSection penilaianBaru={penilaianBaru as any} />
       <SertifikatSection sertifikat={sertifikat as any} />
       <TiketSayaSection transaksis={transaksiTikets as any} />

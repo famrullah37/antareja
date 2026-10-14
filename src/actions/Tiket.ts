@@ -10,14 +10,16 @@ import { buildDynamicQrisImage, decodeQrisFromImage } from "@/lib/qris";
 import { catatLog } from "@/lib/activityLog";
 import { labelBundling, punyaBundling, totalBayarTiket } from "@/lib/tiket";
 
+// Pengaturan tiket (master, harga, bundling, rekening/QRIS): ADMIN & BENDAHARA.
 async function requireAdmin() {
   const session = await getServerSession();
-  if (session?.user?.role !== "ADMIN") throw new Error("Forbidden");
+  if (!["ADMIN", "BENDAHARA"].includes(session?.user?.role ?? "")) throw new Error("Forbidden");
 }
 
+// Operasional (jual offline/POS, verifikasi, scan): ditambah petugas TIKET.
 async function requireAdminOrTiket() {
   const session = await getServerSession();
-  if (!["ADMIN", "TIKET"].includes(session?.user?.role ?? "")) throw new Error("Forbidden");
+  if (!["ADMIN", "BENDAHARA", "TIKET"].includes(session?.user?.role ?? "")) throw new Error("Forbidden");
 }
 import {
   createTiket,
