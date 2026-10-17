@@ -614,6 +614,13 @@ model KonfigUmum {
   // bebas dari panitia (lokasi, fasilitas, barang yang perlu dibawa, dst).
   menginapAktif          Boolean   @default(false)
   menginapInfo           String?
+  // Popup informasi yang muncul saat pengunjung membuka beranda (sekali per
+  // sesi browser). popupTampilKuota = ikut tampilkan daftar sisa kuota per jenjang
+  // aktif (dihitung langsung dari tim terkonfirmasi) di dalam popup.
+  popupAktif             Boolean   @default(false)
+  popupJudul             String?
+  popupIsi               String?
+  popupTampilKuota       Boolean   @default(true)
 }
 
 // ─── Ruangan Basecamp ────────────────────────────────────────────────────────

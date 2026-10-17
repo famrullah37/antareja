@@ -53,6 +53,10 @@ export async function upsertKonfigUmum(data: {
   ujiCobaBatas?: Date | null;
   menginapAktif?: boolean;
   menginapInfo?: string | null;
+  popupAktif?: boolean;
+  popupJudul?: string | null;
+  popupIsi?: string | null;
+  popupTampilKuota?: boolean;
 }) {
   return prisma.konfigUmum.upsert({
     where: { id: SINGLETON_ID },

@@ -164,3 +164,27 @@ export async function saveKuotaTim(data: FormData) {
     return { success: false, message: "Gagal menyimpan kuota" };
   }
 }
+
+// Popup informasi di beranda — form sendiri di Pengaturan (bukan bagian
+// saveKonfigUmum) supaya bisa dinyalakan/diubah tanpa ikut validasi timeline dkk.
+export async function savePopupInfo(data: FormData) {
+  await requireAdmin();
+  const popupAktif = data.get("popupAktif") === "on";
+  const popupTampilKuota = data.get("popupTampilKuota") === "on";
+  const popupJudul = ((data.get("popupJudul") as string) || "").trim();
+  const popupIsi = ((data.get("popupIsi") as string) || "").trim();
+
+  if (popupJudul.length > 120) return { success: false, message: "Judul maksimal 120 karakter" };
+  if (popupIsi.length > 2000) return { success: false, message: "Isi maksimal 2000 karakter" };
+  if (popupAktif && !popupJudul && !popupIsi && !popupTampilKuota) {
+    return { success: false, message: "Popup aktif tapi kosong — isi judul/isi atau tampilkan kuota" };
+  }
+
+  try {
+    await upsertKonfigUmum({ popupAktif, popupTampilKuota, popupJudul: popupJudul || null, popupIsi: popupIsi || null });
+    revalidatePath("/", "layout");
+    return { success: true, message: "Popup informasi disimpan" };
+  } catch {
+    return { success: false, message: "Gagal menyimpan popup informasi" };
+  }
+}

@@ -12,6 +12,7 @@ import TiketSection from "./components/TiketSection";
 import RevealSection from "./components/parts/RevealSection";
 import ComingSoon from "./components/ComingSoon";
 import EventJsonLd from "./components/EventJsonLd";
+import InfoPopup from "./components/InfoPopup";
 import { getKonfigUmum, type TimelineItem } from "@/queries/konfigUmum.query";
 
 export default async function LandingPage() {
@@ -33,6 +34,7 @@ export default async function LandingPage() {
   return (
     <>
       <EventJsonLd timeline={timeline} />
+      <InfoPopup />
       <Hero />
       <RevealSection delay={0}>
         <Kategori />
