@@ -36,6 +36,32 @@ import {
 import { imageUploader, validateUploadFile } from "./fileUploader";
 import prisma from "@/lib/prisma";
 import { escapeHtml } from "@/lib/escapeHtml";
+import { blokRingkasanPembayaran, kirimEmailPesananDiterima, type RingkasanPembayaran } from "@/lib/emailPembayaran";
+
+// Ringkasan nominal transaksi tiket untuk email (pesanan diterima & verifikasi).
+function ringkasanTiket(tr: {
+  jumlah: number;
+  kodeUnik: string | null;
+  bundleJumlah: number;
+  bundleHarga: number;
+  bundleIsi: string | null;
+  metodePembayaran: string;
+  createdAt: Date;
+  tiket: { jenis: string; harga: number };
+}): RingkasanPembayaran {
+  return {
+    kodeUnik: tr.kodeUnik,
+    totalBayar: totalBayarTiket(tr),
+    metodePembayaran: tr.metodePembayaran,
+    tanggal: tr.createdAt,
+    rincian: [
+      { label: `Tiket ${tr.tiket.jenis} × ${tr.jumlah}`, nominal: tr.tiket.harga * tr.jumlah },
+      ...(tr.bundleJumlah > 0
+        ? [{ label: `Bundling ${tr.bundleIsi ?? ""} × ${tr.bundleJumlah}`.trim(), nominal: tr.bundleHarga * tr.bundleJumlah }]
+        : []),
+    ],
+  };
+}
 
 // ─── Admin: Master Tiket ──────────────────────────────────────────────────────
 
@@ -226,7 +252,7 @@ export async function beliTiket(data: FormData) {
 
   try {
     // Atomic: decrement sisa hanya jika cukup, lalu buat transaksi
-    await prisma.$transaction(async (tx) => {
+    const dibuat = await prisma.$transaction(async (tx) => {
       const tiket = await tx.tiket.findUnique({ where: { id: tiketId } });
       if (!tiket) throw new Error("TIKET_TIDAK_DITEMUKAN");
       if (jumlah < 1) throw new Error("JUMLAH_INVALID");
@@ -242,7 +268,8 @@ export async function beliTiket(data: FormData) {
       });
       if (dipakai) throw new Error("KODE_UNIK_DIPAKAI");
 
-      await tx.transaksiTiket.create({
+      return tx.transaksiTiket.create({
+        include: { tiket: true },
         data: {
           tiket: { connect: { id: tiketId } },
           jumlah,
@@ -259,6 +286,13 @@ export async function beliTiket(data: FormData) {
           ...(userId ? { user: { connect: { id: userId } } } : {}),
         },
       });
+    });
+    await kirimEmailPesananDiterima({
+      to: dibuat.email,
+      nama: dibuat.nama,
+      produk: "Tiket",
+      ringkasan: ringkasanTiket(dibuat),
+      keterangan: "QR code tiket akan dikirim ke email ini setelah pembayaran diverifikasi panitia.",
     });
     revalidatePath("/tiket");
     return { success: true };
@@ -426,7 +460,8 @@ export async function verifikasiTiket(transaksiId: string) {
           <div style="font-family:sans-serif;max-width:520px;margin:auto">
             <h2 style="color:#F70048">Tiket Anda Terverifikasi!</h2>
             <p>Halo <b>${escapeHtml(transaksi.nama)}</b>,</p>
-            <p>Pembelian tiket <b>${transaksi.tiket.jenis}</b> (${transaksi.jumlah} tiket) telah diverifikasi.</p>
+            <p>Pembelian tiket <b>${escapeHtml(transaksi.tiket.jenis)}</b> (${transaksi.jumlah} tiket) telah diverifikasi.</p>
+            ${blokRingkasanPembayaran(ringkasanTiket(transaksi), "Lunas")}
             ${transaksi.bundleJumlah > 0 ? `<p>Termasuk bundling <b>${transaksi.bundleIsi}</b> × ${transaksi.bundleJumlah} — diambil saat QR bertanda bundling di-scan di pintu masuk.</p>` : ""}
             <div style="background:#f9f9f9;border-radius:8px;padding:16px;margin:16px 0">
               <p style="margin:0 0 12px;font-weight:bold">QR Code Tiket Anda:</p>

@@ -21,6 +21,28 @@ import { sendMailTo } from "@/lib/mailer";
 import prisma from "@/lib/prisma";
 import { toDownloadUrl } from "@/lib/downloadUrl";
 import { escapeHtml } from "@/lib/escapeHtml";
+import { blokRingkasanPembayaran, kirimEmailPesananDiterima, type RingkasanPembayaran } from "@/lib/emailPembayaran";
+
+// Ringkasan nominal pembelian foto untuk email. TransaksiFoto.harga sudah
+// termasuk kode unik (lihat beliFoto); harga album bisa berubah setelah beli,
+// jadi rincian memakai total tersimpan dikurangi kode unik.
+function ringkasanFoto(t: {
+  harga: number;
+  kodeUnik: string | null;
+  fotoList: unknown;
+  metodePembayaran: string;
+  createdAt: Date;
+}): RingkasanPembayaran {
+  const kode = t.kodeUnik ? parseInt(t.kodeUnik, 10) : 0;
+  const jumlahFoto = Array.isArray(t.fotoList) ? t.fotoList.length : 0;
+  return {
+    kodeUnik: t.kodeUnik,
+    totalBayar: t.harga,
+    metodePembayaran: t.metodePembayaran,
+    tanggal: t.createdAt,
+    rincian: [{ label: `Foto Premium (${jumlahFoto} foto)`, nominal: t.harga - kode }],
+  };
+}
 
 async function requireAdmin() {
   const session = await getServerSession();
@@ -212,6 +234,15 @@ export async function beliFoto(data: FormData) {
       email: email || null,
       ...(userId ? { user: { connect: { id: userId } } } : {}),
     } as any);
+    if (email) {
+      await kirimEmailPesananDiterima({
+        to: email,
+        nama: namaPembeli || "Pembeli",
+        produk: "Foto",
+        ringkasan: ringkasanFoto({ harga, kodeUnik, fotoList, metodePembayaran, createdAt: new Date() }),
+        keterangan: "Link unduhan foto akan dikirim ke email ini setelah pembayaran diverifikasi panitia.",
+      });
+    }
     revalidatePath("/galeri");
     return { success: true, kodeUnik, transaksiId: (transaksi as any).id };
   } catch { return { success: false }; }
@@ -258,7 +289,7 @@ export async function verifikasiFoto(transaksiId: string) {
         await sendMailTo({
           to: userEmail,
           subject: `✅ Foto LPKBB Antareja 2026 — Siap Diunduh`,
-          html: `<div style="font-family:sans-serif;max-width:520px;margin:auto"><h2 style="color:#F70048">Foto Anda Siap Diunduh!</h2><p>Halo <b>${escapeHtml(namaPembeli)}</b>,</p><p>Pembayaran Anda telah diverifikasi. Silakan unduh foto Anda:</p><div style="margin:16px 0"><a href="${downloadPageUrl}" style="background:#F70048;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;display:inline-block">🔗 Buka Halaman Unduhan</a></div><ul style="padding-left:0;list-style:none">${fotoLinks}</ul><p style="font-size:12px;color:#aaa">LPKBB Antareja 2026 — SMK Telkom Malang</p></div>`,
+          html: `<div style="font-family:sans-serif;max-width:520px;margin:auto"><h2 style="color:#F70048">Foto Anda Siap Diunduh!</h2><p>Halo <b>${escapeHtml(namaPembeli)}</b>,</p><p>Pembayaran Anda telah diverifikasi. Silakan unduh foto Anda:</p>${blokRingkasanPembayaran(ringkasanFoto({ harga: transaksi.harga, kodeUnik: t.kodeUnik ?? null, fotoList: transaksi.fotoList, metodePembayaran: t.metodePembayaran, createdAt: transaksi.createdAt }), "Lunas")}<div style="margin:16px 0"><a href="${downloadPageUrl}" style="background:#F70048;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;display:inline-block">🔗 Buka Halaman Unduhan</a></div><ul style="padding-left:0;list-style:none">${fotoLinks}</ul><p style="font-size:12px;color:#aaa">LPKBB Antareja 2026 — SMK Telkom Malang</p></div>`,
         });
       } catch { /* email failure is non-fatal */ }
     }
