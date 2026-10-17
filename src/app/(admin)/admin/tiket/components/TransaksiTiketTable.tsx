@@ -1,6 +1,7 @@
 ﻿"use client";
 
-import { rejectTiket, verifikasiTiket } from "@/actions/Tiket";
+import { rejectTiket, unduhKuitansiTiket, verifikasiTiket } from "@/actions/Tiket";
+import UnduhKuitansiButton from "../../components/UnduhKuitansiButton";
 import { toast } from "sonner";
 import { totalBayarTiket } from "@/lib/tiket";
 
@@ -180,6 +181,9 @@ export default function TransaksiTiketTable({
                           Tolak
                         </button>
                       </div>
+                    )}
+                    {tr.status === "VERIFIED" && tr.jenisJual === "ONLINE" && (
+                      <UnduhKuitansiButton id={tr.id} aksi={unduhKuitansiTiket} />
                     )}
                     {tr.status === "VERIFIED" && tr.noHp && (
                       <a

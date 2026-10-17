@@ -21,6 +21,7 @@ import { sendMailTo } from "@/lib/mailer";
 import prisma from "@/lib/prisma";
 import { toDownloadUrl } from "@/lib/downloadUrl";
 import { escapeHtml } from "@/lib/escapeHtml";
+import { buatKuitansiFoto } from "@/lib/kuitansiPenjualan";
 import { blokRingkasanPembayaran, kirimEmailPesananDiterima, type RingkasanPembayaran } from "@/lib/emailPembayaran";
 
 // Ringkasan nominal pembelian foto untuk email. TransaksiFoto.harga sudah
@@ -286,10 +287,17 @@ export async function verifikasiFoto(transaksiId: string) {
         const fotoLinks = fotos.map((f, i) =>
           `<li style="margin-bottom:8px"><a href="${toDownloadUrl(f.pathAsli, f.tagTim ?? `Foto-${i + 1}`)}" download style="background:#F70048;color:#fff;padding:6px 14px;border-radius:6px;text-decoration:none;font-weight:bold;font-size:13px;display:inline-block">⬇ Unduh Foto ${i + 1}${f.tagTim ? ` — ${f.tagTim}` : ""}</a></li>`
         ).join("");
+        const kuitansi = await buatKuitansiFoto(transaksiId).catch((e) => {
+          console.error("Gagal membuat kuitansi foto:", e);
+          return null;
+        });
         await sendMailTo({
           to: userEmail,
+          ...(kuitansi
+            ? { fileAttachments: [{ filename: kuitansi.filename, content: kuitansi.pdf, contentType: "application/pdf" }] }
+            : {}),
           subject: `✅ Foto LPKBB Antareja 2026 — Siap Diunduh`,
-          html: `<div style="font-family:sans-serif;max-width:520px;margin:auto"><h2 style="color:#F70048">Foto Anda Siap Diunduh!</h2><p>Halo <b>${escapeHtml(namaPembeli)}</b>,</p><p>Pembayaran Anda telah diverifikasi. Silakan unduh foto Anda:</p>${blokRingkasanPembayaran(ringkasanFoto({ harga: transaksi.harga, kodeUnik: t.kodeUnik ?? null, fotoList: transaksi.fotoList, metodePembayaran: t.metodePembayaran, createdAt: transaksi.createdAt }), "Lunas")}<div style="margin:16px 0"><a href="${downloadPageUrl}" style="background:#F70048;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;display:inline-block">🔗 Buka Halaman Unduhan</a></div><ul style="padding-left:0;list-style:none">${fotoLinks}</ul><p style="font-size:12px;color:#aaa">LPKBB Antareja 2026 — SMK Telkom Malang</p></div>`,
+          html: `<div style="font-family:sans-serif;max-width:520px;margin:auto"><h2 style="color:#F70048">Foto Anda Siap Diunduh!</h2><p>Halo <b>${escapeHtml(namaPembeli)}</b>,</p><p>Pembayaran Anda telah diverifikasi. Silakan unduh foto Anda:</p>${blokRingkasanPembayaran(ringkasanFoto({ harga: transaksi.harga, kodeUnik: t.kodeUnik ?? null, fotoList: transaksi.fotoList, metodePembayaran: t.metodePembayaran, createdAt: transaksi.createdAt }), "Lunas")}${kuitansi ? `<p>Kuitansi pembayaran terlampir (No. <b>${kuitansi.nomor}</b>).</p>` : ""}<div style="margin:16px 0"><a href="${downloadPageUrl}" style="background:#F70048;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;display:inline-block">🔗 Buka Halaman Unduhan</a></div><ul style="padding-left:0;list-style:none">${fotoLinks}</ul><p style="font-size:12px;color:#aaa">LPKBB Antareja 2026 — SMK Telkom Malang</p></div>`,
         });
       } catch { /* email failure is non-fatal */ }
     }
@@ -297,6 +305,84 @@ export async function verifikasiFoto(transaksiId: string) {
     revalidatePath("/admin/kas");
     return { success: true };
   } catch { return { success: false }; }
+}
+
+// Unduh kuitansi PDF pembelian foto terverifikasi — nomor sama tiap unduh.
+export async function unduhKuitansiFoto(transaksiId: string) {
+  await requireAdmin();
+  try {
+    const k = await buatKuitansiFoto(transaksiId);
+    if (!k) return { success: false, message: "Kuitansi hanya untuk pembelian yang sudah diverifikasi" };
+    return { success: true, base64: k.pdf.toString("base64"), filename: k.filename };
+  } catch (e) {
+    console.error("unduhKuitansiFoto error:", e);
+    return { success: false, message: "Gagal membuat kuitansi" };
+  }
+}
+
+// ─── Watermark Foto Lama ─────────────────────────────────────────────────────
+
+// Foto yang diupload sebelum watermark server-side ada (atau yang watermark-nya
+// gagal saat upload) punya pathWatermark === pathAsli — preview publik album
+// berbayar jadi sama dengan file aslinya. Diproses per batch kecil supaya satu
+// klik tidak kena batas waktu request; tombol diklik ulang sampai sisa 0.
+const BATCH_WATERMARK = 10;
+
+export async function hitungFotoTanpaWatermark() {
+  await requireAdminOrFotografer();
+  const rows = await prisma.$queryRaw<{ n: bigint }[]>`SELECT COUNT(*)::bigint AS n FROM "Foto" WHERE "pathWatermark" = "pathAsli"`;
+  return Number(rows[0]?.n ?? 0);
+}
+
+// no-store: fetch di server Next.js di-cache secara default, dan foto event
+// besar (beberapa MB) tidak perlu/boleh masuk cache itu. Dicoba ulang sekali
+// karena koneksi ke Cloudinary sesekali putus di tengah unduhan.
+async function unduhFoto(url: string): Promise<Buffer> {
+  let galat: unknown;
+  for (let i = 0; i < 2; i++) {
+    try {
+      const res = await fetch(url, { cache: "no-store" });
+      if (!res.ok) throw new Error(`unduh foto gagal (HTTP ${res.status})`);
+      return Buffer.from(await res.arrayBuffer());
+    } catch (e) {
+      galat = e;
+    }
+  }
+  throw galat instanceof Error ? new Error(`unduh foto gagal: ${galat.message}`) : new Error("unduh foto gagal");
+}
+
+export async function buatWatermarkFotoLama() {
+  await requireAdminOrFotografer();
+  const fotos = await prisma.$queryRaw<{ id: string; pathAsli: string }[]>`
+    SELECT id, "pathAsli" FROM "Foto" WHERE "pathWatermark" = "pathAsli" ORDER BY "createdAt" LIMIT ${BATCH_WATERMARK}`;
+  let berhasil = 0;
+  const gagal: string[] = [];
+  for (const f of fotos) {
+    try {
+      const asli = await unduhFoto(f.pathAsli);
+      const wm = await addWatermark(asli);
+      // addWatermark mengembalikan buffer asli kalau gagal — jangan dianggap berhasil.
+      if (wm === asli) throw new Error("watermark gagal dibuat");
+      const up = await imageUploader(wm);
+      if (!up.data?.url) throw new Error(up.message || "upload gagal");
+      await prisma.foto.update({ where: { id: f.id }, data: { pathWatermark: up.data.url } });
+      berhasil++;
+    } catch (e) {
+      gagal.push(e instanceof Error ? e.message : "error");
+    }
+  }
+  const sisa = await hitungFotoTanpaWatermark();
+  if (berhasil > 0) {
+    await catatLog("WATERMARK_FOTO_LAMA", `${berhasil} foto diproses, sisa ${sisa}`);
+    revalidatePath("/admin/galeri");
+    revalidatePath("/galeri");
+  }
+  return {
+    success: gagal.length === 0,
+    berhasil,
+    sisa,
+    message: gagal.length ? `${gagal.length} foto gagal: ${Array.from(new Set(gagal)).join("; ")}` : undefined,
+  };
 }
 
 export async function rejectFoto(transaksiId: string) {

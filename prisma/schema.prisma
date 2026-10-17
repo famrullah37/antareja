@@ -311,6 +311,10 @@ model TransaksiTiket {
   // Tiket online yang sudah diambil pembeli di loket (ditandai petugas POS) —
   // terpisah dari QRTiket.statusScan (scan di pintu masuk). null = belum diambil.
   diambilAt        DateTime?
+  // Kuitansi PDF terbit saat diverifikasi (counter sama dengan kuitansi
+  // pendaftaran, KonfigUmum.counterKuitansi) — unduh ulang memakai nomor sama.
+  nomorKuitansi    String?   @unique
+  kuitansiTanggal  DateTime?
   createdAt        DateTime  @default(now())
   user             User?     @relation(fields: [userId], references: [id])
   tiket            Tiket     @relation(fields: [tiketId], references: [id])
@@ -442,6 +446,9 @@ model TransaksiFoto {
   kodeUnik         String?
   metodePembayaran String    @default("TRANSFER")
   expiredAt        DateTime?
+  // Kuitansi PDF — lihat TransaksiTiket.nomorKuitansi.
+  nomorKuitansi    String?   @unique
+  kuitansiTanggal  DateTime?
   createdAt        DateTime  @default(now())
   user             User?     @relation(fields: [userId], references: [id])
 }

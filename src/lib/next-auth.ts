@@ -2,6 +2,7 @@ import { validateHash } from "@/lib/hash";
 import { findUser, findUserByEmail } from "@/queries/user.query"; // prisma query user
 import { catatLogLogin } from "@/lib/activityLog";
 import { batasiAksi, catatLoginGagal, loginDiblokir, resetLoginGagal } from "@/lib/rateLimit";
+import { SESI_IDLE_MENIT } from "@/lib/sesi";
 import { Role } from "@prisma/client";
 import {
   getServerSession as nextAuthGetServerSession,
@@ -45,7 +46,11 @@ export const authOptions: AuthOptions = {
   },
   session: {
     strategy: "jwt",
-    maxAge: 30 * 24 * 60 * 60, // 30 hari
+    // Dulu 30 hari: auto-logout idle cuma di klien, jadi cookie lama tetap
+    // diterima server (tab baru langsung ke /admin, server action, localStorage
+    // diblokir, halaman dari cache tombol Back). Sekarang server ikut menegakkan
+    // batas idle — lihat src/lib/sesi.ts.
+    maxAge: SESI_IDLE_MENIT * 60,
   },
   providers: [
     CredentialsProvider({

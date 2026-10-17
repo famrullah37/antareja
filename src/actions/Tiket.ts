@@ -38,6 +38,7 @@ import { imageUploader, validateUploadFile } from "./fileUploader";
 import prisma from "@/lib/prisma";
 import { escapeHtml } from "@/lib/escapeHtml";
 import { formatJamWib } from "@/lib/ujiCoba";
+import { buatKuitansiTiket } from "@/lib/kuitansiPenjualan";
 import { blokRingkasanPembayaran, kirimEmailPesananDiterima, type RingkasanPembayaran } from "@/lib/emailPembayaran";
 
 // Ringkasan nominal transaksi tiket untuk email (pesanan diterima & verifikasi).
@@ -453,10 +454,20 @@ export async function verifikasiTiket(transaksiId: string) {
       })
     );
 
+    // Kuitansi PDF dilampirkan ke email — gagal dibuat tidak menggagalkan verifikasi
+    // (admin masih bisa mengunduhnya dari tabel transaksi).
+    const kuitansi = await buatKuitansiTiket(transaksiId).catch((e) => {
+      console.error("Gagal membuat kuitansi tiket:", e);
+      return null;
+    });
+
     // Kirim email
     try {
       await sendMailTo({
         to: transaksi.email,
+        ...(kuitansi
+          ? { fileAttachments: [{ filename: kuitansi.filename, content: kuitansi.pdf, contentType: "application/pdf" }] }
+          : {}),
         subject: `✅ Tiket LPKBB Antareja 2026 — ${transaksi.tiket.jenis}`,
         html: `
           <div style="font-family:sans-serif;max-width:520px;margin:auto">
@@ -464,6 +475,7 @@ export async function verifikasiTiket(transaksiId: string) {
             <p>Halo <b>${escapeHtml(transaksi.nama)}</b>,</p>
             <p>Pembelian tiket <b>${escapeHtml(transaksi.tiket.jenis)}</b> (${transaksi.jumlah} tiket) telah diverifikasi.</p>
             ${blokRingkasanPembayaran(ringkasanTiket(transaksi), "Lunas")}
+            ${kuitansi ? `<p>Kuitansi pembayaran terlampir (No. <b>${kuitansi.nomor}</b>).</p>` : ""}
             ${transaksi.bundleJumlah > 0 ? `<p>Termasuk bundling <b>${transaksi.bundleIsi}</b> × ${transaksi.bundleJumlah} — diambil saat QR bertanda bundling di-scan di pintu masuk.</p>` : ""}
             <div style="background:#f9f9f9;border-radius:8px;padding:16px;margin:16px 0">
               <p style="margin:0 0 12px;font-weight:bold">QR Code Tiket Anda:</p>
@@ -485,6 +497,19 @@ export async function verifikasiTiket(transaksiId: string) {
     return { success: true };
   } catch {
     return { success: false };
+  }
+}
+
+// Unduh kuitansi PDF tiket online terverifikasi (admin/bendahara) — nomor sama tiap unduh.
+export async function unduhKuitansiTiket(transaksiId: string) {
+  await requireAdmin();
+  try {
+    const k = await buatKuitansiTiket(transaksiId);
+    if (!k) return { success: false, message: "Kuitansi hanya untuk tiket online yang sudah diverifikasi" };
+    return { success: true, base64: k.pdf.toString("base64"), filename: k.filename };
+  } catch (e) {
+    console.error("unduhKuitansiTiket error:", e);
+    return { success: false, message: "Gagal membuat kuitansi" };
   }
 }
 

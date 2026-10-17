@@ -13,14 +13,23 @@ function formatRupiah(n: number) {
 
 export default function TimTable({ data }: { data: TimWithRelations[] }) {
   const [loader, setLoader] = useState(true);
+  // Tim yang sedang dikonfirmasi — tombolnya dinonaktifkan supaya tidak terklik
+  // dua kali selama proses (kuitansi & email butuh beberapa detik).
+  const [proses, setProses] = useState<string | null>(null);
   const router = useRouter();
 
   async function handleApprove(e: React.MouseEvent, timId: string, isDP: boolean) {
     e.stopPropagation();
-    const toastId = toast.loading("Mengkonfirmasi...");
-    const result = await approvePayment(timId, isDP);
-    if (result.success) toast.success(result.message ?? "Pembayaran terkonfirmasi!", { id: toastId, duration: result.message ? 6000 : 4000 });
-    else toast.error("Gagal konfirmasi", { id: toastId });
+    if (proses) return;
+    setProses(timId);
+    const toastId = toast.loading("Mengkonfirmasi... (membuat & mengirim kuitansi)");
+    try {
+      const result = await approvePayment(timId, isDP);
+      if (result.success) toast.success(result.message ?? "Pembayaran terkonfirmasi!", { id: toastId, duration: result.message ? 6000 : 4000 });
+      else toast.error("Gagal konfirmasi", { id: toastId });
+    } finally {
+      setProses(null);
+    }
   }
 
   const columns: TableColumn<TimWithRelations>[] = [
@@ -89,13 +98,15 @@ export default function TimTable({ data }: { data: TimWithRelations[] }) {
           <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
             <button
               onClick={(e) => handleApprove(e, row.id, false)}
-              className="bg-green-500 hover:bg-green-600 text-white text-xs font-semibold px-2 py-1.5 rounded-lg transition-colors"
+              disabled={!!proses}
+              className="disabled:opacity-50 disabled:cursor-wait bg-green-500 hover:bg-green-600 text-white text-xs font-semibold px-2 py-1.5 rounded-lg transition-colors"
             >
               Lunas
             </button>
             <button
               onClick={(e) => handleApprove(e, row.id, true)}
-              className="bg-primary-500 hover:bg-primary-600 text-white text-xs font-semibold px-2 py-1.5 rounded-lg transition-colors"
+              disabled={!!proses}
+              className="disabled:opacity-50 disabled:cursor-wait bg-primary-500 hover:bg-primary-600 text-white text-xs font-semibold px-2 py-1.5 rounded-lg transition-colors"
             >
               DP
             </button>

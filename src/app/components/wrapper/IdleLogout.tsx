@@ -4,6 +4,7 @@ import { signOut, useSession } from "next-auth/react";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { toast } from "sonner";
+import { SESI_IDLE_MS } from "@/lib/sesi";
 
 // Auto-logout kalau tidak ada aktivitas — supaya sesi yang lupa di-logout
 // (mis. di komputer/HP bersama, warnet, dsb) tidak nganggur login selamanya.
@@ -15,7 +16,7 @@ import { toast } from "sonner";
 // lebih dari 30 menit tidak aktif. Cek dilakukan saat halaman dibuka, saat tab
 // kembali aktif, dan saat timer habis. Ini pengaman kenyamanan (client-side),
 // bukan pengganti kontrol keamanan server.
-const IDLE_TIMEOUT_MS = 30 * 60 * 1000;
+const IDLE_TIMEOUT_MS = SESI_IDLE_MS; // sama dengan umur sesi di server (src/lib/sesi.ts)
 const ACTIVITY_KEY = "antareja:lastActivity";
 const NOTICE_KEY = "antareja:idleLogout";
 
@@ -55,6 +56,19 @@ export default function IdleLogout() {
       600
     );
     return () => clearTimeout(t);
+  }, []);
+
+  // Tombol Back setelah logout bisa memulihkan halaman admin/dashboard dari
+  // cache browser (bfcache) lengkap dengan datanya, tanpa request ke server.
+  // Muat ulang dari server supaya middleware yang memutuskan (login lagi kalau
+  // sesinya sudah habis).
+  useEffect(() => {
+    const onPageShow = (e: PageTransitionEvent) => {
+      const p = window.location.pathname;
+      if (e.persisted && (p.startsWith("/admin") || p.startsWith("/dashboard"))) window.location.reload();
+    };
+    window.addEventListener("pageshow", onPageShow);
+    return () => window.removeEventListener("pageshow", onPageShow);
   }, []);
 
   useEffect(() => {

@@ -1,6 +1,7 @@
 ﻿"use client";
 
-import { rejectFoto, verifikasiFoto } from "@/actions/Galeri";
+import { rejectFoto, unduhKuitansiFoto, verifikasiFoto } from "@/actions/Galeri";
+import UnduhKuitansiButton from "../../components/UnduhKuitansiButton";
 import { toast } from "sonner";
 
 type TransaksiFotoItem = {
@@ -135,6 +136,7 @@ export default function TransaksiFotoTable({
                     </button>
                   </div>
                 )}
+                {tr.status === "VERIFIED" && <UnduhKuitansiButton id={tr.id} aksi={unduhKuitansiFoto} />}
               </td>
             </tr>
           ))}

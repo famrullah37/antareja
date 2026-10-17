@@ -1,7 +1,5 @@
 "use server";
 
-import { updatePembayaran } from "@/queries/pembayaran.query";
-import { updateTim } from "@/queries/tim.query";
 import { getKonfigUmum } from "@/queries/konfigUmum.query";
 import { revalidatePath } from "next/cache";
 import prisma from "@/lib/prisma";
@@ -248,11 +246,22 @@ export async function generateKuitansiManual(timId: string) {
 // dua fungsi ini duplikat persis, gampang saling tidak sinkron kalau salah satu
 // diubah tanpa yang lain.
 async function setStatusPembayaran(timId: string, confirmed: boolean, isDP: boolean) {
-  // Dua write independen (tabel berbeda, tidak saling bergantung) — paralel.
-  const [tim] = await Promise.all([
-    updateTim({ id: timId }, { confirmed }),
-    updatePembayaran({ tim_id: timId }, { isDP }),
-  ]);
+  // Baris tim dikunci (FOR UPDATE) selama status dibaca & diubah: tombol yang
+  // terklik dua kali (proses konfirmasi butuh beberapa detik untuk kuitansi &
+  // email) dulu menjalankan semuanya dua kali — log dobel, dan kuitansi bisa
+  // terkirim dua kali dengan nomor berbeda. Request kedua sekarang menunggu,
+  // lalu melihat status sudah sama → tidak melakukan apa-apa.
+  const tim = await prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM "Tim" WHERE id = ${timId} FOR UPDATE`;
+    const lama = await tx.tim.findUnique({ where: { id: timId }, include: { pembayaran: { select: { isDP: true } } } });
+    if (!lama) throw new Error("Tim tidak ditemukan");
+    if (lama.confirmed === confirmed && lama.pembayaran?.isDP === isDP) return null;
+    const baru = await tx.tim.update({ where: { id: timId }, data: { confirmed } });
+    await tx.pembayaran.update({ where: { tim_id: timId }, data: { isDP } });
+    return baru;
+  });
+  if (!tim) return null; // tidak ada perubahan (klik ganda / simpan ulang tanpa mengubah apa pun)
+
   await catatLog(
     confirmed ? "KONFIRMASI_PEMBAYARAN_TIM" : "BATAL_KONFIRMASI_PEMBAYARAN_TIM",
     `Tim ${tim.nama_tim} — ${tim.asal_sekolah}${isDP ? " (DP)" : ""}`
@@ -341,8 +350,12 @@ export async function approvePayment(timId: string, isDP: boolean) {
 export async function batalkanKonfirmasi(timId: string) {
   try {
     await requireAdmin();
-    const tim = await updateTim({ id: timId }, { confirmed: false });
-    await catatLog("BATAL_KONFIRMASI_PEMBAYARAN_TIM", `Tim ${tim.nama_tim} — ${tim.asal_sekolah}`);
+    // Hanya mencatat log kalau status benar-benar berubah (klik ganda tidak dobel).
+    const berubah = await prisma.tim.updateMany({ where: { id: timId, confirmed: true }, data: { confirmed: false } });
+    if (berubah.count > 0) {
+      const tim = await prisma.tim.findUnique({ where: { id: timId }, select: { nama_tim: true, asal_sekolah: true } });
+      await catatLog("BATAL_KONFIRMASI_PEMBAYARAN_TIM", `Tim ${tim?.nama_tim} — ${tim?.asal_sekolah}`);
+    }
     revalidatePath("/", "layout");
     return { success: true };
   } catch (e) {
