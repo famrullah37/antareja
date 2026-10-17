@@ -73,12 +73,20 @@ export async function getLaporanKas() {
   const totalPendaftaranVerified = kasTransaksis
     .filter((k) => k.tipe === "PEMASUKAN" && k.sumber === "PENDAFTARAN")
     .reduce((s, k) => s + k.jumlah, 0);
+  const totalMerchVerified = kasTransaksis
+    .filter((k) => k.tipe === "PEMASUKAN" && k.sumber === "MERCHANDISE")
+    .reduce((s, k) => s + k.jumlah, 0);
+  const totalMakananVerified = kasTransaksis
+    .filter((k) => k.tipe === "PEMASUKAN" && k.sumber === "MAKANAN")
+    .reduce((s, k) => s + k.jumlah, 0);
 
   return {
     totalTiketVerified,
     totalFotoVerified,
     totalVotingVerified,
     totalPendaftaranVerified,
+    totalMerchVerified,
+    totalMakananVerified,
     totalPendapatan: totalPemasukan,
     totalPengeluaran,
     saldo: totalPemasukan - totalPengeluaran,

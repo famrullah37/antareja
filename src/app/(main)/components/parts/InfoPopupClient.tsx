@@ -58,6 +58,7 @@ export default function InfoPopupClient({
 
   const deadlineDate = deadline ? new Date(deadline) : null;
   const ditutup = !!deadlineDate && deadlineDate.getTime() <= Date.now();
+  const semuaPenuh = kuota.length > 0 && kuota.every((k) => k.kuota !== null && k.terisi >= k.kuota);
   const deadlineText = deadlineDate?.toLocaleString("id-ID", {
     timeZone: "Asia/Jakarta",
     weekday: "long",
@@ -70,7 +71,8 @@ export default function InfoPopupClient({
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4"
+      // Di atas Navbar (z-[999]) — kalau di bawahnya, navbar menutupi bagian atas popup di layar HP.
+      className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/50 p-4"
       onClick={tutup}
       role="dialog"
       aria-modal="true"
@@ -139,7 +141,7 @@ export default function InfoPopupClient({
           )}
 
           <div className="flex flex-col sm:flex-row gap-3">
-            {kuota.length > 0 && !ditutup && (
+            {kuota.length > 0 && !ditutup && !semuaPenuh && (
               <Link
                 href="/auth/register"
                 onClick={tutup}
