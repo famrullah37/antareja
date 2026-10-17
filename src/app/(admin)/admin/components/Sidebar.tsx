@@ -20,6 +20,12 @@ export default function Sidebar({ active, session }: Readonly<Sidenavprops>) {
   const allowedRoutes = protectedRoutes.filter((item) =>
     item.roles.includes(session?.user?.role!)
   );
+  // Menu aktif = rute terpanjang yang cocok dengan URL, supaya /admin/tiket/pos
+  // tidak ikut menyalakan "Tiket" & "Scanner Tiket" (dulu dibandingkan per segmen kedua saja).
+  const activePath = allowedRoutes
+    .map((item) => item.path)
+    .filter((p) => pathname === p || pathname.startsWith(p + "/"))
+    .sort((a, b) => b.length - a.length)[0];
 
   return (
     <aside
@@ -42,7 +48,7 @@ export default function Sidebar({ active, session }: Readonly<Sidenavprops>) {
                   <Link
                     href={item.path}
                     className={
-                      (pathname.split("/")[2] == item.path.split("/")[2]
+                      (item.path === activePath
                         ? "bg-red-100 "
                         : "") +
                       "group flex items-center rounded-lg p-2 text-base font-normal text-primary-400 hover:bg-red-200 transition-all"

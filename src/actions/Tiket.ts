@@ -28,7 +28,6 @@ import {
   findKonfigTiket,
   findTransaksiTiket,
   incrementCounterUrutTiket,
-  updateQRTiket,
   updateTiket,
   updateTransaksiTiket,
   upsertKonfigTiket,
@@ -36,6 +35,7 @@ import {
 import { imageUploader, validateUploadFile } from "./fileUploader";
 import prisma from "@/lib/prisma";
 import { escapeHtml } from "@/lib/escapeHtml";
+import { formatJamWib } from "@/lib/ujiCoba";
 import { blokRingkasanPembayaran, kirimEmailPesananDiterima, type RingkasanPembayaran } from "@/lib/emailPembayaran";
 
 // Ringkasan nominal transaksi tiket untuk email (pesanan diterima & verifikasi).
@@ -504,6 +504,17 @@ export async function rejectTiket(transaksiId: string) {
   }
 }
 
+// Rekap pintu masuk untuk halaman scanner: QR tiket terverifikasi yang sudah
+// masuk vs total.
+export async function statistikScanTiket() {
+  await requireAdminOrTiket();
+  const [masuk, total] = await Promise.all([
+    prisma.qRTiket.count({ where: { statusScan: true } }),
+    prisma.qRTiket.count({ where: { transaksi: { status: "VERIFIED" } } }),
+  ]);
+  return { masuk, total };
+}
+
 export async function scanQRTiket(token: string) {
   await requireAdminOrTiket();
   try {
@@ -512,16 +523,27 @@ export async function scanQRTiket(token: string) {
       include: { transaksi: { include: { tiket: true } } },
     });
 
-    if (!qr) return { success: false, message: "QR tidak valid" };
-    if (qr.statusScan)
-      return { success: false, message: "Tiket sudah pernah di-scan" };
+    if (!qr) return { success: false, message: "QR tidak valid — bukan tiket Antareja" };
     if (qr.transaksi.status !== "VERIFIED")
-      return { success: false, message: "Tiket belum diverifikasi" };
+      return { success: false, message: "Tiket belum diverifikasi panitia" };
+    const sudahScan = (waktu: Date | null) => ({
+      success: false,
+      message: `Tiket sudah pernah di-scan${waktu ? ` pukul ${formatJamWib(waktu)} WIB` : ""}`,
+      nama: qr.transaksi.nama,
+    });
+    if (qr.statusScan) return sudahScan(qr.waktuScan);
 
-    await updateQRTiket(
-      { token },
-      { statusScan: true, waktuScan: new Date() }
-    );
+    // Klaim atomik: dua petugas scan QR yang sama bersamaan → hanya satu yang
+    // berhasil (cek-lalu-update biasa bisa meloloskan keduanya).
+    const waktuScan = new Date();
+    const klaim = await prisma.qRTiket.updateMany({
+      where: { token, statusScan: false },
+      data: { statusScan: true, waktuScan },
+    });
+    if (klaim.count === 0) {
+      const terbaru = await prisma.qRTiket.findUnique({ where: { token }, select: { waktuScan: true } });
+      return sudahScan(terbaru?.waktuScan ?? null);
+    }
 
     return {
       success: true,
@@ -529,7 +551,7 @@ export async function scanQRTiket(token: string) {
         nama: qr.transaksi.nama,
         jenis: qr.transaksi.tiket.jenis,
         bundle: qr.bundle ? qr.transaksi.bundleIsi ?? "Bundling" : null,
-        waktuScan: new Date().toISOString(),
+        waktuScan: waktuScan.toISOString(),
       },
     };
   } catch {
