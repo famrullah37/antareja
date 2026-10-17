@@ -7,7 +7,8 @@ import {
   updateAnggota,
 } from "@/queries/anggota.query";
 import { findTimsByUser } from "@/queries/tim.query";
-import { Kelas, Posisi } from "@prisma/client";
+import prisma from "@/lib/prisma";
+import { Kelas, Posisi, Prisma } from "@prisma/client";
 import { compressPhoto, imageUploader, validateUploadFile } from "./fileUploader";
 import { revalidatePath } from "next/cache";
 import { isHttpUrl } from "@/lib/safeUrl";
@@ -26,7 +27,7 @@ export async function upsertAnggotaForm(
   if (!owned) return { success: false, message: "Forbidden" };
 
   const nama = data.get("nama") as string;
-  const email = data.get("email") as string;
+  const email = ((data.get("email") as string) || "").trim();
   const telp = data.get("telp") as string;
   const nisn = data.get("nisn") as string | undefined;
   const foto = data.get("foto") as File;
@@ -50,6 +51,17 @@ export async function upsertAnggotaForm(
   // milik tim yang barusan divalidasi kepemilikannya, bukan tim lain.
   if (tryFindAnggota && tryFindAnggota.timId !== timId)
     return { success: false, message: "Forbidden" };
+
+  // Email PELATIH boleh sama di beberapa tim (satu pelatih melatih 2+ tim);
+  // posisi lain tetap unik. Dicek sebelum upload foto supaya tidak buang kuota
+  // Cloudinary — index unik parsial di DB tetap jadi jaring pengaman.
+  if (posisi !== "PELATIH") {
+    const dipakai = await prisma.anggota.findFirst({
+      where: { email, posisi: { not: "PELATIH" }, ...(tryFindAnggota ? { id: { not: tryFindAnggota.id } } : {}) },
+      select: { id: true },
+    });
+    if (dipakai) return { success: false, message: "Email sudah dipakai anggota lain" };
+  }
 
   try {
     let fotoUrl: string | undefined;
@@ -75,6 +87,8 @@ export async function upsertAnggotaForm(
     revalidatePath("/", "layout");
     return { success: true, message: "Berhasil memperbarui anggota!" };
   } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002")
+      return { success: false, message: "Email sudah dipakai anggota lain" };
     console.error(error);
     return { success: false, message: "Gagal memperbarui anggota" };
   }

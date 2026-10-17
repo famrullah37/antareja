@@ -95,7 +95,11 @@ model Tim {
 model Anggota {
   id      String  @id @default(uuid())
   nama    String
-  email   String  @unique
+  // Unik hanya untuk posisi selain PELATIH (satu pelatih boleh melatih beberapa
+  // tim) — lewat partial unique index "Anggota_email_non_pelatih_key" di
+  // db/sql/0028, yang tidak bisa dinyatakan di schema Prisma 5. Dicek juga di
+  // upsertAnggotaForm supaya pesannya jelas.
+  email   String
   telp    String
   foto    String
   posisi  Posisi
@@ -107,6 +111,7 @@ model Anggota {
   Tim     Tim     @relation(fields: [timId], references: [id], onDelete: Cascade)
 
   @@unique([posisi, timId])
+  @@index([email])
 }
 
 model Pembayaran {
