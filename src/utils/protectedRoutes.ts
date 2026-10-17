@@ -13,6 +13,7 @@ export const protectedRoutes: ProtectedRoutes[] = [
   { title: "Uji Coba Lapangan", path: "/admin/uji-coba", roles: ["ADMIN", "SIE_ACARA"] },
   { title: "Menginap", path: "/admin/menginap", roles: ["ADMIN", "SIE_ACARA"] },
   { title: "Basecamp", path: "/admin/basecamp", roles: ["ADMIN", "SIE_ACARA"] },
+  { title: "Pemesanan Makanan", path: "/admin/makanan", roles: ["ADMIN", "BENDAHARA", "SIE_ACARA"] },
   { title: "Juri", path: "/admin/juri", roles: ["ADMIN", "SIE_LOMBA"] },
   { title: "Penghargaan", path: "/admin/penghargaan", roles: ["ADMIN", "SIE_LOMBA"] },
   { title: "Galeri", path: "/admin/galeri", roles: ["ADMIN"] },

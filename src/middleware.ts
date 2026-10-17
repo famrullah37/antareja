@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from "next/server";
 // semua tim) dan "/admin/penilaian" (sistem lama) memuat nama sekolah & nilai juri lain.
 const JURI_ROUTES = ["/admin/penilaian-baru/input"];
 const TIKET_ROUTES = ["/admin/tiket"];
-const BENDAHARA_ROUTES = ["/admin/kas", "/admin/pembayaran", "/admin/voting", "/admin/merchandise", "/admin/tiket"];
+const BENDAHARA_ROUTES = ["/admin/kas", "/admin/pembayaran", "/admin/voting", "/admin/merchandise", "/admin/tiket", "/admin/makanan"];
 const FOTOGRAFER_ROUTES = ["/admin/galeri"];
 const SIE_HUMAS_ROUTES = ["/admin/sponsor", "/admin/berita"];
 const SIE_LOMBA_ROUTES = [
@@ -19,7 +19,7 @@ const SIE_LOMBA_ROUTES = [
 ];
 // Pelaksanaan acara: jadwal uji coba, akomodasi & ruangan. Sengaja tanpa
 // tim/juri/penilaian — data anggota & nilai bukan urusan Sie Acara.
-const SIE_ACARA_ROUTES = ["/admin/uji-coba", "/admin/menginap", "/admin/basecamp", "/admin/pengumuman"];
+const SIE_ACARA_ROUTES = ["/admin/uji-coba", "/admin/menginap", "/admin/basecamp", "/admin/pengumuman", "/admin/makanan"];
 
 const STAFF_ROUTES: Record<string, string[]> = {
   JURI: JURI_ROUTES,

@@ -84,6 +84,7 @@ model Tim {
   sertifikat      Sertifikat[]
   ujiCoba         UjiCobaTim?
   menginap        PengajuanMenginap?
+  pesananMakanan  PesananMakanan[]
   transaksiVoting TransaksiVoting[]
   votingTally     VotingTally[]
   user            User              @relation(fields: [userId], references: [id])
@@ -621,6 +622,13 @@ model KonfigUmum {
   popupJudul             String?
   popupIsi               String?
   popupTampilKuota       Boolean   @default(true)
+  // Pemesanan makanan dari dashboard tim (lihat SesiMakan/PesananMakanan) —
+  // false = form disembunyikan (pesanan yang sudah ada tetap terlihat).
+  // makananInfo = keterangan panitia (lokasi stand pengambilan, dst).
+  makananAktif           Boolean   @default(false)
+  makananInfo            String?
+  // Counter kode unik pembayaran pesanan makanan (0-999, siklus ulang).
+  counterUrutMakanan     Int       @default(0)
 }
 
 // ─── Ruangan Basecamp ────────────────────────────────────────────────────────
@@ -791,4 +799,59 @@ enum Posisi {
   B5S1
   B5S2
   B5S3
+}
+
+// ─── Pemesanan Makanan ───────────────────────────────────────────────────────
+
+// Sesi makan (mis. "Sabtu Siang") dibuat panitia di /admin/makanan; tiap sesi
+// punya menu sendiri. Pemesanan sesi tutup saat batasPesan lewat (kosong =
+// sampai waktu makan) atau sesi dinonaktifkan.
+model SesiMakan {
+  id         String           @id @default(uuid())
+  nama       String
+  waktu      DateTime
+  batasPesan DateTime?
+  aktif      Boolean          @default(true)
+  createdAt  DateTime         @default(now())
+  menus      MenuMakanan[]
+  pesanan    PesananMakanan[]
+}
+
+model MenuMakanan {
+  id        String    @id @default(uuid())
+  sesiId    String
+  nama      String
+  deskripsi String?
+  harga     Int
+  aktif     Boolean   @default(true)
+  urutan    Int       @default(0)
+  createdAt DateTime  @default(now())
+  sesi      SesiMakan @relation(fields: [sesiId], references: [id], onDelete: Cascade)
+
+  @@index([sesiId])
+}
+
+// Satu pesanan = satu sesi makan dari satu tim (tim boleh memesan lebih dari
+// sekali). items = snapshot [{menuId, nama, harga, jumlah}] — harga menu bisa
+// berubah, nominal yang sudah dibayar tidak. Status PENDING | VERIFIED |
+// REJECTED | DIAMBIL. Sesi yang sudah punya pesanan tidak bisa dihapus.
+model PesananMakanan {
+  id           String    @id @default(uuid())
+  timId        String
+  sesiId       String
+  items        Json
+  subtotal     Int
+  kodeUnik     String
+  totalBayar   Int
+  bukti        String?
+  catatan      String?
+  status       String    @default("PENDING")
+  catatanAdmin String?
+  diambilAt    DateTime?
+  createdAt    DateTime  @default(now())
+  tim          Tim       @relation(fields: [timId], references: [id], onDelete: Cascade)
+  sesi         SesiMakan @relation(fields: [sesiId], references: [id], onDelete: Restrict)
+
+  @@index([timId])
+  @@index([sesiId])
 }

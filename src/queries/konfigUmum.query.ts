@@ -57,6 +57,8 @@ export async function upsertKonfigUmum(data: {
   popupJudul?: string | null;
   popupIsi?: string | null;
   popupTampilKuota?: boolean;
+  makananAktif?: boolean;
+  makananInfo?: string | null;
 }) {
   return prisma.konfigUmum.upsert({
     where: { id: SINGLETON_ID },
