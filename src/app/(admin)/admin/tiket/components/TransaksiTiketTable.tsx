@@ -19,6 +19,7 @@ type TransaksiWithRelations = {
   bundleJumlah: number;
   bundleHarga: number;
   bundleIsi: string | null;
+  diambilAt: Date | null;
   createdAt: Date;
   tiket: { jenis: string; harga: number };
   qrTikets: { token: string; statusScan: boolean; waktuScan: Date | null; bundle: boolean }[];
@@ -134,6 +135,9 @@ export default function TransaksiTiketTable({
                   >
                     {tr.status}
                   </span>
+                  {tr.diambilAt && (
+                    <div className="mt-1 text-xs font-semibold text-green-700 whitespace-nowrap">✓ Diambil</div>
+                  )}
                 </td>
                 <td className="px-4 py-3">
                   {tr.jenisJual === "OFFLINE" ? (

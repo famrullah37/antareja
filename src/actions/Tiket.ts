@@ -17,6 +17,8 @@ async function requireAdmin() {
 }
 
 // Operasional (jual offline/POS, verifikasi, scan): ditambah petugas TIKET.
+// Petugas tiket (TIKET) hanya untuk POS (jual langsung + tandai tiket online
+// diambil) — verifikasi pembayaran & scanner pintu masuk tetap Admin/Bendahara.
 async function requireAdminOrTiket() {
   const session = await getServerSession();
   if (!["ADMIN", "BENDAHARA", "TIKET"].includes(session?.user?.role ?? "")) throw new Error("Forbidden");
@@ -389,7 +391,7 @@ export async function jualTiketOffline(data: FormData) {
 // ─── Admin: Verifikasi & QR ───────────────────────────────────────────────────
 
 export async function verifikasiTiket(transaksiId: string) {
-  await requireAdminOrTiket();
+  await requireAdmin();
   try {
     const transaksi = await findTransaksiTiket({ id: transaksiId });
     if (!transaksi) return { success: false };
@@ -487,7 +489,7 @@ export async function verifikasiTiket(transaksiId: string) {
 }
 
 export async function rejectTiket(transaksiId: string) {
-  await requireAdminOrTiket();
+  await requireAdmin();
   try {
     const transaksi = await findTransaksiTiket({ id: transaksiId });
     // Hanya yang masih PENDING — menolak transaksi yang sudah VERIFIED akan
@@ -504,10 +506,43 @@ export async function rejectTiket(transaksiId: string) {
   }
 }
 
+// ─── POS: Pengambilan Tiket Online ───────────────────────────────────────────
+
+// Petugas loket menandai tiket online (sudah VERIFIED) sudah diambil pembeli.
+// Klaim atomik (where diambilAt null) supaya dua petugas tidak menandai ganda.
+export async function tandaiTiketDiambil(transaksiId: string) {
+  await requireAdminOrTiket();
+  const klaim = await prisma.transaksiTiket.updateMany({
+    where: { id: transaksiId, status: "VERIFIED", jenisJual: "ONLINE", diambilAt: null },
+    data: { diambilAt: new Date() },
+  });
+  if (klaim.count === 0) return { success: false, message: "Tiket sudah ditandai diambil atau belum terverifikasi" };
+  const tr = await prisma.transaksiTiket.findUnique({ where: { id: transaksiId }, include: { tiket: true } });
+  await catatLog("TIKET_DIAMBIL", `${tr?.nama} — ${tr?.tiket.jenis} × ${tr?.jumlah}${tr?.kodeUnik ? ` [#${tr.kodeUnik}]` : ""}`);
+  revalidatePath("/admin/tiket/pos");
+  revalidatePath("/admin/tiket");
+  return { success: true };
+}
+
+// Untuk koreksi salah tandai di loket.
+export async function batalTiketDiambil(transaksiId: string) {
+  await requireAdminOrTiket();
+  const batal = await prisma.transaksiTiket.updateMany({
+    where: { id: transaksiId, diambilAt: { not: null } },
+    data: { diambilAt: null },
+  });
+  if (batal.count === 0) return { success: false, message: "Tiket belum ditandai diambil" };
+  const tr = await prisma.transaksiTiket.findUnique({ where: { id: transaksiId }, select: { nama: true, kodeUnik: true } });
+  await catatLog("BATAL_TIKET_DIAMBIL", `${tr?.nama}${tr?.kodeUnik ? ` [#${tr.kodeUnik}]` : ""}`);
+  revalidatePath("/admin/tiket/pos");
+  revalidatePath("/admin/tiket");
+  return { success: true };
+}
+
 // Rekap pintu masuk untuk halaman scanner: QR tiket terverifikasi yang sudah
 // masuk vs total.
 export async function statistikScanTiket() {
-  await requireAdminOrTiket();
+  await requireAdmin();
   const [masuk, total] = await Promise.all([
     prisma.qRTiket.count({ where: { statusScan: true } }),
     prisma.qRTiket.count({ where: { transaksi: { status: "VERIFIED" } } }),
@@ -516,7 +551,7 @@ export async function statistikScanTiket() {
 }
 
 export async function scanQRTiket(token: string) {
-  await requireAdminOrTiket();
+  await requireAdmin();
   try {
     const qr = await prisma.qRTiket.findUnique({
       where: { token },

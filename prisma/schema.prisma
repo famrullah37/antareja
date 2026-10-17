@@ -308,6 +308,9 @@ model TransaksiTiket {
   bundleJumlah     Int       @default(0)
   bundleHarga      Int       @default(0)
   bundleIsi        String?
+  // Tiket online yang sudah diambil pembeli di loket (ditandai petugas POS) —
+  // terpisah dari QRTiket.statusScan (scan di pintu masuk). null = belum diambil.
+  diambilAt        DateTime?
   createdAt        DateTime  @default(now())
   user             User?     @relation(fields: [userId], references: [id])
   tiket            Tiket     @relation(fields: [tiketId], references: [id])

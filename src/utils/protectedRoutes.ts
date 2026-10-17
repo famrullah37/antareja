@@ -25,7 +25,7 @@ export const protectedRoutes: ProtectedRoutes[] = [
   { title: "POS", path: "/admin/tiket/pos", roles: ["ADMIN", "BENDAHARA", "TIKET"] },
   { title: "Merchandise", path: "/admin/merchandise", roles: ["ADMIN", "BENDAHARA"] },
   { title: "Voting", path: "/admin/voting", roles: ["ADMIN", "BENDAHARA"] },
-  { title: "Scanner Tiket", path: "/admin/tiket/scanner", roles: ["ADMIN", "BENDAHARA", "TIKET"] },
+  { title: "Scanner Tiket", path: "/admin/tiket/scanner", roles: ["ADMIN", "BENDAHARA"] },
   { title: "Kas & Laporan", path: "/admin/kas", roles: ["ADMIN", "BENDAHARA"] },
   { title: "Sertifikat", path: "/admin/sertifikat", roles: ["ADMIN", "SIE_LOMBA"] },
   { title: "Log Aktivitas", path: "/admin/log-aktivitas", roles: ["ADMIN"] },

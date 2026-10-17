@@ -4,7 +4,8 @@ import { NextRequest, NextResponse } from "next/server";
 // Juri hanya halaman input nilai — "/admin/penilaian-baru" (konfigurasi + ranking
 // semua tim) dan "/admin/penilaian" (sistem lama) memuat nama sekolah & nilai juri lain.
 const JURI_ROUTES = ["/admin/penilaian-baru/input"];
-const TIKET_ROUTES = ["/admin/tiket"];
+// Petugas tiket hanya POS (bukan manajemen tiket, verifikasi pembayaran, atau scanner).
+const TIKET_ROUTES = ["/admin/tiket/pos"];
 const BENDAHARA_ROUTES = ["/admin/kas", "/admin/pembayaran", "/admin/voting", "/admin/merchandise", "/admin/tiket", "/admin/makanan"];
 const FOTOGRAFER_ROUTES = ["/admin/galeri"];
 const SIE_HUMAS_ROUTES = ["/admin/sponsor", "/admin/berita"];
