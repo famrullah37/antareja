@@ -45,7 +45,21 @@ function toDatetimeLocal(d: Date) {
 export default function PengaturanForm({ konfig }: { konfig: Konfig }) {
   async function handleSubmit(data: FormData) {
     const toastId = toast.loading("Menyimpan...");
-    const result = await saveKonfigUmum(data);
+    // File besar (mis. Juklak > batas body server action) membuat request
+    // gagal tanpa result — tampilkan alasannya, jangan biarkan toast menggantung.
+    const juklak = data.get("juklak") as File | null;
+    if (juklak && juklak.size > 15 * 1024 * 1024) {
+      toast.error("Ukuran file Juklak maksimal 15MB", { id: toastId });
+      return;
+    }
+    let result: { success: boolean; message?: string };
+    try {
+      result = await saveKonfigUmum(data);
+    } catch (e) {
+      console.error(e);
+      toast.error("Gagal mengirim data ke server (koneksi/ukuran file)", { id: toastId });
+      return;
+    }
     if (result.success) toast.success("Pengaturan disimpan!", { id: toastId });
     else toast.error(result.message ?? "Gagal menyimpan", { id: toastId });
   }

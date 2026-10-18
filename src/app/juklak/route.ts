@@ -9,9 +9,10 @@ export async function GET() {
     headers: {
       "Content-Type": "application/pdf",
       "Content-Disposition": 'inline; filename="Juklak Antareja.pdf"',
-      // URL di database diberi ?v=<waktu upload>, jadi tiap upload baru
-      // otomatis melewati cache browser.
-      "Cache-Control": "public, max-age=300",
+      // Jangan di-cache: kalau halaman masih memegang link ?v= lama (cache
+      // router/halaman), browser tetap menyajikan PDF lama. File ini kecil &
+      // jarang diunduh, jadi selalu ambil dari disk.
+      "Cache-Control": "no-store, max-age=0",
     },
   });
 }
