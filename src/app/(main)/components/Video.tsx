@@ -8,14 +8,14 @@ import { getKonfigUmum } from "@/queries/konfigUmum.query";
 import VideoPlayer from "./parts/VideoPlayer";
 
 const cards = [
-  { number: "2", step: "Pilih Kategori", detail: "Pilih kategori tim anda" },
-  { number: "3", step: "Isi Profile Tim", detail: "Isi administrasi Tim" },
+  { number: "2", step: "Isi Profile Tim", detail: "Isi administrasi Tim" },
+  { number: "3", step: "Pilih Kategori", detail: "Pilih kategori tim anda" },
   { number: "4", step: "Bukti Pembayaran", detail: "Unggah bukti" },
   { number: "5", step: "Kirim", detail: "Pendaftaran berhasil!" },
   {
     number: "6",
     step: "Selesai",
-    detail: "Tunggu pengumuman selanjutnya di dashboard!",
+    detail: "Setelah pembayaran dikonfirmasi, lengkapi anggota tim di dashboard!",
   },
 ];
 
