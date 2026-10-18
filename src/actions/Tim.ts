@@ -85,6 +85,29 @@ export async function updateLinkPoster(id: string, formData: FormData) {
   return updateLinkTim(id, formData, "linkPoster", "poster");
 }
 
+// Nama tim diubah sendiri oleh pemilik tim lewat dashboard.
+export async function updateNamaTim(id: string, formData: FormData) {
+  const session = await getServerSession();
+  if (!session?.user?.id) return { success: false, message: "Unauthorized" };
+
+  const tim = await prisma.tim.findUnique({ where: { id } });
+  if (!tim || tim.userId !== session.user.id)
+    return { success: false, message: "Forbidden" };
+
+  const nama_tim = (formData.get("nama_tim") as string)?.trim().replace(/\s+/g, " ");
+  if (!nama_tim) return { success: false, message: "Nama tim tidak boleh kosong" };
+  if (nama_tim.length > 100)
+    return { success: false, message: "Nama tim maksimal 100 karakter" };
+
+  try {
+    await updateTim({ id }, { nama_tim });
+    revalidatePath("/", "layout");
+    return { success: true, message: "Nama tim berhasil disimpan" };
+  } catch {
+    return { success: false, message: "Gagal menyimpan nama tim" };
+  }
+}
+
 export async function updateTimFormAdmin(data: FormData, id: string) {
   await requireAdmin();
   const asal_sekolah = data.get("asal_sekolah") as string;

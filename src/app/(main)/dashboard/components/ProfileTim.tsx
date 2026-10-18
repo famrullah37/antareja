@@ -8,7 +8,7 @@ import { TimWithRelations } from "@/types/entityRelations";
 import { AnggotaCard } from "./parts/AnggotaCard";
 import cn from "@/lib/clsx";
 import { initials } from "@/lib/initials";
-import { updateLinkPoster, updateLinkRekomendasi, updateTimForm } from "@/actions/Tim";
+import { updateLinkPoster, updateLinkRekomendasi, updateNamaTim, updateTimForm } from "@/actions/Tim";
 import Field from "../components/parts/input";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -209,7 +209,23 @@ export default function ProfileTim({
     }
   }
 
-  const [savingLink, setSavingLink] = useState<"rekomendasi" | "poster" | null>(null);
+  const [editNama, setEditNama] = useState(false);
+  const [savingNama, setSavingNama] = useState(false);
+  async function submitNama(formData: FormData) {
+    setSavingNama(true);
+    const toastId = toast.loading("Menyimpan nama tim...");
+    const result = await updateNamaTim(tim.id, formData);
+    setSavingNama(false);
+    if (result.success) {
+      toast.success(result.message, { id: toastId });
+      setEditNama(false);
+      router.refresh();
+    } else {
+      toast.error(result.message, { id: toastId });
+    }
+  }
+
+  const [savingLink, setSavingLink] =useState<"rekomendasi" | "poster" | null>(null);
   async function submitLink(
     kind: "rekomendasi" | "poster",
     action: typeof updateLinkRekomendasi,
@@ -234,7 +250,46 @@ export default function ProfileTim({
         {/* --- info tim --- */}
         <div className="flex flex-col gap-1 mb-4">
           <H3>Nama Tim</H3>
-          <P>{tim.nama_tim}</P>
+          {editNama ? (
+            <form action={submitNama} className="flex flex-col sm:flex-row gap-2">
+              <input
+                name="nama_tim"
+                defaultValue={tim.nama_tim}
+                required
+                maxLength={100}
+                autoFocus
+                className="flex-1 border border-neutral-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
+              />
+              <div className="flex gap-2 shrink-0">
+                <button
+                  type="submit"
+                  disabled={savingNama}
+                  className="bg-primary-500 hover:bg-primary-600 disabled:opacity-60 text-white text-sm font-semibold px-5 py-2.5 rounded-lg transition-colors"
+                >
+                  {savingNama ? "Menyimpan..." : "Simpan"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditNama(false)}
+                  disabled={savingNama}
+                  className="border border-neutral-300 hover:bg-neutral-100 text-sm font-semibold px-5 py-2.5 rounded-lg transition-colors"
+                >
+                  Batal
+                </button>
+              </div>
+            </form>
+          ) : (
+            <div className="flex items-center gap-3">
+              <P>{tim.nama_tim}</P>
+              <button
+                type="button"
+                onClick={() => setEditNama(true)}
+                className="text-primary-600 hover:underline text-sm"
+              >
+                Ubah
+              </button>
+            </div>
+          )}
         </div>
 
         {tim.pembayaran && (
