@@ -21,7 +21,7 @@ type TimVote = {
   nama_tim: string;
   asal_sekolah: string;
   jenjang: string;
-  pelatih: string;
+  pelatih: string | null;
   totalVote: number;
   foto: string | null;
 };

@@ -84,6 +84,12 @@ export async function upsertAnggotaForm(
 
     if (tryFindAnggota) await updateAnggota({ id }, anggotaUpdate);
     else await createAnggota(anggotaCreate);
+    // Tim.pelatih/official dipakai voting, formulir, ekspor & kontak — salin
+    // dari anggota supaya selalu sama dengan data terbaru di dashboard.
+    if (posisi === "PELATIH")
+      await prisma.tim.update({ where: { id: timId }, data: { pelatih: nama, no_pelatih: telp } });
+    else if (posisi === "OFFICIAL")
+      await prisma.tim.update({ where: { id: timId }, data: { official: nama, no_official: telp } });
     revalidatePath("/", "layout");
     return { success: true, message: "Berhasil memperbarui anggota!" };
   } catch (error) {

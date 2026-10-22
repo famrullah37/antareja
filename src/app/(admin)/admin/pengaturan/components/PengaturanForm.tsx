@@ -26,6 +26,7 @@ type Konfig = {
   timeline: TimelineItem[] | null;
   juklakUrl: string | null;
   videoUrl: string | null;
+  grupWaUrl: string | null;
   bendaharaNama: string | null;
   bendaharaTtdUrl: string | null;
 };
@@ -258,6 +259,32 @@ export default function PengaturanForm({ konfig }: { konfig: Konfig }) {
           <span className="text-xs text-gray-400">
             Untuk Google Drive, pastikan file dibagikan &ldquo;Siapa saja yang memiliki link&rdquo; agar bisa diputar pengunjung.
           </span>
+        </div>
+        <button
+          type="submit"
+          className="self-start bg-primary-500 text-white rounded-lg py-2 px-6 text-sm font-semibold hover:bg-primary-600 transition-colors"
+        >
+          Simpan
+        </button>
+      </div>
+
+      {/* Grup WhatsApp Peserta */}
+      <div className="bg-white border border-neutral-200 rounded-xl p-6 flex flex-col gap-4">
+        <h2 className="font-semibold text-lg">Grup WhatsApp Peserta</h2>
+        <p className="text-sm text-gray-500">
+          Link undangan grup WhatsApp peserta. Tombol &ldquo;Gabung Grup WhatsApp&rdquo; hanya muncul di dashboard tim
+          yang pembayarannya sudah diverifikasi. Kosongkan untuk menyembunyikan.
+        </p>
+        <div className="flex flex-col gap-1">
+          <label htmlFor="grupWaUrl" className="text-sm font-medium">Link Grup WhatsApp</label>
+          <input
+            id="grupWaUrl"
+            type="url"
+            name="grupWaUrl"
+            defaultValue={konfig.grupWaUrl ?? ""}
+            placeholder="https://chat.whatsapp.com/..."
+            className="border border-neutral-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-primary-400"
+          />
         </div>
         <button
           type="submit"

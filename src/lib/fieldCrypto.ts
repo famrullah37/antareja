@@ -66,7 +66,7 @@ export function decryptField(value: string): string {
 // Kolom terenkripsi per model Prisma. true = deterministik.
 export const ENCRYPTED_FIELDS: Record<string, Record<string, boolean>> = {
   Anggota: { telp: false, nisn: false, email: true },
-  Tim: { no_pelatih: false },
+  Tim: { no_pelatih: false, no_official: false },
   PengajuanMenginap: { noHpPj: false },
 };
 

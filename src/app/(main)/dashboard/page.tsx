@@ -16,6 +16,7 @@ import UjiCobaSection from "./components/UjiCobaSection";
 import MenginapSection from "./components/MenginapSection";
 import BasecampSection from "./components/BasecampSection";
 import MakananSection from "./components/MakananSection";
+import GrupWaSection from "./components/GrupWaSection";
 import { biayaPendaftaran } from "@/actions/pembayaran";
 import { getKonfigUmum } from "@/queries/konfigUmum.query";
 import {
@@ -60,6 +61,7 @@ export default async function TimDashboard() {
     <>
       <Heading />
       <ProfileTim tim={tim} penilaian={tim.penilaian ?? null} biayaDasar={biayaDasar} dokumen={dokumen} />
+      <GrupWaSection confirmed={tim.confirmed} url={konfig.grupWaUrl} />
       <BasecampSection timId={tim.id} ruanganId={tim.ruanganId} />
       <UjiCobaSection timId={tim.id} confirmed={tim.confirmed} batas={konfig.ujiCobaBatas} />
       <MenginapSection

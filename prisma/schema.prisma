@@ -53,13 +53,17 @@ model Tim {
   id              String            @id @default(uuid())
   nama_tim        String
   updated_at      DateTime          @updatedAt
-  pelatih         String
+  // Pendaftaran hanya meminta Official (official/no_official); data Pelatih
+  // diisi belakangan lewat dashboard (anggota PELATIH) dan disalin ke sini.
+  pelatih         String?
+  official        String?
   jenjang         Jenjang
   confirmed       Boolean           @default(false)
   userId          String            @unique
   asal_sekolah    String
   tipe_tim        Tipe
-  no_pelatih      String
+  no_pelatih      String?
+  no_official     String?
   link_berkas     String?
   link_video      String?
   foto            String?
@@ -608,6 +612,9 @@ model KonfigUmum {
   dokumenPeserta         Json?
   // Video Antareja di halaman utama (bagian Alur Pendaftaran): YouTube, Google Drive, atau file video langsung.
   videoUrl               String?
+  // Link undangan grup WhatsApp peserta — hanya ditampilkan di dashboard tim
+  // yang pembayarannya sudah diverifikasi (Tim.confirmed).
+  grupWaUrl              String?
   // Counter kode unik pembayaran pendaftaran tim (0-999, siklus ulang) —
   // sama pola dengan KonfigVoting.counterUrut.
   counterUrutPendaftaran Int       @default(0)

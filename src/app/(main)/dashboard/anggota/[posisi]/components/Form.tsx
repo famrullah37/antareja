@@ -61,7 +61,9 @@ export default function EditAnggotaForm({
           type="text"
           className="w-full"
           value={
-            anggota.posisi === "PELATIH" ? tim?.pelatih : anggota.nama
+            anggota.nama ||
+            (anggota.posisi === "PELATIH" ? tim?.pelatih : anggota.posisi === "OFFICIAL" ? tim?.official : null) ||
+            undefined
           }
           label="Nama"
           required
@@ -87,7 +89,9 @@ export default function EditAnggotaForm({
           type="tel"
           className="w-full"
           value={
-            anggota.posisi === "PELATIH" ? tim?.no_pelatih ?? "" : anggota.telp
+            anggota.telp ||
+            (anggota.posisi === "PELATIH" ? tim?.no_pelatih : anggota.posisi === "OFFICIAL" ? tim?.no_official : null) ||
+            ""
           }
           label="Nomor Telepon"
           required

@@ -92,7 +92,7 @@ export default function TimForm({
           label="Pelatih"
           name="pelatih"
           placeholder="Pelatih"
-          value={data?.pelatih}
+          value={data?.pelatih ?? undefined}
           required={edit ? false : true}
           disabled={true}
         />
@@ -102,8 +102,26 @@ export default function TimForm({
           label="No. Telp Pelatih"
           name="nopelatih"
           placeholder="nomor telepon pelatih"
-          value={data?.no_pelatih}
+          value={data?.no_pelatih ?? undefined}
           required={edit ? false : true}
+          disabled={true}
+        />
+        <TextField
+          id="official"
+          type="text"
+          label="Official"
+          name="official"
+          placeholder="Official"
+          value={data?.official ?? undefined}
+          disabled={true}
+        />
+        <TextField
+          id="noofficial"
+          type="text"
+          label="No. Telp Official"
+          name="noofficial"
+          placeholder="nomor telepon official"
+          value={data?.no_official ?? undefined}
           disabled={true}
         />
         <div className="flex flex-col gap-2">

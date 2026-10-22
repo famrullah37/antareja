@@ -33,7 +33,7 @@ export default function TimTable({ data }: { data: TimWithRelations[] }) {
     },
     {
       name: "Pelatih",
-      selector: (row: TimWithRelations) => row.pelatih,
+      selector: (row: TimWithRelations) => row.pelatih ?? "-",
       sortable: false,
     },
     {

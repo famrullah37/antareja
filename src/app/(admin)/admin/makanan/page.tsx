@@ -106,7 +106,7 @@ export default async function AdminMakananPage() {
             namaTim: p.tim.nama_tim,
             asalSekolah: p.tim.asal_sekolah,
             jenjang: p.tim.jenjang,
-            noHp: p.tim.no_pelatih,
+            noHp: p.tim.no_official ?? p.tim.no_pelatih ?? "",
             items: p.items as ItemMakanan[],
             totalBayar: p.totalBayar,
             kodeUnik: p.kodeUnik,

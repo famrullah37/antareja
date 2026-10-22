@@ -141,21 +141,21 @@ export default function FormComponent({
           required
         />
         <TextField
-          id="nama-pelatih"
-          name="pelatih"
-          placeholder="Masukkan nama Pelatih"
+          id="nama-official"
+          name="official"
+          placeholder="Masukkan nama Official"
           type="text"
           className="w-full"
-          label="Nama Pelatih"
+          label="Nama Official"
           required
         />
         <TextField
-          id="no-pelatih"
-          name="no-pelatih"
-          placeholder="Masukkan Nomor Telepon Pelatih"
+          id="no-official"
+          name="no-official"
+          placeholder="Masukkan Nomor Telepon Official"
           type="text"
           className="w-full"
-          label="No.Telp Pelatih"
+          label="No.Telp Official"
           required
         />
         <TextField

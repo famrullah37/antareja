@@ -65,7 +65,7 @@ export default async function submitFormRegistrasi(data: FormData) {
   const userId = session.user.id;
 
   const nama_tim = data.get("namatim") as string;
-  const pelatih = data.get("pelatih") as string;
+  const official = data.get("official") as string;
   const asal_sekolah = data.get("asal") as string;
   const jenjang = data.get("jenjang") as Jenjang;
   const tipe_tim = data.get("size") as Tipe;
@@ -73,11 +73,11 @@ export default async function submitFormRegistrasi(data: FormData) {
   const bank = data.get("namabank") as string;
   const nama_rek = data.get("namarek") as string;
   const tipe_pembayaran = data.get("tipe-pembayaran") as string;
-  const no_pelatih = data.get("no-pelatih") as string;
+  const no_official = data.get("no-official") as string;
   const kodeUnik = data.get("kodeUnik") as string;
   const isDP = tipe_pembayaran === "TRUE";
 
-  if (!nama_tim || !pelatih || !asal_sekolah || !no_pelatih || !bank || !nama_rek)
+  if (!nama_tim || !official || !asal_sekolah || !no_official || !bank || !nama_rek)
     return { success: false, message: "Mohon lengkapi semua data" };
   if (!VALID_JENJANG.includes(jenjang)) return { success: false, message: "Jenjang tidak valid" };
   if (!VALID_TIPE.includes(tipe_tim)) return { success: false, message: "Jumlah pasukan tidak valid" };
@@ -123,9 +123,9 @@ export default async function submitFormRegistrasi(data: FormData) {
           nama_tim,
           asal_sekolah,
           jenjang,
-          pelatih,
+          official,
           tipe_tim,
-          no_pelatih,
+          no_official,
           user: { connect: { id: userId } },
           pembayaran: {
             create: {

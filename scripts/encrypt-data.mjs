@@ -16,7 +16,7 @@ const dryRun = process.argv.includes("--dry-run");
 // model Prisma -> { kolom: deterministik? } (sama dengan ENCRYPTED_FIELDS)
 const FIELDS = {
   anggota: { telp: false, nisn: false, email: true },
-  tim: { no_pelatih: false },
+  tim: { no_pelatih: false, no_official: false },
   pengajuanMenginap: { noHpPj: false },
 };
 

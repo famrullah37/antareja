@@ -5,6 +5,7 @@ import { upsertKonfigUmum, type TimelineItem } from "@/queries/konfigUmum.query"
 import { revalidatePath } from "next/cache";
 import { parseWibDatetimeLocal } from "@/lib/datetime";
 import { parseVideoUrl } from "@/lib/videoUrl";
+import { isHttpUrl } from "@/lib/safeUrl";
 import { imageUploader, validateUploadFile } from "./fileUploader";
 import { saveUploadFile } from "@/lib/localUpload";
 
@@ -45,6 +46,13 @@ export async function saveKonfigUmum(data: FormData) {
     };
   }
   const videoUrl = videoUrlRaw || null;
+
+  // Grup WhatsApp peserta — kosong = section disembunyikan dari dashboard tim.
+  const grupWaUrlRaw = ((data.get("grupWaUrl") as string) || "").trim();
+  if (grupWaUrlRaw && !isHttpUrl(grupWaUrlRaw)) {
+    return { success: false, message: "Link grup WhatsApp harus diawali https://" };
+  }
+  const grupWaUrl = grupWaUrlRaw || null;
 
   // Semua section di PengaturanForm berbagi satu <form>, jadi field timeline
   // selalu ikut terkirim apa pun tombol "Simpan" yang diklik.
@@ -121,6 +129,7 @@ export async function saveKonfigUmum(data: FormData) {
       biayaPurna, biayaPurnaDP,
       sdAktif, smpAktif, smaAktif, purnaAktif,
       videoUrl,
+      grupWaUrl,
       bankNama, bankNoRek, bankAtasNama,
       timeline,
       bendaharaNama,

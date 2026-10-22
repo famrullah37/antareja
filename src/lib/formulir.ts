@@ -110,8 +110,8 @@ export async function buildFormulirPdf(tim: Tim, anggotas: Anggota[]): Promise<B
     const fields: [string, string][] = [
       ["Asal Sekolah", tim.asal_sekolah],
       ["Jumlah Tim", `1 Tim (${pasukan.length} Anggota + 1 Danton)`],
-      ["Nama Pelatih", tim.pelatih],
-      ["Nama Official", official?.nama ?? "-"],
+      ["Nama Pelatih", pelatih?.nama ?? tim.pelatih ?? "-"],
+      ["Nama Official", official?.nama ?? tim.official ?? "-"],
     ];
     for (const [label, value] of fields) {
       doc.font("Helvetica-Bold").fontSize(10.5).text(label, 85, y, { width: 90 });
@@ -154,9 +154,9 @@ export async function buildFormulirPdf(tim: Tim, anggotas: Anggota[]): Promise<B
 
     // Halaman 1: Danton di tengah diapit Pelatih & Official, lalu satu baris
     // pasukan pertama (susunan sama seperti template).
-    drawBox(colX(0), y, fotoPelatih, tim.pelatih, "Pelatih");
+    drawBox(colX(0), y, fotoPelatih, pelatih?.nama ?? tim.pelatih ?? "-", "Pelatih");
     drawBox(colX(1), y, fotoDanton, danton?.nama ?? "-", "Danton");
-    drawBox(colX(2), y, fotoOfficial, official?.nama ?? "-", "Official");
+    drawBox(colX(2), y, fotoOfficial, official?.nama ?? tim.official ?? "-", "Official");
     y += ROW_PITCH + 12; // nama Danton bisa 2 baris + label, butuh ruang ekstra
 
     const rows: number[][] = [];
@@ -186,7 +186,7 @@ export async function buildFormulirPdf(tim: Tim, anggotas: Anggota[]): Promise<B
     doc.text("Official", rightX, y, { width: sigW, align: "center" });
     y += 62;
     doc.font("Helvetica");
-    doc.text(`( ${tim.pelatih} )`, leftX, y, { width: sigW, align: "center" });
+    doc.text(`( ${pelatih?.nama ?? tim.pelatih ?? "..................."} )`, leftX, y, { width: sigW, align: "center" });
     doc.text(`( ${official?.nama ?? "..................."} )`, rightX, y, { width: sigW, align: "center" });
 
     doc.font("Helvetica-Oblique").fontSize(7.5).fillColor("#666666").text(

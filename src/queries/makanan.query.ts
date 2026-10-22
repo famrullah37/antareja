@@ -32,7 +32,7 @@ export async function findPesananMakananAdmin() {
     orderBy: { createdAt: "desc" },
     include: {
       sesi: { select: { id: true, nama: true, waktu: true } },
-      tim: { select: { nama_tim: true, asal_sekolah: true, jenjang: true, no_pelatih: true } },
+      tim: { select: { nama_tim: true, asal_sekolah: true, jenjang: true, no_pelatih: true, no_official: true } },
     },
   });
 }
