@@ -122,11 +122,14 @@ export default function TimTable({ data }: { data: TimWithRelations[] }) {
 
   if (loader) return <div>Loading</div>;
 
+  // Yang belum dikonfirmasi tampil paling atas; urutan asli tetap dalam tiap kelompok.
+  const sorted = [...data].sort((a, b) => Number(a.confirmed) - Number(b.confirmed));
+
   return (
     <div className="p-2 rounded-md bg-white">
       <DataTable
         columns={columns}
-        data={data}
+        data={sorted}
         pagination
         highlightOnHover
         customStyles={{
