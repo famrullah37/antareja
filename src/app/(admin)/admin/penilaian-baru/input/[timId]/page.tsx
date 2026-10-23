@@ -111,6 +111,8 @@ export default async function InputNilaiPage({
       </div>
       {juriAktif && (
         <MasukanSuaraJuri
+          // Ganti tim/juri = komponen baru, supaya rekaman yang berjalan selesai & tersimpan ke tim sebelumnya.
+          key={`${tim.id}-${juriAktif.id}`}
           timId={tim.id}
           juriId={juriAktif.id}
           terkunci={!!penilaian?.published}

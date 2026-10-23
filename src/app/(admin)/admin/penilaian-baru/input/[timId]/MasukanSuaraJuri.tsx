@@ -36,6 +36,28 @@ export default function MasukanSuaraJuri({
   const recorderRef = useRef<MediaRecorder | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const wakeLockRef = useRef<{ release: () => Promise<void> } | null>(null);
+  // Juri pindah ke tim lain (komponen dilepas): rekaman dihentikan & langsung disimpan.
+  const keluarRef = useRef(false);
+  const rekamanRef = useRef<Rekaman | null>(null);
+  useEffect(() => {
+    rekamanRef.current = rekaman;
+  }, [rekaman]);
+
+  async function unggah(blob: Blob, durasi: number) {
+    const fd = new FormData();
+    const ext = blob.type.includes("mp4") ? "m4a" : blob.type.includes("ogg") ? "ogg" : "webm";
+    fd.append("audio", blob, `masukan.${ext}`);
+    fd.append("durasi", String(durasi));
+    fd.append("juriId", juriId);
+    return simpanMasukanSuara(timId, fd);
+  }
+
+  async function simpanSaatKeluar(blob: Blob, durasi: number) {
+    const toastId = toast.loading("Menyimpan rekaman tim sebelumnya...");
+    const result = await unggah(blob, durasi);
+    if (result.success) toast.success("Rekaman tim sebelumnya tersimpan", { id: toastId });
+    else toast.error(`Rekaman tim sebelumnya gagal disimpan: ${result.message ?? "coba rekam ulang"}`, { id: toastId });
+  }
 
   // Peringatkan juri sebelum meninggalkan halaman saat rekaman belum tersimpan.
   const belumTersimpan = status !== "siap" || !!rekaman;
@@ -46,9 +68,19 @@ export default function MasukanSuaraJuri({
     return () => window.removeEventListener("beforeunload", cegah);
   }, [belumTersimpan]);
 
-  useEffect(() => () => {
-    if (timerRef.current) clearInterval(timerRef.current);
-    recorderRef.current?.stream.getTracks().forEach((t) => t.stop());
+  useEffect(() => {
+    keluarRef.current = false;
+    return () => {
+      keluarRef.current = true;
+      // Sedang merekam: stop → onstop yang menyimpan. Sudah berhenti tapi belum disimpan: simpan di sini.
+      if (recorderRef.current?.state === "recording") recorderRef.current.stop();
+      else if (rekamanRef.current) {
+        const { blob, url, durasi } = rekamanRef.current;
+        URL.revokeObjectURL(url);
+        simpanSaatKeluar(blob, durasi);
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function mulai() {
@@ -75,6 +107,10 @@ export default function MasukanSuaraJuri({
       wakeLockRef.current = null;
       const blob = new Blob(potongan, { type: recorder.mimeType });
       const durasi = Math.max(1, Math.round((Date.now() - mulaiPada) / 1000));
+      if (keluarRef.current) {
+        simpanSaatKeluar(blob, durasi);
+        return;
+      }
       setRekaman({ blob, url: URL.createObjectURL(blob), durasi });
       setStatus("siap");
     };
@@ -107,12 +143,7 @@ export default function MasukanSuaraJuri({
     if (!rekaman) return;
     setStatus("menyimpan");
     const toastId = toast.loading("Mengunggah rekaman...");
-    const fd = new FormData();
-    const ext = rekaman.blob.type.includes("mp4") ? "m4a" : rekaman.blob.type.includes("ogg") ? "ogg" : "webm";
-    fd.append("audio", rekaman.blob, `masukan.${ext}`);
-    fd.append("durasi", String(rekaman.durasi));
-    fd.append("juriId", juriId);
-    const result = await simpanMasukanSuara(timId, fd);
+    const result = await unggah(rekaman.blob, rekaman.durasi);
     setStatus("siap");
     if (result.success) {
       toast.success("Masukan suara tersimpan", { id: toastId });
