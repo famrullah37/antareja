@@ -3,9 +3,9 @@
 // diatur admin lewat Pengaturan karena memang sering diganti.
 export const siteConfig = {
   name: "LPKBB Antareja",
-  title: "LPKBB Antareja 2026 | Lomba Baris Berbaris SMK Telkom Malang",
+  title: "LPKBB Antareja 2026 | Lomba LKBB & PBB SMK Telkom Malang",
   description:
-    "Website resmi LPKBB Antareja 2026, lomba keterampilan baris-berbaris tingkat Jawa Timur yang diselenggarakan SMK Telkom Malang. Daftarkan tim, lihat jadwal dan kategori lomba, galeri foto, serta dukung tim favoritmu.",
+    "Website resmi LPKBB Antareja 2026 (LKBB Antareja), lomba keterampilan baris-berbaris tingkat Jawa Timur yang diselenggarakan SMK Telkom Malang. Daftarkan tim, lihat jadwal dan kategori lomba, galeri foto, serta dukung tim favoritmu.",
   keywords: [
     "LPKBB Antareja",
     "Antareja",
