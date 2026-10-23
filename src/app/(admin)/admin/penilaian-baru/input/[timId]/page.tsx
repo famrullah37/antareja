@@ -11,6 +11,7 @@ import {
 } from "@/queries/penilaianBaru.query";
 import { notFound, redirect } from "next/navigation";
 import InputNilaiForm from "./InputNilaiForm";
+import MasukanSuaraJuri from "./MasukanSuaraJuri";
 
 export default async function InputNilaiPage({
   params,
@@ -68,6 +69,7 @@ export default async function InputNilaiPage({
   if (!tim) return notFound();
 
   const penilaian = await findPenilaianBaru({ timId: timParam.id });
+  const suaraSaya = penilaian?.masukanSuara.find((m) => m.juriId === juriAktif?.id);
 
   // Props komponen klien ikut terkirim ke browser (terbaca di page source), jadi
   // hanya kirim yang dibutuhkan: tanpa nama/sekolah tim, tanpa nilai juri lain.
@@ -107,6 +109,18 @@ export default async function InputNilaiPage({
           {isJuri ? `Jenjang ${tim.jenjang}` : `${tim.asal_sekolah} — ${tim.jenjang}`}
         </p>
       </div>
+      {juriAktif && (
+        <MasukanSuaraJuri
+          timId={tim.id}
+          juriId={juriAktif.id}
+          terkunci={!!penilaian?.published}
+          existing={
+            suaraSaya
+              ? { id: suaraSaya.id, durasiDetik: suaraSaya.durasiDetik, v: suaraSaya.updatedAt.getTime() }
+              : null
+          }
+        />
+      )}
       <InputNilaiForm
         tim={{ id: tim.id }}
         juriAktif={juriAktif}

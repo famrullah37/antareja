@@ -16,6 +16,7 @@ import {
 import prisma from "@/lib/prisma";
 import { catatLog } from "@/lib/activityLog";
 import { findOrLinkJuriByUser } from "@/queries/juri.query";
+import { deleteUploadFile, saveUploadFile } from "@/lib/localUpload";
 
 async function requireAdmin() {
   const session = await getServerSession();
@@ -198,6 +199,88 @@ export async function inputNilaiJuri(
   } catch (e) {
     console.error("inputNilaiJuri error:", e);
     return { success: false, message: "Gagal menyimpan nilai" };
+  }
+}
+
+// Masukan suara: satu rekaman per juri per tim. Durasi mengikuti lamanya juri
+// menilai, jadi batasnya hanya pengaman (rekaman ~32 kbps ≈ 7 MB per 30 menit).
+const MAKS_DURASI_SUARA = 30 * 60;
+const MAKS_UKURAN_SUARA = 15 * 1024 * 1024;
+const EXT_SUARA: Record<string, string> = {
+  "audio/webm": "webm",
+  "audio/ogg": "ogg",
+  "audio/mp4": "m4a",
+  "audio/mpeg": "mp3",
+  "audio/aac": "aac",
+};
+
+export async function simpanMasukanSuara(timId: string, data: FormData) {
+  const penilai = await juriPenilai((data.get("juriId") as string) || undefined);
+  if (!penilai.juri) return { success: false, message: penilai.error };
+  const { juri, oleh } = penilai;
+
+  const tolak = await cekTimBisaDinilai(timId);
+  if (tolak) return { success: false, message: tolak };
+
+  const file = data.get("audio");
+  if (!(file instanceof File) || file.size === 0) return { success: false, message: "Rekaman kosong" };
+  if (file.size > MAKS_UKURAN_SUARA) return { success: false, message: "Rekaman terlalu besar (maks 15 MB)" };
+  // Browser mengirim mis. "audio/webm;codecs=opus" — cukup tipe dasarnya.
+  const mime = file.type.split(";")[0].trim().toLowerCase();
+  const ext = EXT_SUARA[mime];
+  if (!ext) return { success: false, message: "Format rekaman tidak didukung" };
+  const durasi = Math.round(Number(data.get("durasi")));
+  if (!Number.isFinite(durasi) || durasi < 1 || durasi > MAKS_DURASI_SUARA)
+    return { success: false, message: "Durasi rekaman tidak valid" };
+
+  try {
+    const penilaian = await upsertPenilaianBaru(timId);
+    const lama = await prisma.masukanSuara.findUnique({
+      where: { penilaianId_juriId: { penilaianId: penilaian.id, juriId: juri.id } },
+    });
+    // Nama file baru tiap upload, supaya rekaman lama yang sedang diputar/tercache tidak tertimpa.
+    const nama = `suara-${penilaian.id}-${juri.id}-${Date.now()}.${ext}`;
+    await saveUploadFile(nama, Buffer.from(await file.arrayBuffer()));
+    await prisma.masukanSuara.upsert({
+      where: { penilaianId_juriId: { penilaianId: penilaian.id, juriId: juri.id } },
+      create: { penilaianId: penilaian.id, juriId: juri.id, file: nama, mime, durasiDetik: durasi },
+      update: { file: nama, mime, durasiDetik: durasi },
+    });
+    if (lama) await deleteUploadFile(lama.file);
+    await catatLog(
+      "INPUT_MASUKAN_SUARA",
+      `${juri.nama}${oleh ? ` (dimasukkan oleh ${oleh})` : ""}: ${durasi} detik (tim ${timId.slice(0, 8)})`
+    );
+    revalidatePath("/admin/penilaian-baru", "layout");
+    return { success: true };
+  } catch (e) {
+    console.error("simpanMasukanSuara error:", e);
+    return { success: false, message: "Gagal menyimpan rekaman" };
+  }
+}
+
+export async function hapusMasukanSuara(timId: string, juriIdDipilih?: string) {
+  const penilai = await juriPenilai(juriIdDipilih);
+  if (!penilai.juri) return { success: false, message: penilai.error };
+  const { juri, oleh } = penilai;
+
+  const tolak = await cekTimBisaDinilai(timId);
+  if (tolak) return { success: false, message: tolak };
+
+  const ms = await prisma.masukanSuara.findFirst({ where: { juriId: juri.id, penilaian: { timId } } });
+  if (!ms) return { success: true };
+  try {
+    await prisma.masukanSuara.delete({ where: { id: ms.id } });
+    await deleteUploadFile(ms.file);
+    await catatLog(
+      "HAPUS_MASUKAN_SUARA",
+      `${juri.nama}${oleh ? ` (oleh ${oleh})` : ""} (tim ${timId.slice(0, 8)})`
+    );
+    revalidatePath("/admin/penilaian-baru", "layout");
+    return { success: true };
+  } catch (e) {
+    console.error("hapusMasukanSuara error:", e);
+    return { success: false, message: "Gagal menghapus rekaman" };
   }
 }
 

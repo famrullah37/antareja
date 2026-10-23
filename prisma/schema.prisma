@@ -156,6 +156,7 @@ model Juri {
   user         User?          @relation(fields: [userId], references: [id])
   juriKategori JuriKategori[]
   nilaiJuri    NilaiJuri[]
+  masukanSuara MasukanSuara[]
 }
 
 // ─── Penilaian (legacy — single-admin input) ─────────────────────────────────
@@ -227,6 +228,7 @@ model PenilaianBaru {
   tim            Tim              @relation(fields: [timId], references: [id])
   nilaiJuri      NilaiJuri[]
   pelanggaranTim PelanggaranTim[]
+  masukanSuara   MasukanSuara[]
 }
 
 model NilaiJuri {
@@ -242,6 +244,24 @@ model NilaiJuri {
   subKategori   SubKategoriMaster @relation(fields: [subKategoriId], references: [id])
 
   @@unique([penilaianId, juriId, subKategoriId])
+}
+
+// Masukan suara juri untuk satu tim (satu rekaman per juri per tim). File
+// audio disimpan di folder uploads (src/lib/localUpload.ts), diputar lewat
+// /api/masukan-suara/[id]; tim baru bisa mendengar setelah nilai dipublish.
+model MasukanSuara {
+  id          String        @id @default(uuid())
+  penilaianId String
+  juriId      String
+  file        String
+  mime        String
+  durasiDetik Int
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  penilaian   PenilaianBaru @relation(fields: [penilaianId], references: [id], onDelete: Cascade)
+  juri        Juri          @relation(fields: [juriId], references: [id], onDelete: Cascade)
+
+  @@unique([penilaianId, juriId])
 }
 
 model Pelanggaran {

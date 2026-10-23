@@ -24,7 +24,12 @@ type PenilaianBaruData = {
   published: boolean;
   nilaiJuri: NilaiJuriItem[];
   pelanggaranTim: PelanggaranItem[];
+  masukanSuara?: { id: string; durasiDetik: number; updatedAt: Date | string; juri: { nama: string } }[];
 } | null;
+
+function formatDurasi(detik: number) {
+  return `${Math.floor(detik / 60)}:${String(detik % 60).padStart(2, "0")}`;
+}
 
 const PREDIKAT_COLOR: Record<string, { bg: string; text: string }> = {
   SANGAT_BAGUS:  { bg: "bg-green-100",  text: "text-green-700"  },
@@ -189,6 +194,28 @@ export default function NilaiAkhirSection({ penilaianBaru }: { penilaianBaru: Pe
                   {pt.pelanggaran.nama} × {pt.jumlahKejadian}
                 </span>
                 <span className="text-red-600 font-semibold">-{pt.totalPengurang}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Masukan suara juri */}
+      {(penilaianBaru.masukanSuara?.length ?? 0) > 0 && (
+        <div className="mb-4 bg-white rounded-xl border border-neutral-200 p-4">
+          <p className="text-sm font-semibold mb-3">Masukan Suara Juri</p>
+          <div className="flex flex-col gap-4">
+            {penilaianBaru.masukanSuara!.map((ms) => (
+              <div key={ms.id} className="flex flex-col gap-1.5">
+                <p className="text-sm text-neutral-600">
+                  {ms.juri.nama} <span className="text-xs text-gray-400">· {formatDurasi(ms.durasiDetik)}</span>
+                </p>
+                <audio
+                  controls
+                  preload="none"
+                  src={`/api/masukan-suara/${ms.id}?v=${new Date(ms.updatedAt).getTime()}`}
+                  className="w-full"
+                />
               </div>
             ))}
           </div>

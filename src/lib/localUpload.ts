@@ -1,4 +1,4 @@
-import { mkdir, readFile, rename, writeFile } from "fs/promises";
+import { mkdir, readFile, rename, unlink, writeFile } from "fs/promises";
 import path from "path";
 
 // File yang diupload admin untuk diunduh publik/peserta (Juklak, surat
@@ -31,4 +31,8 @@ export async function readUploadFile(name: string) {
   } catch {
     return null;
   }
+}
+
+export async function deleteUploadFile(name: string) {
+  await unlink(uploadPath(name)).catch(() => {});
 }

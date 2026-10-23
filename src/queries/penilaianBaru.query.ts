@@ -104,6 +104,11 @@ export async function findPenilaianBaru(
       tim: true,
       nilaiJuri: { include: { juri: true, subKategori: true } },
       pelanggaranTim: { include: { pelanggaran: true } },
+      // Tanpa nama file — rekaman diputar lewat /api/masukan-suara/[id] yang memeriksa hak akses.
+      masukanSuara: {
+        select: { id: true, juriId: true, durasiDetik: true, updatedAt: true, juri: { select: { nama: true } } },
+        orderBy: { createdAt: "asc" },
+      },
     },
   });
 }
