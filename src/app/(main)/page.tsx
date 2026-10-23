@@ -4,6 +4,7 @@ import Sponsor from "./components/Sponsor";
 import BeritaSection from "./components/BeritaSection";
 import Video from "./components/Video";
 import Daftar from "./components/Daftar";
+import DokumenSection from "./components/DokumenSection";
 import Hero from "./components/Hero";
 import Timeline from "./components/Timeline";
 import Juri from "./components/Juri";
@@ -53,6 +54,9 @@ export default async function LandingPage() {
       </RevealSection>
       <RevealSection delay={0}>
         <TiketSection />
+      </RevealSection>
+      <RevealSection delay={0}>
+        <DokumenSection />
       </RevealSection>
       <RevealSection delay={0}>
         <Daftar />
