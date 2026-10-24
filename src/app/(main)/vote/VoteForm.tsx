@@ -5,7 +5,7 @@ import { initials } from "@/lib/initials";
 import type { KategoriVoting } from "@/queries/voting.query";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 function formatRupiah(n: number) {
@@ -74,15 +74,24 @@ export default function VoteForm({
   kategoriList,
   dantonMap,
   tallyMap,
+  linkTimId,
+  linkKategori,
 }: {
   tims: TimVote[];
   konfig: KonfigVoting;
   kategoriList: KategoriVoting[];
   dantonMap: Record<string, string>;
   tallyMap: Record<string, Record<string, number>>;
+  // Dari link yang dibagikan (/vote?tim=..&kategori=..): tim/orang itu disorot
+  // dan ditawarkan di atas. Kode unik TIDAK langsung dipesan — baru saat
+  // pendukung menekan Pilih, supaya tiap klik link tidak menghabiskan kode.
+  linkTimId?: string | null;
+  linkKategori?: string | null;
 }) {
   const router = useRouter();
-  const [activeKategori, setActiveKategori] = useState<KategoriVoting>(kategoriList[0]);
+  const [activeKategori, setActiveKategori] = useState<KategoriVoting>(
+    () => kategoriList.find((k) => k.key === linkKategori) ?? kategoriList[0]
+  );
   const [activeJenjang, setActiveJenjang] = useState<(typeof JENJANG_TABS)[number]>("SEMUA");
   const [selected, setSelected] = useState<TimVote | null>(null);
   const [reserved, setReserved] = useState<{ kodeUnik: string; hargaSatuan: number } | null>(null);
@@ -111,6 +120,40 @@ export default function VoteForm({
   }, [tims, activeJenjang, activeKategori, dantonMap, tallyMap]);
   const top3 = ranked.slice(0, 3);
   const rest = ranked.slice(3);
+  const linkTim = linkTimId ? ranked.find((t) => t.id === linkTimId) ?? null : null;
+  const formRef = useRef<HTMLFormElement>(null);
+
+  // Buka link tim → gulir ke kartunya (sekali saat halaman dibuka).
+  useEffect(() => {
+    if (linkTimId) document.getElementById(`tim-${linkTimId}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [linkTimId]);
+
+  // Kode unik siap → gulir ke form pembayaran (form ada di bawah daftar tim).
+  useEffect(() => {
+    if (reserved) formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [reserved]);
+
+  async function bagikan(tim: TimVote) {
+    const params = new URLSearchParams({ tim: tim.id });
+    if (activeKategori.key !== "tim_favorit") params.set("kategori", activeKategori.key);
+    const url = `${window.location.origin}/vote?${params}`;
+    const nama = displayName(tim, activeKategori, dantonMap);
+    const text = `Yuk dukung ${nama} (${tim.asal_sekolah}) di Vote ${activeKategori.label} LPKBB Antareja 2026!`;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: `Dukung ${nama}`, text, url });
+      } catch {
+        // dibatalkan pengguna
+      }
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(`${text} ${url}`);
+      toast.success("Link dukungan disalin — tinggal tempel di WhatsApp/IG");
+    } catch {
+      window.prompt("Salin link dukungan ini:", url);
+    }
+  }
 
   function pilihKategori(k: KategoriVoting) {
     setActiveKategori(k);
@@ -232,6 +275,29 @@ export default function VoteForm({
         ))}
       </div>
 
+      {/* Dari link yang dibagikan */}
+      {linkTim && selected?.id !== linkTim.id && (
+        <div className="bg-primary-50 border-2 border-primary-200 rounded-2xl p-5 flex flex-col sm:flex-row items-center gap-4">
+          <Avatar tim={linkTim} size={64} className="w-16 h-16 rounded-xl border-2 border-white shadow shrink-0" />
+          <div className="flex-1 text-center sm:text-left">
+            <div className="text-xs font-semibold text-primary-600 uppercase tracking-wide">{activeKategori.label}</div>
+            <div className="font-bold text-lg leading-snug">{displayName(linkTim, activeKategori, dantonMap)}</div>
+            <div className="text-xs text-gray-500">
+              {activeKategori.unit === "TIM" ? linkTim.asal_sekolah : `${linkTim.nama_tim} — ${linkTim.asal_sekolah}`} ·{" "}
+              {getCount(linkTim)} suara
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => handlePilihTim(linkTim)}
+            disabled={loadingReserve}
+            className="w-full sm:w-auto bg-primary-500 hover:bg-primary-600 disabled:opacity-60 text-white rounded-xl px-6 py-3 font-semibold transition-colors"
+          >
+            Pilih & Dukung
+          </button>
+        </div>
+      )}
+
       {/* Papan Peringkat */}
       {ranked.length > 0 && (
         <div className="bg-white rounded-2xl border border-gray-200 p-5">
@@ -296,10 +362,13 @@ export default function VoteForm({
           {ranked.map((t, i) => (
             <div
               key={t.id}
-              className={`rounded-2xl border-2 p-5 flex flex-col items-center text-center gap-2 transition-all ${
+              id={`tim-${t.id}`}
+              className={`rounded-2xl border-2 p-5 flex flex-col items-center text-center gap-2 transition-all scroll-mt-24 ${
                 selected?.id === t.id
                   ? "border-primary-500 bg-primary-50"
-                  : "border-gray-200 bg-white"
+                  : linkTimId === t.id
+                    ? "border-primary-300 bg-white ring-4 ring-primary-100"
+                    : "border-gray-200 bg-white"
               }`}
             >
               <div className="relative mb-1">
@@ -315,13 +384,22 @@ export default function VoteForm({
                 {activeKategori.unit === "TIM" ? t.asal_sekolah : `${t.nama_tim} — ${t.asal_sekolah}`}
               </div>
               <div className="text-sm text-gray-500">{getCount(t)} suara</div>
-              <button
-                type="button"
-                onClick={() => handlePilihTim(t)}
-                className="w-full bg-primary-500 hover:bg-primary-600 text-white rounded-xl py-2.5 font-semibold transition-colors mt-1"
-              >
-                Pilih
-              </button>
+              <div className="w-full flex gap-2 mt-1">
+                <button
+                  type="button"
+                  onClick={() => handlePilihTim(t)}
+                  className="flex-1 bg-primary-500 hover:bg-primary-600 text-white rounded-xl py-2.5 font-semibold transition-colors"
+                >
+                  Pilih
+                </button>
+                <button
+                  type="button"
+                  onClick={() => bagikan(t)}
+                  className="px-4 border-2 border-primary-200 text-primary-600 hover:bg-primary-50 rounded-xl py-2 text-sm font-semibold transition-colors"
+                >
+                  Bagikan
+                </button>
+              </div>
             </div>
           ))}
         </div>
@@ -332,7 +410,7 @@ export default function VoteForm({
       )}
 
       {selected && reserved && (
-        <form action={handleSubmit} className="flex flex-col gap-4">
+        <form ref={formRef} action={handleSubmit} className="flex flex-col gap-4 scroll-mt-24">
           <input type="hidden" name="timId" value={selected.id} />
           <input type="hidden" name="kodeUnik" value={reserved.kodeUnik} />
           <input type="hidden" name="jumlahVote" value={jumlahVote} />

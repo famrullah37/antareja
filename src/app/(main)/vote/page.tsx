@@ -11,16 +11,73 @@ import { cekJendelaVoting } from "@/actions/Voting";
 import VoteForm from "./VoteForm";
 import VotingCountdownBanner from "./VotingCountdownBanner";
 import InfoHalaman from "../components/InfoHalaman";
+import prisma from "@/lib/prisma";
+import { siteConfig } from "@/config/site";
 
 import type { Metadata } from "next";
 
-export const metadata: Metadata = {
+type VoteSearchParams = { tim?: string; kategori?: string };
+
+const METADATA_UMUM: Metadata = {
   title: { absolute: "Vote Tim Favorit LPKBB Antareja 2026 | Lomba Paskibra SMK Telkom Malang" },
   description:
     "Dukung dan vote tim paskibra favoritmu di LPKBB Antareja 2026, SMK Telkom Malang. Pantau papan peringkat dukungan tim secara langsung.",
 };
 
-export default async function VotePage() {
+// Link yang dibagikan per tim/pelatih/danton (/vote?tim=..&kategori=..) dapat
+// judul & deskripsi sendiri supaya preview di WhatsApp menyebut siapa yang
+// didukung. Tim tidak dikenal → metadata umum halaman vote.
+export async function generateMetadata({ searchParams }: { searchParams: VoteSearchParams }): Promise<Metadata> {
+  if (!searchParams.tim) return METADATA_UMUM;
+  const [tim, konfigVoting] = await Promise.all([
+    prisma.tim.findFirst({
+      where: { id: searchParams.tim, confirmed: true },
+      select: {
+        nama_tim: true,
+        asal_sekolah: true,
+        pelatih: true,
+        foto: true,
+        anggotas: { where: { posisi: "DANTON" }, select: { nama: true }, take: 1 },
+      },
+    }),
+    findKonfigVoting(),
+  ]);
+  if (!tim) return METADATA_UMUM;
+  const kategori =
+    getKategoriList(konfigVoting).find((k) => k.key === searchParams.kategori) ?? getKategoriList(konfigVoting)[0];
+  const nama =
+    kategori.unit === "PELATIH"
+      ? tim.pelatih
+      : kategori.unit === "DANTON"
+        ? tim.anggotas[0]?.nama
+        : tim.nama_tim;
+  if (!nama) return METADATA_UMUM;
+  const judul =
+    kategori.unit === "TIM"
+      ? `Dukung ${nama} — ${tim.asal_sekolah}`
+      : `Dukung ${nama} (${kategori.label}, ${tim.nama_tim} — ${tim.asal_sekolah})`;
+  const gambar = tim.foto ?? `${siteConfig.url}${siteConfig.ogImage}`;
+  const deskripsi = `Vote ${kategori.label} LPKBB Antareja 2026: beri dukunganmu untuk ${nama} dan pantau papan peringkatnya secara langsung.`;
+  return {
+    title: { absolute: `${judul} | Vote LPKBB Antareja 2026` },
+    description: deskripsi,
+    // openGraph/twitter halaman menggantikan (bukan menggabung) milik layout,
+    // jadi siteName/locale/gambar diisi ulang — gambar = foto tim kalau ada.
+    openGraph: {
+      type: "website",
+      siteName: siteConfig.name,
+      locale: siteConfig.locale,
+      title: judul,
+      description: deskripsi,
+      images: [gambar],
+    },
+    twitter: { card: "summary_large_image", title: judul, description: deskripsi, images: [gambar] },
+    // Satu halaman vote untuk mesin pencari; varian per tim hanya untuk dibagikan.
+    alternates: { canonical: "/vote" },
+  };
+}
+
+export default async function VotePage({ searchParams }: { searchParams: VoteSearchParams }) {
   const [tims, konfigVoting, dantonMap, tallyMap, konfigTiket] = await Promise.all([
     findTimsForVoting(),
     findKonfigVoting(),
@@ -67,6 +124,8 @@ export default async function VotePage() {
             kategoriList={kategoriList}
             dantonMap={dantonMap}
             tallyMap={tallyMap}
+            linkTimId={searchParams.tim ?? null}
+            linkKategori={searchParams.kategori ?? null}
           />
         </div>
       )}
