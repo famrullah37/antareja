@@ -1,6 +1,7 @@
 import "server-only";
 import { escapeHtml } from "@/lib/escapeHtml";
 import { sendMailTo } from "@/lib/mailer";
+import prisma from "@/lib/prisma";
 import { siteConfig } from "@/config/site";
 
 // Ringkasan pembayaran untuk email Tiket & Galeri Foto: (1) email "pesanan
@@ -95,9 +96,16 @@ export async function kirimEmailPesananDiterima(input: {
 }
 
 // Notifikasi ke panitia setiap ada pembayaran baru masuk (status PENDING),
-// supaya bendahara tidak perlu bolak-balik membuka panel admin. Alamat bisa
-// diganti lewat env EMAIL_NOTIF_PEMBAYARAN tanpa deploy ulang kode.
+// supaya bendahara tidak perlu bolak-balik membuka panel admin. Penerima =
+// email admin (env EMAIL_NOTIF_PEMBAYARAN, default antareja@) + semua akun
+// ber-role BENDAHARA — diambil tiap kirim, jadi bendahara baru langsung ikut.
 const EMAIL_NOTIF_PEMBAYARAN = process.env.EMAIL_NOTIF_PEMBAYARAN || "antareja@smktelkom-mlg.sch.id";
+
+async function penerimaNotifPembayaran() {
+  const bendahara = await prisma.user.findMany({ where: { role: "BENDAHARA" }, select: { email: true } });
+  const semua = [EMAIL_NOTIF_PEMBAYARAN, ...bendahara.map((b) => b.email)].map((e) => e.trim().toLowerCase());
+  return Array.from(new Set(semua.filter(Boolean)));
+}
 
 export type NotifPembayaranMasuk = {
   jenis: string; // mis. "Pendaftaran Tim", "Tiket"
@@ -114,11 +122,15 @@ export type NotifPembayaranMasuk = {
 // Sengaja tidak di-await pemanggil: pembeli tidak perlu menunggu SMTP ke
 // panitia, dan gagal kirim tidak boleh menggagalkan pembayaran.
 export function notifPembayaranMasuk(n: NotifPembayaranMasuk) {
+  kirimNotifPembayaran(n).catch((e) => console.error(`Gagal kirim notifikasi pembayaran ${n.jenis}:`, e));
+}
+
+async function kirimNotifPembayaran(n: NotifPembayaranMasuk) {
   const linkAdmin = `${siteConfig.url}${n.pathAdmin}`;
   const baris = (label: string, isi: string) =>
     `<tr><td style="padding:4px 12px 4px 0;color:#666;vertical-align:top">${label}</td><td style="padding:4px 0">${isi}</td></tr>`;
-  sendMailTo({
-    to: EMAIL_NOTIF_PEMBAYARAN,
+  await sendMailTo({
+    to: (await penerimaNotifPembayaran()).join(", "),
     subject: `💰 Pembayaran ${n.jenis} masuk — ${rp(n.totalBayar)}${n.kodeUnik ? ` #${n.kodeUnik}` : ""}`,
     html: `
       <div style="font-family:sans-serif;max-width:520px;margin:auto">
@@ -139,5 +151,5 @@ export function notifPembayaranMasuk(n: NotifPembayaranMasuk) {
         </p>
         <p style="font-size:12px;color:#aaa">Notifikasi otomatis LPKBB Antareja 2026</p>
       </div>`,
-  }).catch((e) => console.error(`Gagal kirim notifikasi pembayaran ${n.jenis}:`, e));
+  });
 }
