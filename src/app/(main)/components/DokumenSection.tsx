@@ -10,9 +10,10 @@ import {
 } from "@/lib/dokumenPeserta";
 import { FaDownload } from "react-icons/fa";
 
-// Surat undangan & rekomendasi Diknas ditampilkan publik supaya sekolah bisa
-// mengurus izin/dana sebelum mendaftar dan membayar. Filenya sama untuk semua
-// tim per jenjang, jadi tidak ada data peserta yang terbuka.
+// Semua dokumen peserta di satu tempat (Juklak + surat undangan & rekomendasi
+// Diknas), ditautkan dari navbar "Dokumen" supaya mudah dicari. Surat tampil
+// publik supaya sekolah bisa mengurus izin/dana sebelum mendaftar dan membayar.
+// Filenya sama untuk semua tim per jenjang, jadi tidak ada data peserta yang terbuka.
 export default async function DokumenSection() {
   const konfig = await getKonfigUmum();
   const daftarDokumen = (konfig.dokumenPeserta ?? {}) as DokumenPeserta;
@@ -29,7 +30,7 @@ export default async function DokumenSection() {
     }))
     .filter((j) => j.dokumen.length > 0);
 
-  if (perJenjang.length === 0) return null;
+  if (!konfig.juklakUrl && perJenjang.length === 0) return null;
 
   return (
     <SectionWrapper id="dokumen" className="mt-16">
@@ -40,34 +41,57 @@ export default async function DokumenSection() {
             Dokumen Peserta
           </span>
           <h2 className="text-3xl sm:text-4xl font-extrabold text-black leading-tight">
-            Surat Undangan <br />
+            Juklak, Surat Undangan <br />
             <span className="text-primary-500">& Rekomendasi</span>
           </h2>
           <p className="text-gray-500 max-w-md">
-            Unduh surat undangan panitia dan surat rekomendasi Diknas untuk keperluan izin sekolah sebelum mendaftar.
+            Unduh petunjuk pelaksanaan lomba, surat undangan panitia, dan surat rekomendasi Diknas untuk keperluan
+            izin sekolah sebelum mendaftar.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-          {perJenjang.map((j) => (
-            <div key={j.jenjang} className="bg-white rounded-3xl border border-gray-200 shadow-sm p-7 flex flex-col gap-5">
+        {konfig.juklakUrl && (
+          <div className="bg-white rounded-3xl border border-gray-200 shadow-sm p-7 flex flex-col sm:flex-row sm:items-center justify-between gap-5">
+            <div className="flex flex-col gap-2">
               <span className="text-xs font-bold px-3 py-1.5 rounded-full border w-fit bg-red-50 text-primary-500 border-red-200">
-                Jenjang {j.jenjang}
+                Semua Jenjang
               </span>
-              <div className="flex flex-col gap-3">
-                {j.dokumen.map((d) => (
-                  <a
-                    key={d.jenis}
-                    href={d.url}
-                    className="inline-flex items-center justify-between gap-3 bg-primary-500 hover:bg-primary-600 text-white text-sm font-semibold px-5 py-3 rounded-xl transition-colors"
-                  >
-                    Unduh {d.label} <FaDownload />
-                  </a>
-                ))}
-              </div>
+              <p className="font-bold text-black">Juklak (Petunjuk Pelaksanaan)</p>
+              <p className="text-sm text-gray-500">Aturan lomba, kategori, penilaian, dan ketentuan peserta.</p>
             </div>
-          ))}
-        </div>
+            <a
+              href={konfig.juklakUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center justify-between gap-3 bg-primary-500 hover:bg-primary-600 text-white text-sm font-semibold px-5 py-3 rounded-xl transition-colors shrink-0"
+            >
+              Unduh Juklak <FaDownload />
+            </a>
+          </div>
+        )}
+
+        {perJenjang.length > 0 && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            {perJenjang.map((j) => (
+              <div key={j.jenjang} className="bg-white rounded-3xl border border-gray-200 shadow-sm p-7 flex flex-col gap-5">
+                <span className="text-xs font-bold px-3 py-1.5 rounded-full border w-fit bg-red-50 text-primary-500 border-red-200">
+                  Jenjang {j.jenjang}
+                </span>
+                <div className="flex flex-col gap-3">
+                  {j.dokumen.map((d) => (
+                    <a
+                      key={d.jenis}
+                      href={d.url}
+                      className="inline-flex items-center justify-between gap-3 bg-primary-500 hover:bg-primary-600 text-white text-sm font-semibold px-5 py-3 rounded-xl transition-colors"
+                    >
+                      Unduh {d.label} <FaDownload />
+                    </a>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </SectionWrapper>
   );

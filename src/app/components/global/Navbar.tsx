@@ -22,6 +22,7 @@ const PublicNav: NavOption[] = [
   { label: "Alur Daftar", href: "/#video" },
   { label: "Timeline", href: "/#timeline" },
   { label: "Juri", href: "/#juri" },
+  { label: "Dokumen", href: "/#dokumen" },
   { label: "Tiket", href: "/#tiket" },
   { label: "Merch", href: "/merchandise" },
   { label: "Galeri", href: "/galeri" },

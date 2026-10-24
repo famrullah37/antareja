@@ -15,6 +15,7 @@ const FootOptions: FootOption[] = [
   { label: "Kategori", href: "/#Kategori" },
   { label: "Video", href: "/#video" },
   { label: "Pendaftaran", href: "/#daftar" },
+  { label: "Juklak & Dokumen", href: "/#dokumen" },
 ];
 
 // Tautan ke semua halaman publik — juga membantu Google menemukan halaman-halaman ini.

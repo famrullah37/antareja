@@ -83,12 +83,10 @@ export default async function Hero() {
               </a>
               {konfig.juklakUrl && (
                 <a
-                  href={konfig.juklakUrl}
-                  target="_blank"
-                  rel="noreferrer"
+                  href="/#dokumen"
                   className="inline-flex items-center gap-2 py-3 px-6 rounded-xl font-bold text-sm text-white/80 border border-white/20 hover:bg-white/10 transition-all duration-300"
                 >
-                  Unduh Juklak
+                  Juklak & Surat
                 </a>
               )}
             </div>
