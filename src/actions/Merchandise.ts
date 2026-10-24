@@ -12,6 +12,7 @@ import { parseWibDatetimeLocal } from "@/lib/datetime";
 import { daftarUkuran, labelItems, poTerbuka, type ItemPesanan } from "@/lib/merchandise";
 import { findKonfigMerch, incrementCounterUrutMerch } from "@/queries/merchandise.query";
 import { compressPhoto, imageUploader, validateUploadFile } from "./fileUploader";
+import { notifPembayaranMasuk } from "@/lib/emailPembayaran";
 
 // Verifikasi pembayaran merch = urusan uang, jadi Bendahara juga boleh.
 async function requireAdminOrBendahara() {
@@ -331,6 +332,17 @@ export async function pesanMerchandise(data: FormData) {
           ...(userId ? { user: { connect: { id: userId } } } : {}),
         },
       });
+    });
+    notifPembayaranMasuk({
+      jenis: "Merchandise",
+      pathAdmin: "/admin/merchandise",
+      nama,
+      kontak: `${email} · ${noHp}`,
+      totalBayar,
+      kodeUnik,
+      metodePembayaran,
+      buktiUrl,
+      detail: labelItems(items),
     });
     revalidatePath("/admin/merchandise");
     return { success: true };

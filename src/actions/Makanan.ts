@@ -9,6 +9,7 @@ import { parseWibDatetimeLocal } from "@/lib/datetime";
 import { labelItemsMakanan, MAKS_PORSI_PER_MENU, sesiTerbuka, type ItemMakanan } from "@/lib/makanan";
 import { getKonfigUmum, upsertKonfigUmum } from "@/queries/konfigUmum.query";
 import { imageUploader, validateUploadFile } from "./fileUploader";
+import { notifPembayaranMasuk } from "@/lib/emailPembayaran";
 
 type Hasil = { success: boolean; message?: string };
 
@@ -328,6 +329,16 @@ export async function pesanMakanan(data: FormData): Promise<Hasil> {
       });
     });
     await catatLog("PESAN_MAKANAN", `${tim.nama_tim} — ${sesi.nama}: ${labelItemsMakanan(items)}`);
+    notifPembayaranMasuk({
+      jenis: "Makanan",
+      pathAdmin: "/admin/makanan",
+      nama: `Tim ${tim.nama_tim}`,
+      totalBayar,
+      kodeUnik,
+      metodePembayaran: "QRIS",
+      buktiUrl,
+      detail: `${sesi.nama}: ${labelItemsMakanan(items)}`,
+    });
     segarkan();
     return { success: true };
   } catch (e) {

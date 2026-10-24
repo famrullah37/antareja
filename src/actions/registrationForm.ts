@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { getServerSession } from "@/lib/next-auth";
 import prisma from "@/lib/prisma";
 import { biayaPendaftaran } from "./pembayaran";
+import { notifPembayaranMasuk } from "@/lib/emailPembayaran";
 
 const VALID_JENJANG: Jenjang[] = ["SD", "SMP", "SMA", "PURNA"];
 const VALID_TIPE: Tipe[] = ["SMALL", "NORMAL"];
@@ -139,6 +140,18 @@ export default async function submitFormRegistrasi(data: FormData) {
           },
         },
       });
+    });
+
+    notifPembayaranMasuk({
+      jenis: "Pendaftaran Tim",
+      pathAdmin: "/admin/pembayaran",
+      nama: `${nama_tim} — ${asal_sekolah}`,
+      kontak: session.user.email,
+      totalBayar,
+      kodeUnik,
+      metodePembayaran: "TRANSFER",
+      buktiUrl: tryUploadImage.data!.url,
+      detail: `Jenjang ${jenjang} · ${isDP ? "DP" : "Lunas"} · ${bank} a.n. ${nama_rek}`,
     });
 
     revalidatePath("/", "layout");

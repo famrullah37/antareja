@@ -1,6 +1,7 @@
 import "server-only";
 import { escapeHtml } from "@/lib/escapeHtml";
 import { sendMailTo } from "@/lib/mailer";
+import { siteConfig } from "@/config/site";
 
 // Ringkasan pembayaran untuk email Tiket & Galeri Foto: (1) email "pesanan
 // diterima" begitu pembeli checkout — supaya nominal tepat (termasuk kode unik)
@@ -91,4 +92,52 @@ export async function kirimEmailPesananDiterima(input: {
   } catch (e) {
     console.error(`Gagal kirim email pesanan ${input.produk}:`, e);
   }
+}
+
+// Notifikasi ke panitia setiap ada pembayaran baru masuk (status PENDING),
+// supaya bendahara tidak perlu bolak-balik membuka panel admin. Alamat bisa
+// diganti lewat env EMAIL_NOTIF_PEMBAYARAN tanpa deploy ulang kode.
+const EMAIL_NOTIF_PEMBAYARAN = process.env.EMAIL_NOTIF_PEMBAYARAN || "antareja@smktelkom-mlg.sch.id";
+
+export type NotifPembayaranMasuk = {
+  jenis: string; // mis. "Pendaftaran Tim", "Tiket"
+  pathAdmin: string; // halaman verifikasi, mis. "/admin/tiket"
+  nama: string;
+  kontak?: string | null; // email / no. HP pembayar
+  totalBayar: number;
+  kodeUnik?: string | null;
+  metodePembayaran: string;
+  buktiUrl?: string | null;
+  detail?: string; // ringkasan isi pesanan
+};
+
+// Sengaja tidak di-await pemanggil: pembeli tidak perlu menunggu SMTP ke
+// panitia, dan gagal kirim tidak boleh menggagalkan pembayaran.
+export function notifPembayaranMasuk(n: NotifPembayaranMasuk) {
+  const linkAdmin = `${siteConfig.url}${n.pathAdmin}`;
+  const baris = (label: string, isi: string) =>
+    `<tr><td style="padding:4px 12px 4px 0;color:#666;vertical-align:top">${label}</td><td style="padding:4px 0">${isi}</td></tr>`;
+  sendMailTo({
+    to: EMAIL_NOTIF_PEMBAYARAN,
+    subject: `💰 Pembayaran ${n.jenis} masuk — ${rp(n.totalBayar)}${n.kodeUnik ? ` #${n.kodeUnik}` : ""}`,
+    html: `
+      <div style="font-family:sans-serif;max-width:520px;margin:auto">
+        <h2 style="color:#F70048">Pembayaran ${escapeHtml(n.jenis)} Masuk</h2>
+        <p>Ada pembayaran baru yang <b>menunggu verifikasi</b>.</p>
+        <table style="border-collapse:collapse;font-size:14px">
+          ${baris("Nama", `<b>${escapeHtml(n.nama)}</b>`)}
+          ${n.kontak ? baris("Kontak", escapeHtml(n.kontak)) : ""}
+          ${n.detail ? baris("Pesanan", escapeHtml(n.detail)) : ""}
+          ${baris("Total", `<b>${rp(n.totalBayar)}</b>`)}
+          ${n.kodeUnik ? baris("Kode unik", `<span style="font-family:monospace">#${escapeHtml(n.kodeUnik)}</span>`) : ""}
+          ${baris("Metode", labelMetode(n.metodePembayaran))}
+          ${baris("Waktu", formatTanggal(new Date()))}
+          ${baris("Bukti", n.buktiUrl ? `<a href="${escapeHtml(n.buktiUrl)}">Lihat bukti</a>` : "Tidak diunggah — cocokkan nominal di mutasi/riwayat QRIS")}
+        </table>
+        <p style="margin-top:20px">
+          <a href="${linkAdmin}" style="background:#F70048;color:#fff;padding:10px 16px;border-radius:6px;text-decoration:none">Buka halaman verifikasi</a>
+        </p>
+        <p style="font-size:12px;color:#aaa">Notifikasi otomatis LPKBB Antareja 2026</p>
+      </div>`,
+  }).catch((e) => console.error(`Gagal kirim notifikasi pembayaran ${n.jenis}:`, e));
 }

@@ -22,7 +22,7 @@ import prisma from "@/lib/prisma";
 import { toDownloadUrl } from "@/lib/downloadUrl";
 import { escapeHtml } from "@/lib/escapeHtml";
 import { buatKuitansiFoto } from "@/lib/kuitansiPenjualan";
-import { blokRingkasanPembayaran, kirimEmailPesananDiterima, type RingkasanPembayaran } from "@/lib/emailPembayaran";
+import { blokRingkasanPembayaran, kirimEmailPesananDiterima, notifPembayaranMasuk, type RingkasanPembayaran } from "@/lib/emailPembayaran";
 
 // Ringkasan nominal pembelian foto untuk email. TransaksiFoto.harga sudah
 // termasuk kode unik (lihat beliFoto); harga album bisa berubah setelah beli,
@@ -48,6 +48,12 @@ function ringkasanFoto(t: {
 async function requireAdmin() {
   const session = await getServerSession();
   if (session?.user?.role !== "ADMIN") throw new Error("Forbidden");
+}
+
+// Verifikasi pembelian foto = urusan keuangan, sama seperti Tiket/Voting/Merch.
+async function requireAdminOrBendahara() {
+  const session = await getServerSession();
+  if (!["ADMIN", "BENDAHARA"].includes(session?.user?.role ?? "")) throw new Error("Forbidden");
 }
 
 async function requireAdminOrFotografer() {
@@ -235,6 +241,17 @@ export async function beliFoto(data: FormData) {
       email: email || null,
       ...(userId ? { user: { connect: { id: userId } } } : {}),
     } as any);
+    notifPembayaranMasuk({
+      jenis: "Foto",
+      pathAdmin: "/admin/galeri/transaksi",
+      nama: namaPembeli || "Pembeli",
+      kontak: email || null,
+      totalBayar: harga,
+      kodeUnik,
+      metodePembayaran,
+      buktiUrl,
+      detail: `${fotoList.length} foto`,
+    });
     if (email) {
       await kirimEmailPesananDiterima({
         to: email,
@@ -252,7 +269,7 @@ export async function beliFoto(data: FormData) {
 // ─── Admin: Verifikasi Pembelian Foto ─────────────────────────────────────────
 
 export async function verifikasiFoto(transaksiId: string) {
-  await requireAdmin();
+  await requireAdminOrBendahara();
   try {
     const transaksi = await prisma.transaksiFoto.findUnique({ where: { id: transaksiId } });
     if (!transaksi) return { success: false };
@@ -302,6 +319,7 @@ export async function verifikasiFoto(transaksiId: string) {
       } catch { /* email failure is non-fatal */ }
     }
     revalidatePath("/admin/galeri");
+    revalidatePath("/admin/galeri/transaksi");
     revalidatePath("/admin/kas");
     return { success: true };
   } catch { return { success: false }; }
@@ -309,7 +327,7 @@ export async function verifikasiFoto(transaksiId: string) {
 
 // Unduh kuitansi PDF pembelian foto terverifikasi — nomor sama tiap unduh.
 export async function unduhKuitansiFoto(transaksiId: string) {
-  await requireAdmin();
+  await requireAdminOrBendahara();
   try {
     const k = await buatKuitansiFoto(transaksiId);
     if (!k) return { success: false, message: "Kuitansi hanya untuk pembelian yang sudah diverifikasi" };
@@ -386,7 +404,7 @@ export async function buatWatermarkFotoLama() {
 }
 
 export async function rejectFoto(transaksiId: string) {
-  await requireAdmin();
+  await requireAdminOrBendahara();
   try {
     const transaksi = await prisma.transaksiFoto.findUnique({ where: { id: transaksiId } });
     // Hanya yang masih PENDING — menolak transaksi yang sudah VERIFIED akan
@@ -398,6 +416,7 @@ export async function rejectFoto(transaksiId: string) {
       await catatLog("TOLAK_FOTO", `Foto${pembeliInfo}`);
     }
     revalidatePath("/admin/galeri");
+    revalidatePath("/admin/galeri/transaksi");
     return { success: true };
   } catch { return { success: false }; }
 }

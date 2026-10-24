@@ -11,6 +11,7 @@ import { parseWibDatetimeLocal } from "@/lib/datetime";
 import { findKonfigTiket } from "@/queries/tiket.query";
 import { catatLog } from "@/lib/activityLog";
 import { sendMailTo } from "@/lib/mailer";
+import { notifPembayaranMasuk } from "@/lib/emailPembayaran";
 import { markVotingVerified } from "@/lib/votingVerifikasi";
 import {
   findTransaksiVoting,
@@ -233,7 +234,8 @@ export async function submitVote(data: FormData) {
 
     const totalBayar = konfig.nominalVote * jumlahVote + parseInt(kodeUnik);
 
-    await prisma.transaksiVoting.create({
+    const vote = await prisma.transaksiVoting.create({
+      select: { tim: { select: { nama_tim: true } } },
       data: {
         tim: { connect: { id: timId } },
         nama,
@@ -248,6 +250,17 @@ export async function submitVote(data: FormData) {
         status: "PENDING",
         ...(userId ? { user: { connect: { id: userId } } } : {}),
       },
+    });
+    notifPembayaranMasuk({
+      jenis: "Dukungan",
+      pathAdmin: "/admin/voting",
+      nama,
+      kontak: `${email} · ${noHp}`,
+      totalBayar,
+      kodeUnik,
+      metodePembayaran: "QRIS",
+      buktiUrl,
+      detail: `${jumlahVote} dukungan untuk ${vote.tim.nama_tim} (${kategori})`,
     });
 
     revalidatePath("/vote");

@@ -39,7 +39,7 @@ import prisma from "@/lib/prisma";
 import { escapeHtml } from "@/lib/escapeHtml";
 import { formatJamWib } from "@/lib/ujiCoba";
 import { buatKuitansiTiket } from "@/lib/kuitansiPenjualan";
-import { blokRingkasanPembayaran, kirimEmailPesananDiterima, type RingkasanPembayaran } from "@/lib/emailPembayaran";
+import { blokRingkasanPembayaran, kirimEmailPesananDiterima, notifPembayaranMasuk, type RingkasanPembayaran } from "@/lib/emailPembayaran";
 
 // Ringkasan nominal transaksi tiket untuk email (pesanan diterima & verifikasi).
 function ringkasanTiket(tr: {
@@ -290,11 +290,23 @@ export async function beliTiket(data: FormData) {
         },
       });
     });
+    const ringkasan = ringkasanTiket(dibuat);
+    notifPembayaranMasuk({
+      jenis: "Tiket",
+      pathAdmin: "/admin/tiket",
+      nama: dibuat.nama,
+      kontak: `${dibuat.email} · ${dibuat.noHp}`,
+      totalBayar: ringkasan.totalBayar,
+      kodeUnik: dibuat.kodeUnik,
+      metodePembayaran: dibuat.metodePembayaran,
+      buktiUrl,
+      detail: `${dibuat.jumlah}× ${dibuat.tiket.jenis}${dibuat.bundleJumlah ? ` (+${dibuat.bundleJumlah} bundling)` : ""}`,
+    });
     await kirimEmailPesananDiterima({
       to: dibuat.email,
       nama: dibuat.nama,
       produk: "Tiket",
-      ringkasan: ringkasanTiket(dibuat),
+      ringkasan,
       keterangan: "QR code tiket akan dikirim ke email ini setelah pembayaran diverifikasi panitia.",
     });
     revalidatePath("/tiket");
