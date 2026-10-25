@@ -151,6 +151,11 @@ export default function Login() {
                   </button>
                 </div>
               </div>
+              <div className="flex justify-end">
+                <Link href={"/auth/lupa-password"} className="text-sm text-primary-500 font-bold">
+                  Lupa password?
+                </Link>
+              </div>
             </div>
           </div>
           <div className="flex flex-col gap-4">

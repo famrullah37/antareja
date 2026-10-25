@@ -18,6 +18,10 @@ model User {
   verified          Boolean           @default(false)
   token             String?           @unique
   verifyTokenSentAt DateTime?
+  // SHA-256 dari token di link reset (bukan token mentahnya) — kebocoran DB
+  // tidak langsung memberi link reset yang bisa dipakai.
+  resetToken          String?         @unique
+  resetTokenExpiresAt DateTime?
   penilaian         Penilaian[]
   tims              Tim[]
   juri              Juri?
