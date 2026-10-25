@@ -63,8 +63,9 @@ export default async function Hero() {
             </h1>
 
             <p className="text-white/70 text-base sm:text-lg max-w-lg leading-relaxed">
-              Selamat datang di website resmi Lomba Ketangkasan Baris Berbaris
-              yang diselenggarakan oleh Paskibra SMK Telkom Malang.
+              Selamat datang di website resmi LPKBB Antareja (dulu LKBB
+              Antareja), Lomba Ketangkasan Baris Berbaris yang diselenggarakan
+              oleh Paskibra SMK Telkom Malang.
             </p>
 
             <div className="flex flex-wrap gap-3">
