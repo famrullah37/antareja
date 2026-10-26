@@ -4,6 +4,7 @@ import { upsertAnggotaForm } from "@/actions/Anggota";
 import TextField from "@/app/components/global/Input";
 import SubmitButton from "@/app/components/global/SubmitButton";
 import { H2 } from "@/app/components/global/Text";
+import { compressFormDataImage } from "@/lib/compressImageClient";
 import { Anggota, Kelas, Tim } from "@prisma/client";
 import { useRouter } from "next/navigation";
 import Select from "react-select";
@@ -34,6 +35,7 @@ export default function EditAnggotaForm({
     const toastId = toast.loading(
       anggota.id === "" ? "Membuat anggota..." : "Memperbarui anggota..."
     );
+    await compressFormDataImage(data, "foto");
     const result = await upsertAnggotaForm(data, anggota.posisi, anggota.id, anggota.timId);
 
     if (result.success) {

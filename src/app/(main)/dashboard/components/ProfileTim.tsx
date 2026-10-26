@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import { FaDownload } from "react-icons/fa";
 import SubmitButton from "@/app/components/global/SubmitButton";
 import { downloadFormulir, downloadKuitansi } from "./parts/downloadFormulir";
+import { compressFormDataImage } from "@/lib/compressImageClient";
 
 const rowsMapNormal = [
   ["b1s1", "b1s2", "b1s3"],
@@ -192,6 +193,7 @@ export default function ProfileTim({
 
   async function submitForm(formData: FormData) {
     const toastId = toast.loading("Menyimpan foto tim...");
+    await compressFormDataImage(formData, "foto");
     const result = await updateTimForm(tim.id, formData);
 
     if ("message" in result) {
