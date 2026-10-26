@@ -17,7 +17,7 @@ export function AnggotaCard({
   return (
     <Link
       href={href}
-      className="relative block mb-6 w-full sm:w-[40%] xl:w-1/6 hover:scale-105 transition-all duration-300"
+      className="relative block mb-6 w-[40%] sm:w-[28%] max-w-[200px] hover:scale-105 transition-all duration-300"
     >
       <MemberCardBody image={image} name={name} posisi={posisi} />
     </Link>
