@@ -56,7 +56,7 @@
     "seed": "dotenv -e .env.local tsx prisma/seed.ts"
   },
   "devDependencies": {
-    "@types/node": "^24.19.2",
+    "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",
     "eslint": "^8",
