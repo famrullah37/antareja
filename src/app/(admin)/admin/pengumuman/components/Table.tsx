@@ -13,13 +13,31 @@ export default function PengumumanTable({ data }: { data: Pengumuman[] }) {
 
   const columns: TableColumn<Pengumuman>[] = [
     {
-      name: "ID Pengumuman",
-      selector: (row: Pengumuman) => row.id,
+      name: "No",
+      cell: (row: Pengumuman) => data.indexOf(row) + 1,
+      width: "70px",
+    },
+    {
+      name: "Tanggal Dibuat",
+      selector: (row: Pengumuman) => new Date(row.createdAt).getTime(),
+      format: (row: Pengumuman) =>
+        new Date(row.createdAt).toLocaleString("id-ID", {
+          day: "numeric",
+          month: "long",
+          year: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+          timeZone: "Asia/Jakarta",
+        }),
       sortable: true,
     },
     {
       name: "Content",
       selector: (row: Pengumuman) => row.content,
+      cell: (row: Pengumuman) => (
+        <span className="whitespace-normal py-2">{row.content}</span>
+      ),
+      grow: 2,
       sortable: true,
     },
     {
