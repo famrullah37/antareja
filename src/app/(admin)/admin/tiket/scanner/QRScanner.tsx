@@ -195,7 +195,7 @@ export default function QRScanner({ statistikAwal }: { statistikAwal: { masuk: n
           type="text"
           value={token}
           onChange={(e) => setToken(e.target.value)}
-          placeholder="Scan atau ketik token QR..."
+          placeholder="Scan atau ketik kode tiket (mis. 00A8-A3F2)..."
           className="border border-neutral-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
         />
         <button

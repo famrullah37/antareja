@@ -47,6 +47,7 @@ const nextConfig = {
         "/auth/login",
         "/auth/verify",
         "/galeri/download/:path*",
+        "/tiket/pesanan/:path*",
       ].map((source) => ({ source, headers: noindex })),
     ];
   },

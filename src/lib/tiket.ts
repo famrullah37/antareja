@@ -23,3 +23,17 @@ export function punyaBundling(t: { bundleHarga: number | null; bundleIsi: string
 export function labelBundling(tr: { bundleJumlah: number; bundleIsi: string | null }) {
   return tr.bundleJumlah > 0 ? ` + Bundling ${tr.bundleIsi ?? ""} × ${tr.bundleJumlah}` : "";
 }
+
+// Kode tiket pendek untuk dibaca/diketik manusia (WA, email, input manual scanner):
+// 8 karakter pertama token QR (UUID), mis. "00a8a3f2-…" → "00A8-A3F2". Gambar QR
+// tetap berisi token lengkap; scanner menerima keduanya.
+export function kodeTiketPendek(token: string) {
+  const h = token.replace(/-/g, "").slice(0, 8).toUpperCase();
+  return `${h.slice(0, 4)}-${h.slice(4)}`;
+}
+
+// "00A8-A3F2" / "00a8a3f2" → "00a8a3f2" (awalan token), null kalau bukan kode pendek.
+export function awalanDariKodePendek(input: string) {
+  const h = input.trim().replace(/[\s-]/g, "").toLowerCase();
+  return /^[0-9a-f]{8}$/.test(h) ? h : null;
+}

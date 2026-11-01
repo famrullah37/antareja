@@ -3,7 +3,7 @@
 import { rejectTiket, unduhKuitansiTiket, verifikasiTiket } from "@/actions/Tiket";
 import UnduhKuitansiButton from "../../components/UnduhKuitansiButton";
 import { toast } from "sonner";
-import { totalBayarTiket } from "@/lib/tiket";
+import { kodeTiketPendek, totalBayarTiket } from "@/lib/tiket";
 
 type TransaksiWithRelations = {
   id: string;
@@ -28,7 +28,7 @@ type TransaksiWithRelations = {
 
 function buildWAMessage(tr: TransaksiWithRelations) {
   const tokens = tr.qrTikets
-    .map((q, i) => `Tiket ${i + 1}${q.bundle ? ` (+ ${tr.bundleIsi})` : ""}: ${q.token}`)
+    .map((q, i) => `${i + 1}. *${kodeTiketPendek(q.token)}*${q.bundle ? ` (+ ${tr.bundleIsi})` : ""}`)
     .join("\n");
   const msg = [
     `✅ *Tiket LPKBB Antareja 2026 Terverifikasi!*`,
@@ -37,10 +37,10 @@ function buildWAMessage(tr: TransaksiWithRelations) {
     `Tiket *${tr.tiket.jenis}* (${tr.jumlah} tiket) sudah diverifikasi.`,
     ...(tr.bundleJumlah > 0 ? [`Termasuk bundling *${tr.bundleIsi}* × ${tr.bundleJumlah}.`] : []),
     ``,
-    `*Token QR:*`,
-    tokens || "(belum ada token)",
+    `*Kode tiket:*`,
+    tokens || "(belum ada kode)",
     ``,
-    `Tunjukkan token ini di pintu masuk.`,
+    `Tunjukkan kode ini atau QR di email ke petugas pintu masuk.`,
     `— LPKBB Antareja 2026, SMK Telkom Malang`,
   ].join("\n");
   const no = tr.noHp.replace(/^0/, "62").replace(/\D/g, "");
@@ -60,6 +60,13 @@ function formatRupiah(n: number) {
     minimumFractionDigits: 0,
   }).format(n);
 }
+
+// Metode bayar: QRIS & Transfer (online), Tunai/QRIS di POS (jenisJual OFFLINE).
+const METODE_BADGE: Record<string, { label: string; cls: string }> = {
+  QRIS: { label: "QRIS", cls: "bg-purple-100 text-purple-700" },
+  TRANSFER: { label: "Transfer", cls: "bg-blue-100 text-blue-700" },
+  CASH: { label: "Tunai", cls: "bg-orange-100 text-orange-700" },
+};
 
 export default function TransaksiTiketTable({
   transaksis,
@@ -94,7 +101,7 @@ export default function TransaksiTiketTable({
             <th className="px-4 py-3 text-left">Total</th>
             <th className="px-4 py-3 text-left">Kode</th>
             <th className="px-4 py-3 text-left">Status</th>
-            <th className="px-4 py-3 text-left">Bukti/Jual</th>
+            <th className="px-4 py-3 text-left">Metode/Bukti</th>
             <th className="px-4 py-3 text-left">QR Scan</th>
             <th className="px-4 py-3 text-left">Aksi</th>
           </tr>
@@ -141,23 +148,23 @@ export default function TransaksiTiketTable({
                   )}
                 </td>
                 <td className="px-4 py-3">
-                  {tr.jenisJual === "OFFLINE" ? (
-                    <span className="bg-orange-100 text-orange-700 text-xs font-medium px-2 py-0.5 rounded-full">
-                      TUNAI
-                    </span>
-                  ) : tr.bukti ? (
-                    <a
-                      href={tr.bukti}
-                      target="_blank"
-                      className="text-blue-500 hover:underline text-xs"
+                  <div className="flex flex-col items-start gap-1">
+                    <span
+                      className={`text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap ${
+                        METODE_BADGE[tr.metodePembayaran]?.cls ?? "bg-neutral-100 text-neutral-600"
+                      }`}
                     >
-                      Lihat
-                    </a>
-                  ) : tr.metodePembayaran === "QRIS" ? (
-                    <span className="text-gray-400 text-xs">QRIS (tanpa bukti)</span>
-                  ) : (
-                    <span className="text-gray-300 text-xs">-</span>
-                  )}
+                      {METODE_BADGE[tr.metodePembayaran]?.label ?? tr.metodePembayaran}
+                      {tr.jenisJual === "OFFLINE" && " · POS"}
+                    </span>
+                    {tr.bukti ? (
+                      <a href={tr.bukti} target="_blank" className="text-blue-500 hover:underline text-xs">
+                        Lihat bukti
+                      </a>
+                    ) : (
+                      tr.jenisJual === "ONLINE" && <span className="text-gray-400 text-xs">tanpa bukti</span>
+                    )}
+                  </div>
                 </td>
                 <td className="px-4 py-3 text-xs">
                   {tr.qrTikets.length

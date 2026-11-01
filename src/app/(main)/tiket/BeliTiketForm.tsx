@@ -6,6 +6,7 @@ import Image from "next/image";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import MasaBerlakuQris, { type KodeTerbit } from "@/app/components/global/MasaBerlakuQris";
+import { usePeringatanKeluar } from "@/lib/usePeringatanKeluar";
 
 function formatRupiah(n: number) {
   return new Intl.NumberFormat("id-ID", {
@@ -33,11 +34,17 @@ export default function BeliTiketForm({
   const [jumlah, setJumlah] = useState(1);
   const [bundleJumlah, setBundleJumlah] = useState(0);
   const [metode, setMetode] = useState<"TRANSFER" | "QRIS">("TRANSFER");
-  const [submitted, setSubmitted] = useState(false);
+  const [submitted, setSubmitted] = useState<{ linkPesanan?: string; adaBukti?: boolean } | null>(null);
   const [kodeUnik, setKodeUnik] = useState<string | null>(null);
   const [reservingKode, setReservingKode] = useState(false);
   const [qrisDinamis, setQrisDinamis] = useState<string | null>(null);
   const [kodeTerbit, setKodeTerbit] = useState<KodeTerbit | null>(null);
+
+  usePeringatanKeluar(
+    !!selected && !!kodeUnik && !submitted,
+    "Pesanan tiket belum dikirim. Kalau sudah membayar, tekan tombol kirim dulu supaya pembayaran tercatat " +
+      "(bukti bisa diunggah belakangan). Tetap tinggalkan halaman ini?"
+  );
 
   function terimaKode(r: KodeTerbit) {
     setKodeUnik(r.kodeUnik);
@@ -108,7 +115,7 @@ export default function BeliTiketForm({
         "Pembelian berhasil! Admin akan memverifikasi dan mengirim QR Code via email.",
         { id: toastId, duration: 5000 }
       );
-      setSubmitted(true);
+      setSubmitted({ linkPesanan: result.linkPesanan, adaBukti: result.adaBukti });
     } else {
       toast.error(result.message ?? "Gagal memproses pembelian", { id: toastId });
       if (["sudah terpakai", "tidak valid", "kedaluwarsa"].some((m) => result.message?.includes(m))) await buatKodeBaru();
@@ -123,9 +130,25 @@ export default function BeliTiketForm({
           Pembelian Diterima!
         </h2>
         <p className="text-green-700 text-sm">
-          Tim kami akan memverifikasi bukti transfer Anda. QR Code tiket akan
+          Tim kami akan memverifikasi pembayaran Anda. QR Code tiket akan
           dikirim ke email Anda setelah verifikasi selesai.
         </p>
+        {submitted.linkPesanan && (
+          <div className="mt-5 flex flex-col items-center gap-2">
+            {!submitted.adaBukti && (
+              <p className="text-sm text-green-800 font-medium">
+                Belum upload bukti pembayaran? Unggah lewat halaman pesanan Anda.
+              </p>
+            )}
+            <a
+              href={submitted.linkPesanan}
+              className="bg-primary-500 hover:bg-primary-600 text-white text-sm font-semibold px-5 py-2.5 rounded-xl"
+            >
+              {submitted.adaBukti ? "Lihat Pesanan" : "Upload Bukti / Lihat Pesanan"}
+            </a>
+            <p className="text-xs text-green-700">Link ini juga dikirim ke email Anda.</p>
+          </div>
+        )}
       </div>
     );
   }
@@ -348,6 +371,9 @@ export default function BeliTiketForm({
                   </div>
                 )}
                 <p className="font-semibold">Nominal: {formatRupiah(totalBayar)}</p>
+                <p className="text-xs font-semibold text-purple-700 text-center">
+                  Setelah bayar, langsung kirim pesanan di bawah — bukti boleh diunggah belakangan.
+                </p>
                 {qrisDinamis ? (
                   <p className="text-xs text-purple-500 text-center">Nominal sudah otomatis terisi di QRIS — tinggal scan & bayar.</p>
                 ) : (

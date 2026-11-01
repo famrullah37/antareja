@@ -70,6 +70,8 @@ export async function kirimEmailPesananDiterima(input: {
   produk: string; // mis. "Tiket", "Foto"
   ringkasan: RingkasanPembayaran;
   keterangan: string; // apa yang dikirim setelah diverifikasi
+  // Link halaman pesanan (cek status + upload bukti menyusul) — saat ini hanya tiket.
+  linkPesanan?: string;
 }) {
   const { ringkasan } = input;
   try {
@@ -87,6 +89,12 @@ export async function kirimEmailPesananDiterima(input: {
             mencocokkan pembayaran dari nominal ini. Simpan email ini sebagai catatan pesanan.
           </p>
           <p>${escapeHtml(input.keterangan)}</p>
+          ${
+            input.linkPesanan
+              ? `<p>Belum upload bukti pembayaran atau ingin cek status pesanan? Buka halaman pesanan Anda:</p>
+          <div style="margin:16px 0"><a href="${input.linkPesanan}" style="background:#F70048;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;display:inline-block">Buka Halaman Pesanan</a></div>`
+              : ""
+          }
           <p style="font-size:12px;color:#aaa">LPKBB Antareja 2026 — SMK Telkom Malang</p>
         </div>`,
     });

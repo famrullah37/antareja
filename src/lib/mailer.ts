@@ -34,6 +34,9 @@ export type mailMetaData = {
     path?: string;
     content?: string | Buffer;
     contentType?: string;
+    // Gambar inline: dirujuk dari HTML sebagai <img src="cid:...">. Gmail memblokir
+    // gambar data: URI, jadi QR/gambar di badan email harus lewat cara ini.
+    cid?: string;
   }>;
 };
 

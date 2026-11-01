@@ -1,7 +1,7 @@
 ﻿import { H2 } from "@/app/components/global/Text";
 import SectionWrapper from "@/app/components/global/Wrapper";
 import QRCode from "qrcode";
-import { totalBayarTiket } from "@/lib/tiket";
+import { kodeTiketPendek, totalBayarTiket } from "@/lib/tiket";
 
 type QRTiket = { token: string; statusScan: boolean; waktuScan: Date | null; bundle: boolean };
 type TransaksiItem = {
@@ -133,8 +133,8 @@ export default async function TiketSayaSection({
                             </div>
                           )}
                         </div>
-                        <div className="text-[10px] font-mono text-gray-400 text-center max-w-[160px] truncate">
-                          {qr.token}
+                        <div className="text-sm font-mono font-bold tracking-wider text-gray-600 text-center">
+                          {kodeTiketPendek(qr.token)}
                         </div>
                         {qr.statusScan ? (
                           <span className="text-xs text-gray-400">

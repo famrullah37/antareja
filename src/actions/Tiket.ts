@@ -8,7 +8,7 @@ import { sendMailTo } from "@/lib/mailer";
 import QRCode from "qrcode";
 import { buildDynamicQrisImage, decodeQrisFromImage } from "@/lib/qris";
 import { catatLog } from "@/lib/activityLog";
-import { labelBundling, punyaBundling, totalBayarTiket } from "@/lib/tiket";
+import { awalanDariKodePendek, kodeTiketPendek, labelBundling, punyaBundling, totalBayarTiket } from "@/lib/tiket";
 
 // Pengaturan tiket (master, harga, bundling, rekening/QRIS): ADMIN & BENDAHARA.
 async function requireAdmin() {
@@ -41,6 +41,7 @@ import { formatJamWib } from "@/lib/ujiCoba";
 import { buatKuitansiTiket } from "@/lib/kuitansiPenjualan";
 import { blokRingkasanPembayaran, kirimEmailPesananDiterima, notifPembayaranMasuk, type RingkasanPembayaran } from "@/lib/emailPembayaran";
 import { cekTokenKode, terbitkanTokenKode } from "@/lib/kodeUnikToken";
+import { cekTandaPesanan, linkPesananTiket } from "@/lib/linkPesanan";
 
 // Ringkasan nominal transaksi tiket untuk email (pesanan diterima & verifikasi).
 function ringkasanTiket(tr: {
@@ -307,15 +308,17 @@ export async function beliTiket(data: FormData) {
       buktiUrl,
       detail: `${dibuat.jumlah}× ${dibuat.tiket.jenis}${dibuat.bundleJumlah ? ` (+${dibuat.bundleJumlah} bundling)` : ""}`,
     });
+    const linkPesanan = linkPesananTiket(dibuat.id);
     await kirimEmailPesananDiterima({
       to: dibuat.email,
       nama: dibuat.nama,
       produk: "Tiket",
       ringkasan,
       keterangan: "QR code tiket akan dikirim ke email ini setelah pembayaran diverifikasi panitia.",
+      linkPesanan,
     });
     revalidatePath("/tiket");
-    return { success: true };
+    return { success: true, linkPesanan, adaBukti: !!buktiUrl };
   } catch (e: any) {
     const msg = e?.message ?? "";
     if (msg === "TIKET_TIDAK_DITEMUKAN") return { success: false, message: "Tiket tidak ditemukan" };
@@ -325,6 +328,52 @@ export async function beliTiket(data: FormData) {
     if (msg === "KODE_UNIK_DIPAKAI") return { success: false, message: "Kode unik sudah terpakai, silakan coba lagi" };
     console.error("beliTiket error:", e);
     return { success: false };
+  }
+}
+
+// Upload bukti menyusul dari halaman pesanan (/tiket/pesanan/[id]) — untuk pembeli
+// QRIS yang tadinya tidak mengunggah bukti, atau mengganti bukti yang salah.
+// Hanya selama pesanan masih PENDING; akses lewat tanda di link pesanan.
+export async function uploadBuktiTiket(data: FormData) {
+  const dibatasi = await batasiAksi("bukti", 20, 10 * 60 * 1000);
+  if (dibatasi) return { success: false, message: dibatasi };
+  const id = data.get("id") as string;
+  const bukti = data.get("bukti") as File | null;
+  if (!id || !cekTandaPesanan(id, data.get("t"))) return { success: false, message: "Link pesanan tidak valid" };
+
+  const fileCheck = await validateUploadFile(bukti);
+  if (!fileCheck.valid) return { success: false, message: fileCheck.message };
+  const tr = await prisma.transaksiTiket.findUnique({ where: { id }, include: { tiket: true } });
+  if (!tr || tr.jenisJual !== "ONLINE") return { success: false, message: "Pesanan tidak ditemukan" };
+  if (tr.status !== "PENDING") return { success: false, message: "Pesanan ini sudah diproses panitia" };
+
+  const upload = await imageUploader(Buffer.from(await bukti!.arrayBuffer()));
+  if (upload.error || !upload.data?.url) {
+    console.error("Upload bukti menyusul gagal:", upload.message);
+    return { success: false, message: upload.message ?? "Gagal mengunggah bukti" };
+  }
+  try {
+    const { count } = await prisma.transaksiTiket.updateMany({
+      where: { id, status: "PENDING" },
+      data: { bukti: upload.data.url },
+    });
+    if (count === 0) return { success: false, message: "Pesanan ini sudah diproses panitia" };
+    notifPembayaranMasuk({
+      jenis: "Tiket (bukti menyusul)",
+      pathAdmin: "/admin/tiket",
+      nama: tr.nama,
+      kontak: `${tr.email} · ${tr.noHp}`,
+      totalBayar: totalBayarTiket(tr),
+      kodeUnik: tr.kodeUnik,
+      metodePembayaran: tr.metodePembayaran,
+      buktiUrl: upload.data.url,
+      detail: `${tr.jumlah}× ${tr.tiket.jenis}${tr.bundleJumlah ? ` (+${tr.bundleJumlah} bundling)` : ""}`,
+    });
+    revalidatePath("/admin/tiket");
+    return { success: true };
+  } catch (e) {
+    console.error("uploadBuktiTiket error:", e);
+    return { success: false, message: "Gagal menyimpan bukti" };
   }
 }
 
@@ -458,18 +507,22 @@ export async function verifikasiTiket(transaksiId: string) {
 
     // Ambil QR tokens yang baru dibuat + generate gambar QR
     const qrTikets = await prisma.qRTiket.findMany({ where: { transaksiId } });
-    const qrBlocks = await Promise.all(
-      qrTikets.map(async (q, i) => {
-        const dataUrl = await QRCode.toDataURL(q.token, { width: 200, margin: 2 });
-        return `
+    // QR sebagai lampiran inline (cid) — Gmail tidak menampilkan <img src="data:...">.
+    const qrGambar = await Promise.all(
+      qrTikets.map(async (q, i) => ({
+        filename: `QR-Tiket-${i + 1}.png`,
+        content: await QRCode.toBuffer(q.token, { width: 320, margin: 2 }),
+        contentType: "image/png",
+        cid: `qr-tiket-${i + 1}@antareja`,
+      }))
+    );
+    const qrBlocks = qrTikets.map((q, i) => `
           <div style="display:inline-block;text-align:center;margin:8px">
             <div style="font-size:12px;font-weight:bold;margin-bottom:4px">Tiket #${i + 1}</div>
             ${q.bundle ? `<div style="font-size:11px;color:#b45309;margin-bottom:4px">+ ${transaksi.bundleIsi ?? "Bundling"}</div>` : ""}
-            <img src="${dataUrl}" width="160" height="160" style="display:block;border-radius:8px;border:1px solid #e5e7eb" alt="QR Tiket ${i + 1}"/>
-            <div style="font-size:10px;font-family:monospace;color:#888;margin-top:4px;max-width:160px;overflow:hidden;text-overflow:ellipsis">${q.token}</div>
-          </div>`;
-      })
-    );
+            <img src="cid:${qrGambar[i].cid}" width="160" height="160" style="display:block;border-radius:8px;border:1px solid #e5e7eb" alt="QR Tiket ${i + 1}"/>
+            <div style="font-size:14px;font-family:monospace;font-weight:bold;color:#444;margin-top:6px;letter-spacing:1px">${kodeTiketPendek(q.token)}</div>
+          </div>`);
 
     // Kuitansi PDF dilampirkan ke email — gagal dibuat tidak menggagalkan verifikasi
     // (admin masih bisa mengunduhnya dari tabel transaksi).
@@ -482,9 +535,10 @@ export async function verifikasiTiket(transaksiId: string) {
     try {
       await sendMailTo({
         to: transaksi.email,
-        ...(kuitansi
-          ? { fileAttachments: [{ filename: kuitansi.filename, content: kuitansi.pdf, contentType: "application/pdf" }] }
-          : {}),
+        fileAttachments: [
+          ...qrGambar,
+          ...(kuitansi ? [{ filename: kuitansi.filename, content: kuitansi.pdf, contentType: "application/pdf" }] : []),
+        ],
         subject: `✅ Tiket LPKBB Antareja 2026 — ${transaksi.tiket.jenis}`,
         html: `
           <div style="font-family:sans-serif;max-width:520px;margin:auto">
@@ -592,9 +646,18 @@ export async function statistikScanTiket() {
   return { masuk, total };
 }
 
-export async function scanQRTiket(token: string) {
+export async function scanQRTiket(input: string) {
   await requireAdmin();
   try {
+    // Input manual boleh kode pendek ("00A8-A3F2") — cari token yang awalannya sama.
+    let token = input.trim();
+    const awalan = awalanDariKodePendek(token);
+    if (awalan) {
+      const cocok = await prisma.qRTiket.findMany({ where: { token: { startsWith: awalan } }, select: { token: true }, take: 2 });
+      if (cocok.length === 0) return { success: false, message: "Kode tiket tidak ditemukan" };
+      if (cocok.length > 1) return { success: false, message: "Kode tiket ganda — scan QR atau ketik token lengkap" };
+      token = cocok[0].token;
+    }
     const qr = await prisma.qRTiket.findUnique({
       where: { token },
       include: { transaksi: { include: { tiket: true } } },
