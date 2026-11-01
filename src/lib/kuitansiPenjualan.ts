@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { buildKuitansiUmumPdf } from "@/lib/kuitansi";
 import { ensureNomorKuitansiFoto, ensureNomorKuitansiTiket } from "@/lib/nomorKuitansi";
 import { getKonfigUmum } from "@/queries/konfigUmum.query";
+import { METODE_KUITANSI_MANUAL } from "@/lib/kuitansiManual";
 
 // Kuitansi PDF tiket penonton & foto premium (online, sudah VERIFIED).
 // Nominal di kuitansi = harga tanpa kode unik — sama dengan aturan kuitansi
@@ -63,4 +64,27 @@ export async function buatKuitansiFoto(id: string): Promise<HasilKuitansi | null
     bendaharaTtdUrl: konfig.bendaharaTtdUrl,
   });
   return { pdf, nomor: terbit.nomor, filename: namaFile(terbit.nomor) };
+}
+
+// Kuitansi manual Bendahara (menu Kuitansi) — nomor & tanggal sudah tersimpan
+// saat dibuat, jadi unduh ulang selalu menghasilkan kuitansi yang sama.
+export async function buatKuitansiManual(id: string): Promise<HasilKuitansi | null> {
+  const k = await prisma.kuitansiManual.findUnique({ where: { id } });
+  if (!k || k.batalAt) return null;
+  const konfig = await getKonfigUmum();
+  const pdf = await buildKuitansiUmumPdf({
+    nomor: k.nomor,
+    judul: "KUITANSI",
+    baris: [
+      ["Diterima dari", k.diterimaDari],
+      ["Untuk pembayaran", k.untukPembayaran],
+      ["Pembayaran", `${METODE_KUITANSI_MANUAL[k.metode] ?? k.metode} — Lunas`],
+    ],
+    total: k.jumlah,
+    tanggal: k.tanggal,
+    catatan: k.catatan || "Kuitansi ini diterbitkan oleh Bendahara sebagai bukti penerimaan pembayaran yang sah.",
+    bendaharaNama: konfig.bendaharaNama,
+    bendaharaTtdUrl: konfig.bendaharaTtdUrl,
+  });
+  return { pdf, nomor: k.nomor, filename: namaFile(k.nomor) };
 }

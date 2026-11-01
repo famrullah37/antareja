@@ -93,6 +93,7 @@ model Tim {
   ujiCoba         UjiCobaTim?
   menginap        PengajuanMenginap?
   pesananMakanan  PesananMakanan[]
+  presensiDP      PresensiDP?
   transaksiVoting TransaksiVoting[]
   votingTally     VotingTally[]
   user            User              @relation(fields: [userId], references: [id])
@@ -118,6 +119,7 @@ model Anggota {
   tanggal_lahir DateTime? @db.Date
   timId   String
   Tim     Tim     @relation(fields: [timId], references: [id], onDelete: Cascade)
+  presensiDP PresensiAnggota?
 
   @@unique([posisi, timId])
   @@index([email])
@@ -895,4 +897,50 @@ model PesananMakanan {
 
   @@index([timId])
   @@index([sesiId])
+}
+
+// Presensi tim di Daerah Persiapan (DP) oleh Sie Lomba: Danton & pasukan tim
+// yang hadir dicentang satu per satu kalau orangnya sesuai dengan data anggota
+// yang didaftarkan (foto/nama/NISN). Baris dibuat saat centang pertama.
+model PresensiDP {
+  id        String            @id @default(uuid())
+  timId     String            @unique
+  hadirAt   DateTime          @default(now())
+  olehNama  String
+  tim       Tim               @relation(fields: [timId], references: [id], onDelete: Cascade)
+  anggota   PresensiAnggota[]
+}
+
+// Satu baris = anggota (Danton/pasukan) sudah dicentang sesuai. Tidak ada baris = belum.
+model PresensiAnggota {
+  id         String     @id @default(uuid())
+  presensiId String
+  anggotaId  String     @unique
+  olehNama   String
+  createdAt  DateTime   @default(now())
+  presensi   PresensiDP @relation(fields: [presensiId], references: [id], onDelete: Cascade)
+  anggota    Anggota    @relation(fields: [anggotaId], references: [id], onDelete: Cascade)
+
+  @@index([presensiId])
+}
+
+// Kuitansi yang dibuat manual oleh Bendahara (menu Kuitansi) untuk pemasukan di
+// luar alur otomatis — sponsor, donasi, pembayaran tunai, dst. Nomor dari counter
+// bersama kuitansi lain. Tidak pernah dihapus: salah tulis → dibatalkan (batalAt),
+// nomornya tetap terpakai. kasId = baris KasTransaksi kalau dicatat ke Kas.
+model KuitansiManual {
+  id              String    @id @default(uuid())
+  nomor           String    @unique
+  tanggal         DateTime
+  diterimaDari    String
+  untukPembayaran String
+  jumlah          Int
+  metode          String // TUNAI | TRANSFER | QRIS
+  catatan         String?
+  kasId           String?
+  olehNama        String
+  batalAt         DateTime?
+  batalAlasan     String?
+  batalOleh       String?
+  createdAt       DateTime  @default(now())
 }

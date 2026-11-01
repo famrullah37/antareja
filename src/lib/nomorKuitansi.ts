@@ -29,15 +29,14 @@ export async function ensureNomorKuitansi(timId: string) {
   });
 }
 
-type TxClient = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
+export type TxClient = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
 
-async function nomorBaru(tx: TxClient) {
+export async function nomorBaru(tx: TxClient, tanggal = new Date()) {
   const konfig = await tx.konfigUmum.upsert({
     where: { id: "singleton" },
     update: { counterKuitansi: { increment: 1 } },
     create: { id: "singleton", counterKuitansi: 1 },
   });
-  const tanggal = new Date();
   return { nomor: formatNomorKuitansi(konfig.counterKuitansi, tanggal), tanggal };
 }
 
