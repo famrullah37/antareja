@@ -10,6 +10,7 @@ import { labelItemsMakanan, MAKS_PORSI_PER_MENU, sesiTerbuka, type ItemMakanan }
 import { getKonfigUmum, upsertKonfigUmum } from "@/queries/konfigUmum.query";
 import { imageUploader, validateUploadFile } from "./fileUploader";
 import { notifPembayaranMasuk } from "@/lib/emailPembayaran";
+import { cekTokenKode, terbitkanTokenKode } from "@/lib/kodeUnikToken";
 
 type Hasil = { success: boolean; message?: string };
 
@@ -246,7 +247,8 @@ export async function reserveKodeMakanan() {
       where: { id: "singleton" },
       data: { counterUrutMakanan: { increment: 1 } },
     });
-    return { success: true, kodeUnik: String(updated.counterUrutMakanan % 1000).padStart(3, "0") };
+    const kodeUnik = String(updated.counterUrutMakanan % 1000).padStart(3, "0");
+    return { success: true, kodeUnik, ...terbitkanTokenKode(kodeUnik) };
   } catch (e) {
     console.error("reserveKodeMakanan error:", e);
     return { success: false, message: "Gagal menyiapkan kode pembayaran" };
@@ -268,6 +270,8 @@ export async function pesanMakanan(data: FormData): Promise<Hasil> {
   const catatan = teks(data, "catatan", 500) || null;
   if (!kodeUnik || !/^\d{3}$/.test(kodeUnik))
     return { success: false, message: "Kode pembayaran tidak valid, muat ulang halaman" };
+  const salahKode = cekTokenKode(data.get("kodeToken"), kodeUnik);
+  if (salahKode) return { success: false, message: salahKode };
 
   const sesi = await prisma.sesiMakan.findUnique({ where: { id: sesiId }, include: { menus: { where: { aktif: true } } } });
   if (!sesi || !sesiTerbuka(sesi)) return { success: false, message: "Pemesanan untuk sesi ini sudah ditutup" };

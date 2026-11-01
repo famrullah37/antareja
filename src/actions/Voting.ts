@@ -13,6 +13,7 @@ import { catatLog } from "@/lib/activityLog";
 import { sendMailTo } from "@/lib/mailer";
 import { notifPembayaranMasuk } from "@/lib/emailPembayaran";
 import { markVotingVerified } from "@/lib/votingVerifikasi";
+import { cekTokenKode, terbitkanTokenKode } from "@/lib/kodeUnikToken";
 import {
   findTransaksiVoting,
   getKategoriList,
@@ -150,7 +151,7 @@ export async function reserveKodeVoting() {
       data: { counterUrut: { increment: 1 } },
     });
     const kodeUnik = String(updated.counterUrut).padStart(3, "0");
-    return { success: true, kodeUnik, hargaSatuan: konfig.nominalVote };
+    return { success: true, kodeUnik, hargaSatuan: konfig.nominalVote, ...terbitkanTokenKode(kodeUnik) };
   } catch (e) {
     console.error("reserveKodeVoting error:", e);
     return { success: false };
@@ -193,6 +194,8 @@ export async function submitVote(data: FormData) {
   if (!kodeUnik || !/^\d+$/.test(kodeUnik)) {
     return { success: false, message: "Kode pembayaran tidak valid, silakan ulangi dari pemilihan tim" };
   }
+  const salahKode = cekTokenKode(data.get("kodeToken"), kodeUnik);
+  if (salahKode) return { success: false, message: salahKode };
   if (!Number.isInteger(jumlahVote) || jumlahVote < 1 || jumlahVote > 10000) {
     return { success: false, message: "Jumlah vote tidak valid (1–10.000)" };
   }

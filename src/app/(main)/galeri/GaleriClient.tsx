@@ -6,6 +6,7 @@ import { toDownloadUrl } from "@/lib/downloadUrl";
 import Image from "next/image";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import MasaBerlakuQris, { type KodeTerbit } from "@/app/components/global/MasaBerlakuQris";
 
 type FotoItem = {
   id: string;
@@ -58,6 +59,21 @@ export default function GaleriClient({
   const [reservingKode, setReservingKode] = useState(false);
   const [metode, setMetode] = useState<"TRANSFER" | "QRIS">("TRANSFER");
   const [qrisDinamis, setQrisDinamis] = useState<string | null>(null);
+  const [kodeTerbit, setKodeTerbit] = useState<KodeTerbit | null>(null);
+
+  function terimaKode(r: KodeTerbit) {
+    setKodeUnik(r.kodeUnik);
+    setKodeTerbit(r);
+  }
+
+  async function buatKodeBaru() {
+    setReservingKode(true);
+    setKodeUnik(null);
+    const r = await reserveKodeFoto();
+    setReservingKode(false);
+    if (r.success) terimaKode(r as KodeTerbit);
+    else toast.error("Gagal menyiapkan kode pembayaran, coba lagi");
+  }
 
   const filtered =
     selectedAlbum === "all"
@@ -90,7 +106,7 @@ export default function GaleriClient({
     reserveKodeFoto().then((result) => {
       if (cancelled) return;
       setReservingKode(false);
-      if (result.success) setKodeUnik(result.kodeUnik!);
+      if (result.success) terimaKode(result as KodeTerbit);
       else toast.error("Gagal menyiapkan kode pembayaran, coba lagi");
     });
     return () => {
@@ -125,13 +141,7 @@ export default function GaleriClient({
       setShowCheckout(false);
     } else {
       toast.error(result.message ?? "Gagal memproses pembelian", { id: toastId });
-      if (result.message?.includes("sudah terpakai") || result.message?.includes("tidak valid")) {
-        setReservingKode(true);
-        setKodeUnik(null);
-        const retry = await reserveKodeFoto();
-        setReservingKode(false);
-        if (retry.success) setKodeUnik(retry.kodeUnik!);
-      }
+      if (["sudah terpakai", "tidak valid", "kedaluwarsa"].some((m) => result.message?.includes(m))) await buatKodeBaru();
     }
   }
 
@@ -324,6 +334,7 @@ export default function GaleriClient({
 
               <form action={handleCheckout} className="flex flex-col gap-4">
                 <input type="hidden" name="kodeUnik" value={kodeUnik ?? ""} />
+                <input type="hidden" name="kodeToken" value={kodeTerbit?.kodeToken ?? ""} />
                 <input type="hidden" name="metodePembayaran" value={metode} />
 
                 {/* Metode Pembayaran */}
@@ -381,6 +392,7 @@ export default function GaleriClient({
                     </div>
                   </div>
                 ) : (
+                  <MasaBerlakuQris berlakuSampai={kodeTerbit?.berlakuSampai ?? null} onBuatBaru={buatKodeBaru}>
                   <div className="bg-purple-50 border border-purple-200 rounded-xl p-4 text-sm text-purple-800 flex flex-col items-center gap-2">
                     <p className="font-semibold">Scan QRIS berikut:</p>
                     {qrisDinamis ? (
@@ -414,6 +426,7 @@ export default function GaleriClient({
                       </div>
                     )}
                   </div>
+                  </MasaBerlakuQris>
                 )}
 
                 {/* Nama */}

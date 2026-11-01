@@ -40,6 +40,7 @@ import { escapeHtml } from "@/lib/escapeHtml";
 import { formatJamWib } from "@/lib/ujiCoba";
 import { buatKuitansiTiket } from "@/lib/kuitansiPenjualan";
 import { blokRingkasanPembayaran, kirimEmailPesananDiterima, notifPembayaranMasuk, type RingkasanPembayaran } from "@/lib/emailPembayaran";
+import { cekTokenKode, terbitkanTokenKode } from "@/lib/kodeUnikToken";
 
 // Ringkasan nominal transaksi tiket untuk email (pesanan diterima & verifikasi).
 function ringkasanTiket(tr: {
@@ -193,7 +194,7 @@ export async function reserveKodeTiket() {
   try {
     const updated = await incrementCounterUrutTiket();
     const kodeUnik = String(updated.counterUrutTiket % 1000).padStart(3, "0");
-    return { success: true, kodeUnik };
+    return { success: true, kodeUnik, ...terbitkanTokenKode(kodeUnik) };
   } catch (e) {
     console.error("reserveKodeTiket error:", e);
     return { success: false };
@@ -232,6 +233,10 @@ export async function beliTiket(data: FormData) {
   }
   if (!kodeUnik || !/^\d{3}$/.test(kodeUnik)) {
     return { success: false, message: "Kode pembayaran tidak valid, silakan pilih ulang jumlah tiket" };
+  }
+  if (metodePembayaran === "QRIS") {
+    const salahKode = cekTokenKode(data.get("kodeToken"), kodeUnik);
+    if (salahKode) return { success: false, message: salahKode };
   }
 
   // Cek tiket & stok SEBELUM upload — jangan buang kuota Cloudinary untuk pembelian

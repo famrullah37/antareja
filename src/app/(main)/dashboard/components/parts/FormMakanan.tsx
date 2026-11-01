@@ -8,6 +8,7 @@ import Image from "next/image";
 import { useRouter } from "next-nprogress-bar";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import MasaBerlakuQris, { type KodeTerbit } from "@/app/components/global/MasaBerlakuQris";
 
 type Sesi = {
   id: string;
@@ -103,6 +104,7 @@ function FormPesan({ sesi, qrisUrl, onSelesai }: { sesi: Sesi[]; qrisUrl: string
   const [reserving, setReserving] = useState(false);
   const [loading, setLoading] = useState(false);
   const [qrisDinamis, setQrisDinamis] = useState<string | null>(null);
+  const [kodeTerbit, setKodeTerbit] = useState<KodeTerbit | null>(null);
 
   const aktif = sesi.find((s) => s.id === sesiId);
   const baris = (aktif?.menus ?? []).filter((m) => (jumlah[m.id] ?? 0) > 0);
@@ -134,8 +136,11 @@ function FormPesan({ sesi, qrisUrl, onSelesai }: { sesi: Sesi[]; qrisUrl: string
     setReserving(true);
     reserveKodeMakanan().then((r) => {
       setReserving(false);
-      if (r.success) setKodeUnik(r.kodeUnik!);
-      else toast.error(r.message ?? "Gagal menyiapkan kode pembayaran");
+      if (r.success) {
+        const k = r as KodeTerbit;
+        setKodeUnik(k.kodeUnik);
+        setKodeTerbit(k);
+      } else toast.error(r.message ?? "Gagal menyiapkan kode pembayaran");
     });
   }, [adaIsi, kodeUnik, reserving]);
 
@@ -146,6 +151,7 @@ function FormPesan({ sesi, qrisUrl, onSelesai }: { sesi: Sesi[]; qrisUrl: string
   async function kirim(data: FormData) {
     data.set("sesiId", sesiId);
     data.set("kodeUnik", kodeUnik ?? "");
+    data.set("kodeToken", kodeTerbit?.kodeToken ?? "");
     data.set("items", JSON.stringify(baris.map((m) => ({ menuId: m.id, jumlah: jumlah[m.id] }))));
     setLoading(true);
     const toastId = toast.loading("Mengirim pesanan...");
@@ -157,7 +163,8 @@ function FormPesan({ sesi, qrisUrl, onSelesai }: { sesi: Sesi[]; qrisUrl: string
       router.refresh();
     } else {
       toast.error(r.message ?? "Gagal", { id: toastId });
-      if (r.message?.includes("sudah terpakai")) setKodeUnik(null);
+      // Kode dikosongkan → efek di atas otomatis mencadangkan kode baru.
+      if (["sudah terpakai", "tidak valid", "kedaluwarsa"].some((m) => r.message?.includes(m))) setKodeUnik(null);
     }
   }
 
@@ -232,6 +239,7 @@ function FormPesan({ sesi, qrisUrl, onSelesai }: { sesi: Sesi[]; qrisUrl: string
         (!kodeUnik ? (
           <p className="text-sm text-gray-400">Menyiapkan kode pembayaran...</p>
         ) : (
+          <MasaBerlakuQris berlakuSampai={kodeTerbit?.berlakuSampai ?? null} onBuatBaru={() => setKodeUnik(null)}>
           <div className="bg-purple-50 border border-purple-200 rounded-xl p-4 text-sm text-purple-800 flex flex-col items-center gap-3">
             <p className="font-semibold">Bayar dengan scan QRIS berikut</p>
             {qrisDinamis ? (
@@ -264,6 +272,7 @@ function FormPesan({ sesi, qrisUrl, onSelesai }: { sesi: Sesi[]; qrisUrl: string
               </p>
             )}
           </div>
+          </MasaBerlakuQris>
         ))}
 
       {adaIsi && (

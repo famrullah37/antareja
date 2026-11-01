@@ -13,6 +13,7 @@ import { daftarUkuran, labelItems, poTerbuka, type ItemPesanan } from "@/lib/mer
 import { findKonfigMerch, incrementCounterUrutMerch } from "@/queries/merchandise.query";
 import { compressPhoto, imageUploader, validateUploadFile } from "./fileUploader";
 import { notifPembayaranMasuk } from "@/lib/emailPembayaran";
+import { cekTokenKode, terbitkanTokenKode } from "@/lib/kodeUnikToken";
 
 // Verifikasi pembayaran merch = urusan uang, jadi Bendahara juga boleh.
 async function requireAdminOrBendahara() {
@@ -241,7 +242,8 @@ export async function reserveKodeMerch() {
   if (dibatasi) return { success: false, message: dibatasi };
   try {
     const updated = await incrementCounterUrutMerch();
-    return { success: true, kodeUnik: String(updated.counterUrut % 1000).padStart(3, "0") };
+    const kodeUnik = String(updated.counterUrut % 1000).padStart(3, "0");
+    return { success: true, kodeUnik, ...terbitkanTokenKode(kodeUnik) };
   } catch (e) {
     console.error("reserveKodeMerch error:", e);
     return { success: false };
@@ -269,6 +271,10 @@ export async function pesanMerchandise(data: FormData) {
     return { success: false, message: "Bukti pembayaran wajib diunggah" };
   if (!kodeUnik || !/^\d{3}$/.test(kodeUnik))
     return { success: false, message: "Kode pembayaran tidak valid, silakan muat ulang halaman" };
+  if (metodePembayaran === "QRIS") {
+    const salahKode = cekTokenKode(data.get("kodeToken"), kodeUnik);
+    if (salahKode) return { success: false, message: salahKode };
+  }
 
   // Keranjang dari klien hanya dipercaya untuk id/ukuran/jumlah — nama & harga
   // selalu diambil ulang dari database.

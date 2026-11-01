@@ -7,6 +7,7 @@ import { Merchandise } from "@prisma/client";
 import Image from "next/image";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import MasaBerlakuQris, { type KodeTerbit } from "@/app/components/global/MasaBerlakuQris";
 import { formatRupiah } from "./format";
 
 type KonfigBayar = {
@@ -141,6 +142,7 @@ export default function PesanMerchForm({
   const [kodeUnik, setKodeUnik] = useState<string | null>(null);
   const [reservingKode, setReservingKode] = useState(false);
   const [qrisDinamis, setQrisDinamis] = useState<string | null>(null);
+  const [kodeTerbit, setKodeTerbit] = useState<KodeTerbit | null>(null);
   const [submitted, setSubmitted] = useState(false);
 
   const baris = keranjang
@@ -166,7 +168,11 @@ export default function PesanMerchForm({
     setReservingKode(true);
     reserveKodeMerch().then((r) => {
       setReservingKode(false);
-      if (r.success) setKodeUnik(r.kodeUnik!);
+      if (r.success) {
+        const k = r as KodeTerbit;
+        setKodeUnik(k.kodeUnik);
+        setKodeTerbit(k);
+      }
       else toast.error("Gagal menyiapkan kode pembayaran, muat ulang halaman");
     });
   }, [adaIsi, kodeUnik, reservingKode]);
@@ -196,9 +202,8 @@ export default function PesanMerchForm({
       setSubmitted(true);
     } else {
       toast.error(result.message ?? "Gagal memproses pesanan", { id: toastId });
-      if (result.message?.includes("sudah terpakai")) {
-        setKodeUnik(null);
-      }
+      // Kode dikosongkan → efek di atas otomatis mencadangkan kode baru.
+      if (["sudah terpakai", "tidak valid", "kedaluwarsa"].some((m) => result.message?.includes(m))) setKodeUnik(null);
     }
   }
 
@@ -299,6 +304,7 @@ export default function PesanMerchForm({
             </div>
             <input type="hidden" name="metodePembayaran" value={metode} />
             <input type="hidden" name="kodeUnik" value={kodeUnik ?? ""} />
+            <input type="hidden" name="kodeToken" value={kodeTerbit?.kodeToken ?? ""} />
           </div>
 
           {!kodeUnik ? (
@@ -328,6 +334,7 @@ export default function PesanMerchForm({
               </div>
             </div>
           ) : (
+            <MasaBerlakuQris berlakuSampai={kodeTerbit?.berlakuSampai ?? null} onBuatBaru={() => setKodeUnik(null)}>
             <div className="bg-purple-50 border border-purple-200 rounded-xl p-4 text-sm text-purple-800 flex flex-col items-center gap-2">
               <p className="font-semibold">Scan QRIS berikut:</p>
               {qrisDinamis ? (
@@ -342,6 +349,7 @@ export default function PesanMerchForm({
               )}
               <p className="font-semibold">Nominal: {formatRupiah(totalBayar)}</p>
             </div>
+            </MasaBerlakuQris>
           )}
 
           <div className="flex flex-col gap-1">

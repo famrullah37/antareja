@@ -5,6 +5,7 @@ import { Tiket } from "@prisma/client";
 import Image from "next/image";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import MasaBerlakuQris, { type KodeTerbit } from "@/app/components/global/MasaBerlakuQris";
 
 function formatRupiah(n: number) {
   return new Intl.NumberFormat("id-ID", {
@@ -36,6 +37,21 @@ export default function BeliTiketForm({
   const [kodeUnik, setKodeUnik] = useState<string | null>(null);
   const [reservingKode, setReservingKode] = useState(false);
   const [qrisDinamis, setQrisDinamis] = useState<string | null>(null);
+  const [kodeTerbit, setKodeTerbit] = useState<KodeTerbit | null>(null);
+
+  function terimaKode(r: KodeTerbit) {
+    setKodeUnik(r.kodeUnik);
+    setKodeTerbit(r);
+  }
+
+  async function buatKodeBaru() {
+    setReservingKode(true);
+    setKodeUnik(null);
+    const r = await reserveKodeTiket();
+    setReservingKode(false);
+    if (r.success) terimaKode(r as KodeTerbit);
+    else toast.error("Gagal menyiapkan kode pembayaran, coba pilih ulang tiket");
+  }
 
   const adaBundling = !!selected?.bundleHarga && !!selected?.bundleIsi;
   const subtotal = selected ? selected.harga * jumlah + (adaBundling ? selected.bundleHarga! * bundleJumlah : 0) : 0;
@@ -60,7 +76,7 @@ export default function BeliTiketForm({
     reserveKodeTiket().then((result) => {
       if (cancelled) return;
       setReservingKode(false);
-      if (result.success) setKodeUnik(result.kodeUnik!);
+      if (result.success) terimaKode(result as KodeTerbit);
       else toast.error("Gagal menyiapkan kode pembayaran, coba pilih ulang tiket");
     });
     return () => {
@@ -95,13 +111,7 @@ export default function BeliTiketForm({
       setSubmitted(true);
     } else {
       toast.error(result.message ?? "Gagal memproses pembelian", { id: toastId });
-      if (result.message?.includes("sudah terpakai") || result.message?.includes("tidak valid")) {
-        setReservingKode(true);
-        setKodeUnik(null);
-        const retry = await reserveKodeTiket();
-        setReservingKode(false);
-        if (retry.success) setKodeUnik(retry.kodeUnik!);
-      }
+      if (["sudah terpakai", "tidak valid", "kedaluwarsa"].some((m) => result.message?.includes(m))) await buatKodeBaru();
     }
   }
 
@@ -285,6 +295,7 @@ export default function BeliTiketForm({
               </div>
               <input type="hidden" name="metodePembayaran" value={metode} />
               <input type="hidden" name="kodeUnik" value={kodeUnik ?? ""} />
+              <input type="hidden" name="kodeToken" value={kodeTerbit?.kodeToken ?? ""} />
             </div>
 
             {reservingKode || !kodeUnik ? (
@@ -313,6 +324,7 @@ export default function BeliTiketForm({
                 </div>
               </div>
             ) : (
+              <MasaBerlakuQris berlakuSampai={kodeTerbit?.berlakuSampai ?? null} onBuatBaru={buatKodeBaru}>
               <div className="bg-purple-50 border border-purple-200 rounded-xl p-4 text-sm text-purple-800 flex flex-col items-center gap-2">
                 <p className="font-semibold">Scan QRIS berikut:</p>
                 {qrisDinamis ? (
@@ -346,6 +358,7 @@ export default function BeliTiketForm({
                   </div>
                 )}
               </div>
+              </MasaBerlakuQris>
             )}
 
             <div className="flex flex-col gap-1">

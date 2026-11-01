@@ -23,6 +23,7 @@ import { toDownloadUrl } from "@/lib/downloadUrl";
 import { escapeHtml } from "@/lib/escapeHtml";
 import { buatKuitansiFoto } from "@/lib/kuitansiPenjualan";
 import { blokRingkasanPembayaran, kirimEmailPesananDiterima, notifPembayaranMasuk, type RingkasanPembayaran } from "@/lib/emailPembayaran";
+import { cekTokenKode, terbitkanTokenKode } from "@/lib/kodeUnikToken";
 
 // Ringkasan nominal pembelian foto untuk email. TransaksiFoto.harga sudah
 // termasuk kode unik (lihat beliFoto); harga album bisa berubah setelah beli,
@@ -161,7 +162,7 @@ export async function reserveKodeFoto() {
   try {
     const updated = await incrementCounterUrutFoto();
     const kodeUnik = String(updated.counterUrutFoto % 1000).padStart(3, "0");
-    return { success: true, kodeUnik };
+    return { success: true, kodeUnik, ...terbitkanTokenKode(kodeUnik) };
   } catch (e) {
     console.error("reserveKodeFoto error:", e);
     return { success: false };
@@ -189,6 +190,10 @@ export async function beliFoto(data: FormData) {
   }
   if (!kodeUnik || !/^\d{3}$/.test(kodeUnik)) {
     return { success: false, message: "Kode pembayaran tidak valid, silakan ulangi checkout" };
+  }
+  if (metodePembayaran === "QRIS") {
+    const salahKode = cekTokenKode(data.get("kodeToken"), kodeUnik);
+    if (salahKode) return { success: false, message: salahKode };
   }
   const salahData = cekDataPemesan({ nama: namaPembeli, email }, { noHpWajib: false });
   if (salahData) return { success: false, message: salahData };

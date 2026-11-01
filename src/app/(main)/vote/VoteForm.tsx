@@ -7,6 +7,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
+import MasaBerlakuQris, { type KodeTerbit } from "@/app/components/global/MasaBerlakuQris";
 
 function formatRupiah(n: number) {
   return new Intl.NumberFormat("id-ID", {
@@ -94,7 +95,7 @@ export default function VoteForm({
   );
   const [activeJenjang, setActiveJenjang] = useState<(typeof JENJANG_TABS)[number]>("SEMUA");
   const [selected, setSelected] = useState<TimVote | null>(null);
-  const [reserved, setReserved] = useState<{ kodeUnik: string; hargaSatuan: number } | null>(null);
+  const [reserved, setReserved] = useState<(KodeTerbit & { hargaSatuan: number }) | null>(null);
   const [loadingReserve, setLoadingReserve] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [jumlahVote, setJumlahVote] = useState(1);
@@ -188,19 +189,25 @@ export default function VoteForm({
     };
   }, [reserved, totalBayar]);
 
-  async function handlePilihTim(tim: TimVote) {
-    setSelected(tim);
-    setReserved(null);
-    setJumlahVote(1);
+  // Kode lama dibiarkan tampil sampai kode baru datang, supaya isian form
+  // (nama, email, dst) tidak hilang saat kode kedaluwarsa diperbarui.
+  async function pesanKode() {
     setLoadingReserve(true);
     const result = await reserveKodeVoting();
     setLoadingReserve(false);
     if (result.success) {
-      setReserved({ kodeUnik: result.kodeUnik!, hargaSatuan: result.hargaSatuan! });
-    } else {
-      toast.error(result.message ?? "Gagal menyiapkan kode pembayaran");
-      setSelected(null);
+      setReserved(result as KodeTerbit & { hargaSatuan: number });
+      return true;
     }
+    toast.error(result.message ?? "Gagal menyiapkan kode pembayaran");
+    return false;
+  }
+
+  async function handlePilihTim(tim: TimVote) {
+    setSelected(tim);
+    setReserved(null);
+    setJumlahVote(1);
+    if (!(await pesanKode())) setSelected(null);
   }
 
   async function handleSubmit(data: FormData) {
@@ -217,6 +224,8 @@ export default function VoteForm({
       if (result.message?.includes("ulangi dari pemilihan tim")) {
         setSelected(null);
         setReserved(null);
+      } else if (result.message?.includes("buat kode baru")) {
+        await pesanKode();
       }
     }
   }
@@ -413,6 +422,7 @@ export default function VoteForm({
         <form ref={formRef} action={handleSubmit} className="flex flex-col gap-4 scroll-mt-24">
           <input type="hidden" name="timId" value={selected.id} />
           <input type="hidden" name="kodeUnik" value={reserved.kodeUnik} />
+          <input type="hidden" name="kodeToken" value={reserved.kodeToken} />
           <input type="hidden" name="jumlahVote" value={jumlahVote} />
           <input type="hidden" name="kategori" value={activeKategori.key} />
 
@@ -435,6 +445,7 @@ export default function VoteForm({
               </span>
             </div>
 
+            <MasaBerlakuQris berlakuSampai={reserved.berlakuSampai} onBuatBaru={pesanKode}>
             <div className="bg-purple-50 border border-purple-200 rounded-xl p-4 text-sm text-purple-800 flex flex-col items-center gap-2">
               <p className="font-semibold">Scan QRIS berikut:</p>
               {qrisDinamis ? (
@@ -470,6 +481,7 @@ export default function VoteForm({
                 <p className="text-xs text-purple-500">Transfer nominal tepat (termasuk kode unik) agar mudah diverifikasi admin.</p>
               )}
             </div>
+            </MasaBerlakuQris>
 
             <div className="flex flex-col gap-1">
               <label className="text-sm font-medium">Nama Lengkap</label>
