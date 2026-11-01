@@ -8,13 +8,7 @@ import { TimWithRelations } from "@/types/entityRelations";
 import { AnggotaCard } from "./parts/AnggotaCard";
 import cn from "@/lib/clsx";
 import { initials } from "@/lib/initials";
-import {
-  updateLinkKartuPelajar,
-  updateLinkPoster,
-  updateLinkRekomendasi,
-  updateNamaTim,
-  updateTimForm,
-} from "@/actions/Tim";
+import { updateLinkPoster, updateLinkRekomendasi, updateNamaTim, updateTimForm } from "@/actions/Tim";
 import Field from "../components/parts/input";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -36,20 +30,19 @@ const rowsMapSmall = [
   ["b3s1", "b3s2", "b3s3"],
   ["b4s1", "b4s2", "b4s3"],
 ];
-type JenisLink = "rekomendasi" | "kartuPelajar" | "poster";
+type JenisLink = "rekomendasi" | "poster";
 
 // Nama file yang diminta panitia: <KODE>_<NamaSekolah>_<NamaTim>, tanpa spasi & tanda baca.
 const namaFileDokumen = (kode: string, sekolah: string, namaTim: string) =>
   [kode, sekolah, namaTim].map((s) => s.replace(/[^A-Za-z0-9]/g, "")).join("_");
 
-// Form link Google Drive/cloud untuk dokumen tim (surat rekomendasi, kartu pelajar, poster).
+// Form link Google Drive/cloud untuk dokumen tim (folder surat rekomendasi & kartu pelajar, poster).
 function FormLinkDokumen({
   judul,
   deskripsi,
   link,
   name,
-  namaFile,
-  pola,
+  berkas,
   menyimpan,
   disabled,
   onSubmit,
@@ -58,8 +51,7 @@ function FormLinkDokumen({
   deskripsi: string;
   link: string | null;
   name: string;
-  namaFile?: string;
-  pola?: string;
+  berkas?: { isi: string; pola: string; namaFile: string }[];
   menyimpan: boolean;
   disabled: boolean;
   onSubmit: (fd: FormData) => void;
@@ -67,11 +59,18 @@ function FormLinkDokumen({
   return (
     <form action={onSubmit} className="flex flex-col gap-2 mb-4">
       <H3>{judul}</H3>
-      {namaFile && (
-        <P className="text-sm">
-          Format nama file: <span className="font-mono font-semibold">{pola}</span> — untuk timmu:{" "}
-          <span className="font-mono font-semibold text-primary-600 break-all">{namaFile}</span>
-        </P>
+      {berkas && (
+        <div className="text-sm flex flex-col gap-1">
+          <span>Isi folder & format nama file:</span>
+          <ol className="list-decimal pl-5 flex flex-col gap-1">
+            {berkas.map((b) => (
+              <li key={b.pola}>
+                {b.isi}: <span className="font-mono font-semibold">{b.pola}</span> — untuk timmu:{" "}
+                <span className="font-mono font-semibold text-primary-600 break-all">{b.namaFile}</span>
+              </li>
+            ))}
+          </ol>
+        </div>
       )}
       <P className="text-sm text-gray-500">
         Tempel link Google Drive (atau cloud lain) {deskripsi} — pastikan link bisa dibuka siapa saja yang punya
@@ -436,26 +435,25 @@ export default function ProfileTim({
         )}
 
         <FormLinkDokumen
-          judul="Surat Rekomendasi Kepala Sekolah"
-          deskripsi="surat rekomendasi kepala sekolah"
+          judul="Surat Rekomendasi Kepala Sekolah & Kartu Pelajar"
+          deskripsi="folder yang berisi kedua file di atas"
           link={tim.linkRekomendasi}
-          namaFile={namaFileDokumen("SR", tim.asal_sekolah, tim.nama_tim)}
-          pola="SR_Namasekolah_NamaTIM"
+          berkas={[
+            {
+              isi: "Surat rekomendasi kepala sekolah",
+              pola: "SR_Namasekolah_NamaTIM",
+              namaFile: namaFileDokumen("SR", tim.asal_sekolah, tim.nama_tim),
+            },
+            {
+              isi: "Scan kartu pelajar seluruh anggota tim, digabung dalam 1 file PDF",
+              pola: "KP_Namasekolah_NamaTIM",
+              namaFile: namaFileDokumen("KP", tim.asal_sekolah, tim.nama_tim),
+            },
+          ]}
           menyimpan={savingLink === "rekomendasi"}
           disabled={savingLink !== null}
           onSubmit={(fd) => submitLink("rekomendasi", updateLinkRekomendasi, fd)}
           name="linkRekomendasi"
-        />
-        <FormLinkDokumen
-          judul="Scan Kartu Pelajar"
-          deskripsi="scan kartu pelajar seluruh anggota tim (boleh digabung dalam satu PDF atau satu folder)"
-          link={tim.linkKartuPelajar}
-          namaFile={namaFileDokumen("KP", tim.asal_sekolah, tim.nama_tim)}
-          pola="KP_Namasekolah_NamaTIM"
-          menyimpan={savingLink === "kartuPelajar"}
-          disabled={savingLink !== null}
-          onSubmit={(fd) => submitLink("kartuPelajar", updateLinkKartuPelajar, fd)}
-          name="linkKartuPelajar"
         />
         <FormLinkDokumen
           judul="Poster"

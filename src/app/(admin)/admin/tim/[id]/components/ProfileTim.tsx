@@ -259,8 +259,7 @@ export default function ProfileTim({
 }: Readonly<{ tim: TimWithRelations }>) {
   return (
     <>
-      <LinkTim judul="Surat Rekomendasi Kepala Sekolah" link={tim.linkRekomendasi} />
-      <LinkTim judul="Scan Kartu Pelajar" link={tim.linkKartuPelajar} />
+      <LinkTim judul="Surat Rekomendasi Kepala Sekolah & Kartu Pelajar" link={tim.linkRekomendasi} />
       <LinkTim judul="Poster" link={tim.linkPoster} />
       <FotoUnduh tim={tim} />
       <TimLayout tim={tim} />
