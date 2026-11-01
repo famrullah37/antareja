@@ -260,6 +260,7 @@ export default function ProfileTim({
   return (
     <>
       <LinkTim judul="Surat Rekomendasi Kepala Sekolah" link={tim.linkRekomendasi} />
+      <LinkTim judul="Scan Kartu Pelajar" link={tim.linkKartuPelajar} />
       <LinkTim judul="Poster" link={tim.linkPoster} />
       <FotoUnduh tim={tim} />
       <TimLayout tim={tim} />

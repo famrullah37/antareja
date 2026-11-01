@@ -10,7 +10,15 @@ import { toast } from "sonner";
 const btn =
   "inline-flex items-center justify-center gap-2 px-4 min-h-[44px] sm:min-h-0 sm:py-2 rounded-xl text-sm font-semibold transition-colors";
 
-export default function ShareButtons({ url, judul }: { url: string; judul: string }) {
+export default function ShareButtons({
+  url,
+  judul,
+  label = "Bagikan berita ini",
+}: {
+  url: string;
+  judul: string;
+  label?: string;
+}) {
   // navigator.share hanya ada di browser (umumnya HP) — dicek setelah mount
   // supaya HTML server & client sama.
   const [bisaShareNative, setBisaShareNative] = useState(false);
@@ -30,7 +38,7 @@ export default function ShareButtons({ url, judul }: { url: string; judul: strin
 
   return (
     <div className="flex flex-col gap-3 border-t border-gray-200 pt-6">
-      <span className="text-sm font-semibold text-neutral-700">Bagikan berita ini</span>
+      <span className="text-sm font-semibold text-neutral-700">{label}</span>
       <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
         {bisaShareNative && (
           <button

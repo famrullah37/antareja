@@ -3,6 +3,7 @@
 export const dynamic = "force-dynamic";
 import { findTikets, findKonfigTiket } from "@/queries/tiket.query";
 import BeliTiketForm from "./BeliTiketForm";
+import ShareButtons from "../components/parts/ShareButtons";
 import InfoHalaman from "../components/InfoHalaman";
 import { getKonfigUmum, type TimelineItem } from "@/queries/konfigUmum.query";
 import { getInfoAcara } from "@/lib/acara";
@@ -42,6 +43,13 @@ export default async function TiketPage() {
       ) : (
         <BeliTiketForm tikets={tikets} konfig={konfig} />
       )}
+      <div className="mt-10">
+        <ShareButtons
+          url={`${siteConfig.url}/tiket`}
+          judul={`Beli tiket penonton ${siteConfig.name}${acara ? ` — ${acara.tanggalTeks}` : ""}`}
+          label="Bagikan link tiket"
+        />
+      </div>
     </section>
     <InfoHalaman path="/tiket" label="Tiket Penonton" judul="Informasi Tiket Penonton">
       <p>

@@ -8,7 +8,13 @@ import { TimWithRelations } from "@/types/entityRelations";
 import { AnggotaCard } from "./parts/AnggotaCard";
 import cn from "@/lib/clsx";
 import { initials } from "@/lib/initials";
-import { updateLinkPoster, updateLinkRekomendasi, updateNamaTim, updateTimForm } from "@/actions/Tim";
+import {
+  updateLinkKartuPelajar,
+  updateLinkPoster,
+  updateLinkRekomendasi,
+  updateNamaTim,
+  updateTimForm,
+} from "@/actions/Tim";
 import Field from "../components/parts/input";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -30,6 +36,73 @@ const rowsMapSmall = [
   ["b3s1", "b3s2", "b3s3"],
   ["b4s1", "b4s2", "b4s3"],
 ];
+type JenisLink = "rekomendasi" | "kartuPelajar" | "poster";
+
+// Nama file yang diminta panitia: <KODE>_<NamaSekolah>_<NamaTim>, tanpa spasi & tanda baca.
+const namaFileDokumen = (kode: string, sekolah: string, namaTim: string) =>
+  [kode, sekolah, namaTim].map((s) => s.replace(/[^A-Za-z0-9]/g, "")).join("_");
+
+// Form link Google Drive/cloud untuk dokumen tim (surat rekomendasi, kartu pelajar, poster).
+function FormLinkDokumen({
+  judul,
+  deskripsi,
+  link,
+  name,
+  namaFile,
+  pola,
+  menyimpan,
+  disabled,
+  onSubmit,
+}: {
+  judul: string;
+  deskripsi: string;
+  link: string | null;
+  name: string;
+  namaFile?: string;
+  pola?: string;
+  menyimpan: boolean;
+  disabled: boolean;
+  onSubmit: (fd: FormData) => void;
+}) {
+  return (
+    <form action={onSubmit} className="flex flex-col gap-2 mb-4">
+      <H3>{judul}</H3>
+      {namaFile && (
+        <P className="text-sm">
+          Format nama file: <span className="font-mono font-semibold">{pola}</span> — untuk timmu:{" "}
+          <span className="font-mono font-semibold text-primary-600 break-all">{namaFile}</span>
+        </P>
+      )}
+      <P className="text-sm text-gray-500">
+        Tempel link Google Drive (atau cloud lain) {deskripsi} — pastikan link bisa dibuka siapa saja yang punya
+        link (share: &quot;Siapa saja yang memiliki link&quot;).
+      </P>
+      {link && (
+        <a href={link} target="_blank" rel="noreferrer" className="text-primary-600 hover:underline text-sm break-all">
+          {link}
+        </a>
+      )}
+      <div className="flex flex-col sm:flex-row gap-2">
+        <input
+          name={name}
+          type="url"
+          placeholder="https://drive.google.com/..."
+          defaultValue={link ?? ""}
+          required
+          className="flex-1 border border-neutral-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
+        />
+        <button
+          type="submit"
+          disabled={disabled}
+          className="bg-primary-500 hover:bg-primary-600 disabled:opacity-60 text-white text-sm font-semibold px-5 py-2.5 rounded-lg transition-colors shrink-0"
+        >
+          {menyimpan ? "Menyimpan..." : link ? "Ganti Link" : "Simpan Link"}
+        </button>
+      </div>
+    </form>
+  );
+}
+
 const sizeMap = {
   SMALL: 12,
   NORMAL: 15,
@@ -227,9 +300,9 @@ export default function ProfileTim({
     }
   }
 
-  const [savingLink, setSavingLink] =useState<"rekomendasi" | "poster" | null>(null);
+  const [savingLink, setSavingLink] = useState<JenisLink | null>(null);
   async function submitLink(
-    kind: "rekomendasi" | "poster",
+    kind: JenisLink,
     action: typeof updateLinkRekomendasi,
     formData: FormData
   ) {
@@ -362,75 +435,37 @@ export default function ProfileTim({
           </div>
         )}
 
-        <form action={(fd) => submitLink("rekomendasi", updateLinkRekomendasi, fd)} className="flex flex-col gap-2 mb-4">
-          <H3>Surat Rekomendasi Kepala Sekolah</H3>
-          <P className="text-sm text-gray-500">
-            Tempel link Google Drive (atau cloud lain) surat rekomendasi kepala sekolah — pastikan link
-            bisa dibuka siapa saja yang punya link (share: &quot;Siapa saja yang memiliki link&quot;).
-          </P>
-          {tim.linkRekomendasi && (
-            <a
-              href={tim.linkRekomendasi}
-              target="_blank"
-              rel="noreferrer"
-              className="text-primary-600 hover:underline text-sm break-all"
-            >
-              {tim.linkRekomendasi}
-            </a>
-          )}
-          <div className="flex flex-col sm:flex-row gap-2">
-            <input
-              name="linkRekomendasi"
-              type="url"
-              placeholder="https://drive.google.com/..."
-              defaultValue={tim.linkRekomendasi ?? ""}
-              required
-              className="flex-1 border border-neutral-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
-            />
-            <button
-              type="submit"
-              disabled={savingLink !== null}
-              className="bg-primary-500 hover:bg-primary-600 disabled:opacity-60 text-white text-sm font-semibold px-5 py-2.5 rounded-lg transition-colors shrink-0"
-            >
-              {savingLink === "rekomendasi" ? "Menyimpan..." : tim.linkRekomendasi ? "Ganti Link" : "Simpan Link"}
-            </button>
-          </div>
-        </form>
-
-        <form action={(fd) => submitLink("poster", updateLinkPoster, fd)} className="flex flex-col gap-2 mb-4">
-          <H3>Poster</H3>
-          <P className="text-sm text-gray-500">
-            Tempel link Google Drive (atau cloud lain) poster tim — pastikan link bisa dibuka siapa saja
-            yang punya link (share: &quot;Siapa saja yang memiliki link&quot;).
-          </P>
-          {tim.linkPoster && (
-            <a
-              href={tim.linkPoster}
-              target="_blank"
-              rel="noreferrer"
-              className="text-primary-600 hover:underline text-sm break-all"
-            >
-              {tim.linkPoster}
-            </a>
-          )}
-          <div className="flex flex-col sm:flex-row gap-2">
-            <input
-              name="linkPoster"
-              type="url"
-              placeholder="https://drive.google.com/..."
-              defaultValue={tim.linkPoster ?? ""}
-              required
-              className="flex-1 border border-neutral-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
-            />
-            <button
-              type="submit"
-              disabled={savingLink !== null}
-              className="bg-primary-500 hover:bg-primary-600 disabled:opacity-60 text-white text-sm font-semibold px-5 py-2.5 rounded-lg transition-colors shrink-0"
-            >
-              {savingLink === "poster" ? "Menyimpan..." : tim.linkPoster ? "Ganti Link" : "Simpan Link"}
-            </button>
-          </div>
-        </form>
+        <FormLinkDokumen
+          judul="Surat Rekomendasi Kepala Sekolah"
+          deskripsi="surat rekomendasi kepala sekolah"
+          link={tim.linkRekomendasi}
+          namaFile={namaFileDokumen("SR", tim.asal_sekolah, tim.nama_tim)}
+          pola="SR_Namasekolah_NamaTIM"
+          menyimpan={savingLink === "rekomendasi"}
+          disabled={savingLink !== null}
+          onSubmit={(fd) => submitLink("rekomendasi", updateLinkRekomendasi, fd)}
+          name="linkRekomendasi"
+        />
+        <FormLinkDokumen
+          judul="Scan Kartu Pelajar"
+          deskripsi="scan kartu pelajar seluruh anggota tim (boleh digabung dalam satu PDF atau satu folder)"
+          link={tim.linkKartuPelajar}
+          namaFile={namaFileDokumen("KP", tim.asal_sekolah, tim.nama_tim)}
+          pola="KP_Namasekolah_NamaTIM"
+          menyimpan={savingLink === "kartuPelajar"}
+          disabled={savingLink !== null}
+          onSubmit={(fd) => submitLink("kartuPelajar", updateLinkKartuPelajar, fd)}
+          name="linkKartuPelajar"
+        />
+        <FormLinkDokumen
+          judul="Poster"
+          deskripsi="poster tim"
+          link={tim.linkPoster}
+          menyimpan={savingLink === "poster"}
+          disabled={savingLink !== null}
+          onSubmit={(fd) => submitLink("poster", updateLinkPoster, fd)}
+          name="linkPoster"
+        />
 
         {tim.confirmed ? (
           <form ref={formRef} action={submitForm} className="mb-4">

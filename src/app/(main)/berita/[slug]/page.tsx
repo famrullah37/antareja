@@ -1,7 +1,7 @@
 export const dynamic = "force-dynamic";
 
 import { findBerita, findBeritas } from "@/queries/berita.query";
-import ShareButtons from "./ShareButtons";
+import ShareButtons from "../../components/parts/ShareButtons";
 import BeritaCard from "../BeritaCard";
 import Image from "next/image";
 import Link from "next/link";

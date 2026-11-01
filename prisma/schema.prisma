@@ -77,6 +77,8 @@ model Tim {
   linkRekomendasi String?
   // Link Google Drive (atau cloud lain) ke poster tim — sama pola dengan linkRekomendasi.
   linkPoster      String?
+  // Link Google Drive (atau cloud lain) ke scan kartu pelajar anggota — sama pola dengan linkRekomendasi.
+  linkKartuPelajar String?
   has_cc          Boolean           @default(false)
   has_maskot      Boolean           @default(false)
   totalVote       Int               @default(0)

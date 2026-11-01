@@ -48,12 +48,12 @@ export async function updateTimForm(id: string, formData: FormData) {
 }
 
 // Link Google Drive/cloud ke dokumen tim (surat rekomendasi kepala sekolah,
-// poster) — diisi sendiri oleh pelatih/tim lewat dashboard (bukan upload
+// scan kartu pelajar, poster) — diisi sendiri oleh pelatih/tim lewat dashboard (bukan upload
 // file, lihat komentar di schema.prisma). Hanya pemilik tim yang boleh mengubah.
 async function updateLinkTim(
   id: string,
   formData: FormData,
-  field: "linkRekomendasi" | "linkPoster",
+  field: "linkRekomendasi" | "linkKartuPelajar" | "linkPoster",
   label: string
 ) {
   const session = await getServerSession();
@@ -79,6 +79,10 @@ async function updateLinkTim(
 
 export async function updateLinkRekomendasi(id: string, formData: FormData) {
   return updateLinkTim(id, formData, "linkRekomendasi", "surat rekomendasi");
+}
+
+export async function updateLinkKartuPelajar(id: string, formData: FormData) {
+  return updateLinkTim(id, formData, "linkKartuPelajar", "scan kartu pelajar");
 }
 
 export async function updateLinkPoster(id: string, formData: FormData) {
