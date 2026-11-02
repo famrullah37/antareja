@@ -258,9 +258,24 @@ async function setStatusPembayaran(timId: string, confirmed: boolean, isDP: bool
     if (lama.confirmed === confirmed && lama.pembayaran?.isDP === isDP) return null;
     const baru = await tx.tim.update({ where: { id: timId }, data: { confirmed } });
     await tx.pembayaran.update({ where: { tim_id: timId }, data: { isDP } });
-    return baru;
+    // Lunas → DP = pelunasan dibatalkan (mis. admin salah klik padahal dana
+    // belum masuk, kasus Tim Gemilang 2 Nov 2026): entri kas pelunasannya ikut
+    // dihapus, kalau tidak kas mencatat uang yang tidak pernah diterima.
+    let kasDibatalkan = 0;
+    if (lama.pembayaran && !lama.pembayaran.isDP && isDP) {
+      const where = { sumber: "PENDAFTARAN", referensiId: timId, keterangan: { startsWith: "Pelunasan" } };
+      kasDibatalkan = (await tx.kasTransaksi.aggregate({ where, _sum: { jumlah: true } }))._sum.jumlah ?? 0;
+      await tx.kasTransaksi.deleteMany({ where });
+    }
+    return { ...baru, kasDibatalkan };
   });
   if (!tim) return null; // tidak ada perubahan (klik ganda / simpan ulang tanpa mengubah apa pun)
+  if (tim.kasDibatalkan > 0) {
+    await catatLog(
+      "BATAL_PELUNASAN_TIM",
+      `Tim ${tim.nama_tim} — ${tim.asal_sekolah}: kas pelunasan Rp${tim.kasDibatalkan.toLocaleString("id-ID")} dihapus`
+    );
+  }
 
   await catatLog(
     confirmed ? "KONFIRMASI_PEMBAYARAN_TIM" : "BATAL_KONFIRMASI_PEMBAYARAN_TIM",

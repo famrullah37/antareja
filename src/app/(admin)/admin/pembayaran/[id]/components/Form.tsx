@@ -78,6 +78,27 @@ Tetap konfirmasi (mis. dibayar tunai / sudah dicek di mutasi)?`;
   ];
 
   async function Update(dataForm: FormData) {
+    const jadiLunas = p?.isDP && dataForm.get("isDP") === "false";
+    const jadiDP = p && !p.isDP && dataForm.get("isDP") === "true";
+    // DP → Lunas lewat dropdown melewati pengecekan nominal & bukti; arahkan ke
+    // tombol Konfirmasi Pelunasan (kasus Tim Gemilang: dilunaskan padahal dana belum masuk).
+    if (
+      jadiLunas &&
+      !confirm(
+        "Mengubah DP → Lunas berarti dana PELUNASAN SUDAH MASUK ke rekening.\n\n" +
+          "Disarankan pakai tombol \"Konfirmasi Pelunasan\" di atas (menampilkan nominal & bukti, dan langsung mengirim kuitansi lunas).\n\n" +
+          "Sudah cek mutasi rekening dan tetap lanjut?"
+      )
+    )
+      return;
+    if (
+      jadiDP &&
+      !confirm(
+        "Mengembalikan Lunas → DP: entri kas pelunasan tim ini akan DIHAPUS.\n\n" +
+          "Setelah disimpan, klik \"Generate Ulang Kuitansi\" supaya tim menerima kuitansi DP pengganti, dan kabari tim bahwa kuitansi lunas sebelumnya batal.\n\nLanjut?"
+      )
+    )
+      return;
     const toastId = toast.loading("Loading...");
     const result = await konfirmasiPembayaran(dataForm, data?.id!);
     if (!result.success) {
