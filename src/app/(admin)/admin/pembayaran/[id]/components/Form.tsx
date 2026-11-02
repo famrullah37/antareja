@@ -94,7 +94,7 @@ Tetap konfirmasi (mis. dibayar tunai / sudah dicek di mutasi)?`;
     if (
       jadiDP &&
       !confirm(
-        "Mengembalikan Lunas → DP: entri kas pelunasan tim ini akan DIHAPUS.\n\n" +
+        "Mengembalikan Lunas → DP: kas TIDAK berubah otomatis. Kalau pelunasan sudah tercatat di kas padahal dananya belum masuk, catat koreksi manual di Kas & Laporan.\n\n" +
           "Setelah disimpan, klik \"Generate Ulang Kuitansi\" supaya tim menerima kuitansi DP pengganti, dan kabari tim bahwa kuitansi lunas sebelumnya batal.\n\nLanjut?"
       )
     )
