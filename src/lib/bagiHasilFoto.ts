@@ -5,10 +5,12 @@ import { hargaJualFoto } from "@/lib/kuitansiPenjualan";
 
 // Bagi hasil penjualan foto premium (hanya transaksi VERIFIED):
 // - Kas mencatat nominal yang dibayar = harga jual + kode unik.
-// - Fotografer mendapat persenFotografer % dari HARGA JUAL (tanpa kode unik),
-//   dihitung per album (harga per foto × jumlah foto); sisanya + kode unik = panitia.
-// Fotografer album diambil dari data album SEKARANG, supaya admin bisa
-// menetapkan/membetulkan pemilik album setelah penjualan terjadi.
+// - Fotografer mendapat persenFotografer % dari HARGA JUAL (tanpa kode unik)
+//   setiap foto miliknya yang terjual; sisanya + kode unik = panitia.
+// - Pemilik foto = Foto.fotograferId (yang upload / dipilih admin); kosong =
+//   fotografer album. Satu album/tim bisa berisi foto banyak fotografer.
+// Pemilik diambil dari data SEKARANG, supaya admin bisa menetapkan/membetulkan
+// fotografer setelah penjualan terjadi.
 
 export type BarisAlbum = { albumId: string; nama: string; harga: number };
 
@@ -17,6 +19,7 @@ type RingkasAlbum = {
   nama: string;
   fotograferId: string | null;
   transaksi: number;
+  jumlahFoto: number;
   penjualan: number;
   bagianFotografer: number;
 };
@@ -31,28 +34,32 @@ export type RingkasFotografer = {
   albums: RingkasAlbum[];
 };
 
+// Bagi `total` rata ke `n` bagian bulat (sisa pembulatan ke bagian terakhir).
+function bagiRata(total: number, n: number) {
+  const dasar = Math.floor(total / n);
+  return Array.from({ length: n }, (_, i) => (i === n - 1 ? total - dasar * (n - 1) : dasar));
+}
+
 export async function hitungBagiHasilFoto() {
   const [transaksis, albums, konfig] = await Promise.all([
     prisma.transaksiFoto.findMany({
       where: { status: "VERIFIED" },
-      select: { harga: true, kodeUnik: true, fotoList: true, rincianAlbum: true, persenFotografer: true },
+      select: { id: true, harga: true, kodeUnik: true, fotoList: true, rincianAlbum: true, persenFotografer: true },
     }),
-    prisma.album.findMany({ select: { id: true, nama: true, harga: true, fotograferId: true, fotografer: { select: { nama: true } } } }),
+    prisma.album.findMany({ select: { id: true, nama: true, harga: true, fotograferId: true } }),
     getKonfigUmum(),
   ]);
   const albumMap = new Map(albums.map((a) => [a.id, a]));
+  const daftarFoto = (t: { fotoList: unknown }) => (Array.isArray(t.fotoList) ? (t.fotoList as string[]) : []);
 
-  // Transaksi lama (sebelum ada snapshot rincianAlbum): rincian dibentuk dari
-  // album foto-foto yang dibeli dengan harga album sekarang.
-  const fotoIdsLama = transaksis
-    .filter((t) => !Array.isArray(t.rincianAlbum))
-    .flatMap((t) => (Array.isArray(t.fotoList) ? (t.fotoList as string[]) : []));
-  const fotos = fotoIdsLama.length
-    ? await prisma.foto.findMany({ where: { id: { in: fotoIdsLama } }, select: { id: true, albumId: true } })
+  const semuaFotoId = Array.from(new Set(transaksis.flatMap(daftarFoto)));
+  const fotos = semuaFotoId.length
+    ? await prisma.foto.findMany({ where: { id: { in: semuaFotoId } }, select: { id: true, albumId: true, fotograferId: true } })
     : [];
-  const albumFoto = new Map(fotos.map((f) => [f.id, f.albumId]));
+  const fotoMap = new Map(fotos.map((f) => [f.id, f]));
 
-  const perAlbum = new Map<string, RingkasAlbum>();
+  // key = fotograferId|albumId
+  const perGrup = new Map<string, RingkasAlbum>();
   let totalKas = 0;
   let totalPenjualan = 0;
 
@@ -61,14 +68,14 @@ export async function hitungBagiHasilFoto() {
     totalKas += t.harga;
     totalPenjualan += hargaJual;
     const persen = t.persenFotografer ?? konfig.persenFotografer;
+    const fotoAda = daftarFoto(t).map((id) => fotoMap.get(id)).filter(Boolean) as (typeof fotos)[number][];
 
+    // Rincian per album: snapshot saat beli; transaksi lama dibentuk dari harga album sekarang.
     let rincian: BarisAlbum[];
     if (Array.isArray(t.rincianAlbum)) {
       rincian = t.rincianAlbum as BarisAlbum[];
     } else {
-      const ids = Array.from(
-        new Set((Array.isArray(t.fotoList) ? (t.fotoList as string[]) : []).map((id) => albumFoto.get(id)).filter(Boolean) as string[])
-      );
+      const ids = Array.from(new Set(fotoAda.map((f) => f.albumId)));
       rincian = ids.map((id) => ({ albumId: id, nama: albumMap.get(id)?.nama ?? "Album terhapus", harga: albumMap.get(id)?.harga ?? 0 }));
     }
     // Pastikan jumlah rincian = harga jual sebenarnya (harga album bisa berubah
@@ -89,30 +96,56 @@ export async function hitungBagiHasilFoto() {
       });
     }
 
+    // Harga tiap album dibagi rata ke foto-fotonya yang dibeli, lalu dikelompokkan
+    // per pemilik foto. Foto yang sudah dihapus → ikut fotografer album.
+    const grupTransaksi = new Map<string, { fotograferId: string | null; albumId: string; nama: string; jumlahFoto: number; harga: number }>();
     for (const r of rincian) {
-      const a = albumMap.get(r.albumId);
-      const baris = perAlbum.get(r.albumId) ?? {
-        albumId: r.albumId,
-        nama: a?.nama ?? r.nama,
-        fotograferId: a?.fotograferId ?? null,
+      const fotoAlbum = fotoAda.filter((f) => f.albumId === r.albumId);
+      const album = albumMap.get(r.albumId);
+      const pecahan = bagiRata(r.harga, Math.max(1, fotoAlbum.length));
+      const item = fotoAlbum.length
+        ? fotoAlbum.map((f, i) => ({ fotograferId: f.fotograferId ?? album?.fotograferId ?? null, harga: pecahan[i], foto: 1 }))
+        : [{ fotograferId: album?.fotograferId ?? null, harga: r.harga, foto: 0 }];
+      for (const it of item) {
+        const key = `${it.fotograferId ?? ""}|${r.albumId}`;
+        const g = grupTransaksi.get(key) ?? { fotograferId: it.fotograferId, albumId: r.albumId, nama: album?.nama ?? r.nama, jumlahFoto: 0, harga: 0 };
+        g.jumlahFoto += it.foto;
+        g.harga += it.harga;
+        grupTransaksi.set(key, g);
+      }
+    }
+
+    for (const [key, g] of Array.from(grupTransaksi.entries())) {
+      const baris = perGrup.get(key) ?? {
+        albumId: g.albumId,
+        nama: g.nama,
+        fotograferId: g.fotograferId,
         transaksi: 0,
+        jumlahFoto: 0,
         penjualan: 0,
         bagianFotografer: 0,
       };
       baris.transaksi += 1;
-      baris.penjualan += r.harga;
-      baris.bagianFotografer += Math.round((r.harga * persen) / 100);
-      perAlbum.set(r.albumId, baris);
+      baris.jumlahFoto += g.jumlahFoto;
+      baris.penjualan += g.harga;
+      baris.bagianFotografer += Math.round((g.harga * persen) / 100);
+      perGrup.set(key, baris);
     }
   }
 
-  const namaFotografer = new Map(albums.filter((a) => a.fotograferId).map((a) => [a.fotograferId!, a.fotografer?.nama ?? "-"]));
+  const idFotografer = Array.from(new Set(Array.from(perGrup.values()).map((g) => g.fotograferId).filter(Boolean) as string[]));
+  const namaFotografer = new Map(
+    (idFotografer.length ? await prisma.user.findMany({ where: { id: { in: idFotografer } }, select: { id: true, nama: true } }) : []).map(
+      (u) => [u.id, u.nama]
+    )
+  );
+
   const perFotografer = new Map<string, RingkasFotografer>();
-  for (const a of Array.from(perAlbum.values())) {
+  for (const a of Array.from(perGrup.values())) {
     const key = a.fotograferId ?? "";
     const f = perFotografer.get(key) ?? {
       fotograferId: a.fotograferId,
-      nama: a.fotograferId ? namaFotografer.get(a.fotograferId) ?? "-" : "Belum ditentukan",
+      nama: a.fotograferId ? namaFotografer.get(a.fotograferId) ?? "Akun terhapus" : "Belum ditentukan",
       transaksi: 0,
       penjualan: 0,
       bagianFotografer: 0,

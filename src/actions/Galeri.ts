@@ -167,10 +167,14 @@ export async function deleteAlbumAdmin(albumId: string) {
 // ─── Fotografer/Admin: Upload Foto ───────────────────────────────────────────
 
 export async function uploadFoto(data: FormData) {
-  await requireAdminOrFotografer();
+  const user = await requireAdminOrFotografer();
   const albumId = data.get("albumId") as string;
   const tagTim = data.get("tagTim") as string;
   const files = data.getAll("fotos") as File[];
+  // Fotografer yang upload otomatis jadi pemilik fotonya (bagi hasil per foto);
+  // admin boleh memilih — kosong = ikut fotografer album.
+  const fotograferId = user.role === "FOTOGRAFER" ? user.id : (data.get("fotograferId") as string) || null;
+  if (!(await fotograferValid(fotograferId))) return { success: false, uploaded: 0, failed: files.length, failedReasons: ["Fotografer tidak valid"] };
 
   const results = await Promise.allSettled(
     files.map(async (file) => {
@@ -194,6 +198,7 @@ export async function uploadFoto(data: FormData) {
         pathWatermark: uploadedWatermark.data?.url ?? uploaded.data.url,
         tagTim: tagTim || undefined,
         statusPublish: true,
+        ...(fotograferId ? { fotografer: { connect: { id: fotograferId } } } : {}),
       });
     })
   );

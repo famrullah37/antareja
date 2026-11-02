@@ -29,6 +29,7 @@ model User {
   pesananMerch      PesananMerch[]
   transaksiFoto     TransaksiFoto[]
   albumFotografer   Album[]           @relation("AlbumFotografer")
+  fotoFotografer    Foto[]            @relation("FotoFotografer")
   penarikanFoto     PenarikanFotografer[]
   transaksiVoting   TransaksiVoting[]
   activityLogs      ActivityLog[]
@@ -466,7 +467,12 @@ model Foto {
   tagTim        String?
   statusPublish Boolean  @default(false)
   createdAt     DateTime @default(now())
+  // Fotografer foto ini (penerima bagi hasil); kosong = ikut fotografer album.
+  fotograferId  String?
+  fotografer    User?    @relation("FotoFotografer", fields: [fotograferId], references: [id], onDelete: SetNull)
   album         Album    @relation(fields: [albumId], references: [id])
+
+  @@index([fotograferId])
 }
 
 model TransaksiFoto {

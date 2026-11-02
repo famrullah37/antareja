@@ -5,8 +5,17 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 type Album = { id: string; nama: string };
+type Fotografer = { id: string; nama: string };
 
-export default function UploadFotoSection({ albums }: { albums: Album[] }) {
+export default function UploadFotoSection({
+  albums,
+  fotografers,
+  isAdmin,
+}: {
+  albums: Album[];
+  fotografers: Fotografer[];
+  isAdmin: boolean;
+}) {
   const [fileCount, setFileCount] = useState(0);
 
   async function handleUpload(data: FormData) {
@@ -62,6 +71,23 @@ export default function UploadFotoSection({ albums }: { albums: Album[] }) {
             ))}
           </select>
         </div>
+
+        {isAdmin ? (
+          <div className="flex flex-col gap-1">
+            <label className="text-sm font-medium">Fotografer foto ini</label>
+            <select name="fotograferId" defaultValue="" className="border border-neutral-300 rounded-lg px-3 py-2 text-sm">
+              <option value="">— Ikut fotografer album —</option>
+              {fotografers.map((f) => (
+                <option key={f.id} value={f.id}>
+                  {f.nama}
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-gray-500">Satu album/tim boleh berisi foto dari beberapa fotografer — bagi hasil dihitung per foto.</p>
+          </div>
+        ) : (
+          <p className="text-xs text-gray-500">Foto yang Anda upload tercatat atas nama Anda untuk bagi hasil penjualan.</p>
+        )}
 
         <div className="flex flex-col gap-1">
           <label className="text-sm font-medium">Tag Nama Tim (opsional)</label>

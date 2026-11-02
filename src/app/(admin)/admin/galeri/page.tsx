@@ -23,7 +23,7 @@ export default async function AdminGaleriPage() {
       <H1>Manajemen Galeri Foto</H1>
       <WatermarkFotoLama jumlah={tanpaWatermark} />
       <AlbumSection albums={albums as any} fotografers={fotografers} isAdmin={session?.user?.role === "ADMIN"} />
-      <UploadFotoSection albums={albums as any} />
+      <UploadFotoSection albums={albums as any} fotografers={fotografers} isAdmin={session?.user?.role === "ADMIN"} />
       <div>
         <h2 className="text-xl font-semibold mb-3">Transaksi Pembelian Foto</h2>
         <TransaksiFotoTable transaksis={transaksis as any} />

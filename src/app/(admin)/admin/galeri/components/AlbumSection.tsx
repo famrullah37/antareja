@@ -113,7 +113,7 @@ export default function AlbumSection({
           </div>
           {isAdmin && (
             <div className="flex flex-col gap-1">
-              <label className="text-sm">Fotografer — penerima bagi hasil penjualan album ini</label>
+              <label className="text-sm">Fotografer album (opsional) — untuk foto yang tidak punya fotografer sendiri</label>
               <select name="fotograferId" defaultValue="" className="border border-neutral-300 rounded-lg px-3 py-2 text-sm">
                 <option value="">— Belum ditentukan —</option>
                 {fotografers.map((f) => (
@@ -162,9 +162,9 @@ export default function AlbumSection({
                         defaultValue={album.fotograferId ?? ""}
                         onChange={(e) => handleFotografer(album.id, e.target.value)}
                         className="border border-neutral-200 rounded px-1 py-0.5 text-[11px] text-gray-600"
-                        title="Fotografer (penerima bagi hasil)"
+                        title="Fotografer album — dipakai untuk foto yang tidak punya fotografer sendiri"
                       >
-                        <option value="">Fotografer: —</option>
+                        <option value="">Fotografer album: —</option>
                         {fotografers.map((f) => (
                           <option key={f.id} value={f.id}>
                             📷 {f.nama}

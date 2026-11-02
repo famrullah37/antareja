@@ -15,7 +15,7 @@ type Saldo = {
   dibayar: number;
   diajukan: number;
   saldo: number;
-  albums: { albumId: string; nama: string; transaksi: number; penjualan: number; bagianFotografer: number }[];
+  albums: { albumId: string; nama: string; transaksi: number; jumlahFoto: number; penjualan: number; bagianFotografer: number }[];
 };
 type Riwayat = {
   id: string;
@@ -155,16 +155,16 @@ export default function PendapatanClient({
         </form>
 
         <div className="bg-white border border-neutral-200 rounded-xl p-5 flex flex-col gap-2">
-          <h2 className="font-semibold text-lg">Penjualan per Album</h2>
+          <h2 className="font-semibold text-lg">Foto Anda yang Terjual</h2>
           {saldo.albums.length === 0 ? (
-            <p className="text-sm text-gray-400">Belum ada penjualan foto terverifikasi dari album Anda.</p>
+            <p className="text-sm text-gray-400">Belum ada foto Anda yang terjual (terverifikasi).</p>
           ) : (
             saldo.albums.map((a) => (
               <div key={a.albumId} className="flex justify-between gap-3 text-sm border-b border-neutral-100 pb-2">
                 <div>
                   <div className="font-medium">{a.nama}</div>
                   <div className="text-xs text-gray-500">
-                    {a.transaksi} transaksi · harga jual {rp(a.penjualan)}
+                    {a.jumlahFoto} foto Anda terjual · harga jual {rp(a.penjualan)}
                   </div>
                 </div>
                 <div className="font-semibold whitespace-nowrap">{rp(a.bagianFotografer)}</div>

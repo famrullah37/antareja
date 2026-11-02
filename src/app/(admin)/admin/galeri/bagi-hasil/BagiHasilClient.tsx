@@ -8,7 +8,7 @@ import { useRouter } from "next-nprogress-bar";
 import { Fragment, useState } from "react";
 import { toast } from "sonner";
 
-type Album = { albumId: string; nama: string; transaksi: number; penjualan: number; bagianFotografer: number };
+type Album = { albumId: string; nama: string; transaksi: number; jumlahFoto: number; penjualan: number; bagianFotografer: number };
 type Fotografer = {
   fotograferId: string | null;
   nama: string;
@@ -265,7 +265,7 @@ export default function BagiHasilClient({
                       f.albums.map((a) => (
                         <tr key={a.albumId} className="bg-neutral-50 text-xs text-gray-600">
                           <td className="pl-10 pr-4 py-1.5">
-                            {a.nama} · {a.transaksi} transaksi
+                            {a.nama} · {a.jumlahFoto} foto terjual · {a.transaksi} transaksi
                           </td>
                           <td className="px-3 py-1.5 text-right">{rp(a.penjualan)}</td>
                           <td className="px-3 py-1.5 text-right">{rp(a.bagianFotografer)}</td>
