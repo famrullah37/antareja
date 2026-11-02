@@ -150,6 +150,16 @@ model Pembayaran {
   nomorKuitansi   String?   @unique
   kuitansiTanggal DateTime?
   kuitansiIsDP    Boolean?
+  // Pelunasan tim yang mendaftar dengan DP: kode unik & nominal dicadangkan saat
+  // dashboard tim pertama kali menampilkan sisa tagihan (pelunasanTotal = sisa +
+  // kode unik), lalu peserta unggah bukti dari dashboard. Dikonfirmasi admin lewat
+  // "Konfirmasi Pelunasan" di /admin/pembayaran/[id] (isDP -> false).
+  pelunasanKodeUnik String?
+  pelunasanTotal    Int?
+  pelunasanBukti    String?
+  pelunasanBank     String?
+  pelunasanNamaRek  String?
+  pelunasanAt       DateTime?
   tim             Tim       @relation(fields: [tim_id], references: [id], onDelete: Cascade)
 }
 

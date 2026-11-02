@@ -290,7 +290,16 @@ async function setStatusPembayaran(timId: string, confirmed: boolean, isDP: bool
   // DP → Lunas tidak pernah tercatat (kas hanya memuat nominal DP). Sekarang
   // selisihnya dicatat sebagai entri "Pelunasan". Serializable supaya dua
   // approve yang terkirim bersamaan tidak sama-sama mencatat.
-  const kodeInfo = pembayaran?.kodeUnik ? ` [#${pembayaran.kodeUnik}]` : "";
+  // Pelunasan lewat dashboard punya kode unik sendiri, jadi transfer pelunasan
+  // = sisa + kode pelunasan. Target kas = total DP (termasuk kode DP) + itu.
+  const kodePelunasan = !isDP && pembayaran?.pelunasanKodeUnik ? parseInt(pembayaran.pelunasanKodeUnik) : 0;
+  const targetKas = totalBayar + kodePelunasan;
+  const kodeInfo =
+    kodePelunasan && pembayaran?.pelunasanKodeUnik
+      ? ` [#${pembayaran.pelunasanKodeUnik}]`
+      : pembayaran?.kodeUnik
+        ? ` [#${pembayaran.kodeUnik}]`
+        : "";
   // Serializable menolak (P2034) request yang bentrok — coba ulang: percobaan
   // berikutnya melihat entri yang sudah tercatat dan tidak menambah apa-apa,
   // jadi klik ganda tidak lagi tampil "gagal" ke admin.
@@ -304,7 +313,7 @@ async function setStatusPembayaran(timId: string, confirmed: boolean, isDP: bool
             _count: true,
           });
           const sudah = tercatat._sum.jumlah ?? 0;
-          if (sudah >= totalBayar) return;
+          if (sudah >= targetKas) return;
           await tx.kasTransaksi.create({
             data: {
               tipe: "PEMASUKAN",
@@ -312,7 +321,7 @@ async function setStatusPembayaran(timId: string, confirmed: boolean, isDP: bool
                 tercatat._count === 0
                   ? `Pendaftaran Tim ${tim.nama_tim} — ${tim.asal_sekolah}${kodeInfo}`
                   : `Pelunasan Pendaftaran Tim ${tim.nama_tim} — ${tim.asal_sekolah}${kodeInfo}`,
-              jumlah: totalBayar - sudah,
+              jumlah: targetKas - sudah,
               kategori: "PENDAFTARAN_TIM",
               sumber: "PENDAFTARAN",
               referensiId: timId,
@@ -388,5 +397,33 @@ export default async function konfirmasiPembayaran(
       success: false,
       message: "Gagal mengupdate status pembayaran",
     };
+  }
+}
+
+// Tombol "Konfirmasi Pelunasan" di detail pembayaran: DP → Lunas (kas mencatat
+// selisihnya lewat setStatusPembayaran), lalu langsung terbitkan & kirim
+// kuitansi lunas. Dulu admin harus ubah status lalu klik "Generate Ulang
+// Kuitansi" terpisah, dan langkah kedua mudah terlupa.
+export async function konfirmasiPelunasan(timId: string) {
+  try {
+    await requireAdmin();
+    const tim = await prisma.tim.findUnique({ where: { id: timId }, include: { pembayaran: true } });
+    if (!tim?.pembayaran) return { success: false, message: "Data pembayaran tidak ditemukan" };
+    if (!tim.confirmed) return { success: false, message: "Pembayaran DP tim ini belum dikonfirmasi" };
+    if (!tim.pembayaran.isDP) return { success: false, message: "Tim ini sudah lunas" };
+
+    // setStatusPembayaran sudah mengirim kuitansi kalau tim belum pernah punya
+    // kuitansi sama sekali — jangan kirim dua kali.
+    const otomatis = await setStatusPembayaran(timId, true, false);
+    const kuitansi = otomatis ?? (await generateDanKirimKuitansi(timId, await biayaPendaftaran(tim.jenjang, false)));
+    revalidatePath("/", "layout");
+    revalidatePath("/admin/kas");
+    if (!kuitansi.success) {
+      return { success: true, message: `Pelunasan terkonfirmasi, tapi kuitansi lunas gagal dikirim: ${kuitansi.message}` };
+    }
+    return { success: true, message: kuitansi.message ? `Pelunasan terkonfirmasi. Catatan: ${kuitansi.message}` : undefined };
+  } catch (e) {
+    console.error("konfirmasiPelunasan error:", e);
+    return { success: false, message: `Gagal konfirmasi pelunasan: ${ringkasGalat(e)}` };
   }
 }

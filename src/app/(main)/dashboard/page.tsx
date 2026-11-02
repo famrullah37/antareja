@@ -17,6 +17,8 @@ import MenginapSection from "./components/MenginapSection";
 import BasecampSection from "./components/BasecampSection";
 import MakananSection from "./components/MakananSection";
 import GrupWaSection from "./components/GrupWaSection";
+import PelunasanSection from "./components/PelunasanSection";
+import { siapkanPelunasan } from "@/lib/pelunasan";
 import { biayaPendaftaran } from "@/actions/pembayaran";
 import { getKonfigUmum } from "@/queries/konfigUmum.query";
 import {
@@ -48,6 +50,7 @@ export default async function TimDashboard() {
     biayaPendaftaran(tim.jenjang, tim.pembayaran?.isDP ?? false),
     getKonfigUmum(),
   ]);
+  const pelunasan = tim.confirmed && tim.pembayaran?.isDP ? await siapkanPelunasan(tim.id) : null;
 
   // Surat undangan & surat rekomendasi Diknas sesuai jenjang tim (hanya SMP/SMA).
   const daftarDokumen = (konfig.dokumenPeserta ?? {}) as DokumenPeserta;
@@ -61,6 +64,22 @@ export default async function TimDashboard() {
     <>
       <Heading />
       <ProfileTim tim={tim} penilaian={tim.penilaian ?? null} biayaDasar={biayaDasar} dokumen={dokumen} />
+      {pelunasan && (
+        <PelunasanSection
+          info={pelunasan}
+          rekening={{ noRek: konfig.bankNoRek, bank: konfig.bankNama, atasNama: konfig.bankAtasNama }}
+          terkirim={
+            tim.pembayaran?.pelunasanBukti
+              ? {
+                  bukti: tim.pembayaran.pelunasanBukti,
+                  bank: tim.pembayaran.pelunasanBank,
+                  namaRek: tim.pembayaran.pelunasanNamaRek,
+                  at: tim.pembayaran.pelunasanAt?.toISOString() ?? null,
+                }
+              : null
+          }
+        />
+      )}
       <GrupWaSection confirmed={tim.confirmed} url={konfig.grupWaUrl} />
       <BasecampSection timId={tim.id} ruanganId={tim.ruanganId} />
       <UjiCobaSection timId={tim.id} confirmed={tim.confirmed} batas={konfig.ujiCobaBatas} />

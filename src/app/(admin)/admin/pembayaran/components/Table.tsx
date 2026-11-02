@@ -52,9 +52,16 @@ export default function TimTable({ data }: { data: TimWithRelations[] }) {
       name: "Tipe Pembayaran",
       cell: (row) =>
         row.pembayaran?.isDP ? (
-          <span className="bg-primary-500 text-white rounded-2xl py-2 px-3 text-center text-sm">
-            DP 50%
-          </span>
+          <div className="flex flex-col items-start gap-1">
+            <span className="bg-primary-500 text-white rounded-2xl py-2 px-3 text-center text-sm">
+              DP 50%
+            </span>
+            {row.pembayaran.pelunasanBukti && (
+              <span className="bg-yellow-100 text-yellow-800 rounded-2xl py-1 px-2 text-xs font-semibold">
+                Bukti pelunasan masuk
+              </span>
+            )}
+          </div>
         ) : (
           <span className="bg-green-500 text-white rounded-2xl py-2 px-3 text-center text-sm">
             Full
