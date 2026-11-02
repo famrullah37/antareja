@@ -1,6 +1,6 @@
 "use client";
 
-import { deleteUserForm, updateRoleUser } from "@/actions/User";
+import { deleteUserForm, kirimUlangVerifikasiAdmin, updateRoleUser } from "@/actions/User";
 import { User } from "@prisma/client";
 import { useRouter } from "next-nprogress-bar";
 import { useState } from "react";
@@ -28,8 +28,13 @@ export default function TimTable({ data }: { data: User[] }) {
   const [page, setPage] = useState(1);
   const [sortKey, setSortKey] = useState<"nama" | "email" | "role">("nama");
   const [sortAsc, setSortAsc] = useState(true);
+  const [hanyaBelumVerifikasi, setHanyaBelumVerifikasi] = useState(false);
+  const [mengirim, setMengirim] = useState<string | null>(null);
+
+  const jumlahBelumVerifikasi = data.filter((u) => !u.verified).length;
 
   const filtered = data
+    .filter((u) => !hanyaBelumVerifikasi || !u.verified)
     .filter(
       (u) =>
         u.nama.toLowerCase().includes(search.toLowerCase()) ||
@@ -55,15 +60,35 @@ export default function TimTable({ data }: { data: User[] }) {
     return <span className="ml-1">{sortAsc ? "↑" : "↓"}</span>;
   }
 
+  async function kirimUlang(id: string) {
+    setMengirim(id);
+    const toastId = toast.loading("Mengirim email verifikasi...");
+    const result = await kirimUlangVerifikasiAdmin(id);
+    setMengirim(null);
+    if (result.success) toast.success("Email verifikasi terkirim!", { id: toastId });
+    else toast.error(result.message ?? "Gagal kirim", { id: toastId, duration: 10000 });
+    router.refresh();
+  }
+
   return (
     <div className="flex flex-col gap-4">
-      <input
-        type="text"
-        placeholder="Cari nama atau email..."
-        value={search}
-        onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-        className="border border-neutral-300 rounded-xl px-4 py-2.5 text-sm w-full max-w-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
-      />
+      <div className="flex flex-wrap items-center gap-3">
+        <input
+          type="text"
+          placeholder="Cari nama atau email..."
+          value={search}
+          onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+          className="border border-neutral-300 rounded-xl px-4 py-2.5 text-sm w-full max-w-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
+        />
+        <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={hanyaBelumVerifikasi}
+            onChange={(e) => { setHanyaBelumVerifikasi(e.target.checked); setPage(1); }}
+          />
+          Hanya belum verifikasi ({jumlahBelumVerifikasi})
+        </label>
+      </div>
 
       <div className="overflow-x-auto rounded-xl border border-neutral-200">
         <table className="w-full text-sm">
@@ -78,13 +103,14 @@ export default function TimTable({ data }: { data: User[] }) {
               <th className="px-4 py-3 text-left cursor-pointer select-none" onClick={() => toggleSort("role")}>
                 Role <SortIcon col="role" />
               </th>
+              <th className="px-4 py-3 text-left">Verifikasi</th>
               <th className="px-4 py-3 text-left">Hapus</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-neutral-100">
             {paged.length === 0 && (
               <tr>
-                <td colSpan={4} className="px-4 py-8 text-center text-gray-400">
+                <td colSpan={5} className="px-4 py-8 text-center text-gray-400">
                   Tidak ada data
                 </td>
               </tr>
@@ -118,6 +144,29 @@ export default function TimTable({ data }: { data: User[] }) {
                     <option value="BENDAHARA">BENDAHARA</option>
                     <option value="FOTOGRAFER">FOTOGRAFER</option>
                   </select>
+                </td>
+                <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                  {user.verified ? (
+                    <span className="text-xs font-semibold px-2 py-1 rounded-full bg-green-100 text-green-700">Terverifikasi</span>
+                  ) : (
+                    <div className="flex flex-col items-start gap-1">
+                      {/* verifyTokenSentAt kosong = email terakhir gagal terkirim (lihat Signup.ts) */}
+                      <span
+                        className={`text-xs font-semibold px-2 py-1 rounded-full ${user.verifyTokenSentAt ? "bg-yellow-100 text-yellow-700" : "bg-red-100 text-red-700"}`}
+                      >
+                        {user.verifyTokenSentAt
+                          ? `Email dikirim ${new Date(user.verifyTokenSentAt).toLocaleString("id-ID", { dateStyle: "short", timeStyle: "short" })}`
+                          : "Email gagal/belum terkirim"}
+                      </span>
+                      <button
+                        onClick={() => kirimUlang(user.id)}
+                        disabled={mengirim === user.id}
+                        className="text-xs font-bold text-primary-500 hover:underline disabled:opacity-50"
+                      >
+                        {mengirim === user.id ? "Mengirim..." : "Kirim ulang"}
+                      </button>
+                    </div>
+                  )}
                 </td>
                 <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                   <button

@@ -54,16 +54,25 @@ export default async function signUp(data: FormData) {
     });
 
     const verifyLink = `${process.env.NEXTAUTH_URL ?? "http://localhost:3000"}/auth/verify?token=${token}`;
-    await sendMailTo({
-      to: email,
-      subject: "Verifikasi Akun Antareja 2026",
-      html: verifyEmailTemplate(nama, verifyLink),
-    }).catch(() => {
-      // email failure is non-fatal; user can request resend later
-    });
+    // Gagal kirim tidak membatalkan pendaftaran, tapi harus dilaporkan ke
+    // pendaftar — sebelumnya ditelan diam-diam dan halaman tetap bilang
+    // "kami sudah mengirim link", padahal emailnya tidak pernah keluar.
+    let emailTerkirim = true;
+    try {
+      await sendMailTo({
+        to: email,
+        subject: "Verifikasi Akun Antareja 2026",
+        html: verifyEmailTemplate(nama, verifyLink),
+      });
+    } catch {
+      emailTerkirim = false;
+      // Kosongkan supaya tombol "kirim ulang" langsung jalan, tidak tertahan
+      // cooldown 60 detik dari email yang sebenarnya tidak terkirim.
+      await updateUser({ email }, { verifyTokenSentAt: null }).catch(() => {});
+    }
 
     revalidatePath("/", "layout");
-    return { success: true };
+    return { success: true, emailTerkirim };
   } catch {
     return { success: false, message: "Gagal mendaftar, coba periksa kembali data Anda!" };
   }
@@ -97,8 +106,8 @@ export async function resendVerificationEmail(email: string) {
     if (elapsed < RESEND_COOLDOWN_MS) return pesanUmum;
   }
 
+  const token = crypto.randomUUID();
   try {
-    const token = crypto.randomUUID();
     await updateUser({ id: user.id }, { token, verifyTokenSentAt: new Date() });
 
     const verifyLink = `${process.env.NEXTAUTH_URL ?? "http://localhost:3000"}/auth/verify?token=${token}`;
@@ -110,6 +119,8 @@ export async function resendVerificationEmail(email: string) {
 
     return pesanUmum;
   } catch {
+    // Email tidak keluar → jangan tahan percobaan berikutnya dengan cooldown.
+    await updateUser({ id: user.id }, { verifyTokenSentAt: null }).catch(() => {});
     return { success: false, message: "Gagal mengirim ulang email, coba lagi nanti." };
   }
 }

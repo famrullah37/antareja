@@ -18,13 +18,17 @@ export default function Register() {
   // (bukan langsung redirect ke login) supaya pesan verifikasi tidak
   // terlewat seperti toast yang hilang beberapa detik kemudian.
   const [registeredEmail, setRegisteredEmail] = useState<string | null>(null);
+  const [emailTerkirim, setEmailTerkirim] = useState(true);
   const { data: session, status } = useSession();
 
   async function submit(data: FormData) {
     const toastId = toast.loading("Membuat akun...");
     const result = await signUp(data);
     if (result.success) {
-      toast.success("Akun berhasil dibuat! Cek email Anda untuk verifikasi.", { id: toastId, duration: 6000 });
+      const terkirim = result.emailTerkirim !== false;
+      if (terkirim) toast.success("Akun berhasil dibuat! Cek email Anda untuk verifikasi.", { id: toastId, duration: 6000 });
+      else toast.warning("Akun dibuat, tapi email verifikasi gagal terkirim. Klik kirim ulang.", { id: toastId, duration: 8000 });
+      setEmailTerkirim(terkirim);
       setRegisteredEmail(data.get("email") as string);
     } else {
       toast.error(result.message, { id: toastId });
@@ -35,8 +39,10 @@ export default function Register() {
     if (!registeredEmail) return;
     const toastId = toast.loading("Mengirim ulang email verifikasi...");
     const result = await resendVerificationEmail(registeredEmail);
-    if (result.success) toast.success(result.message, { id: toastId, duration: 5000 });
-    else toast.error(result.message, { id: toastId });
+    if (result.success) {
+      toast.success(result.message, { id: toastId, duration: 5000 });
+      setEmailTerkirim(true);
+    } else toast.error(result.message, { id: toastId });
   }
 
   // Konsisten dengan fix di halaman login (reload penuh, bukan navigasi
@@ -55,12 +61,20 @@ export default function Register() {
           <div className="mx-auto bg-primary-500 w-[64px] h-[60px] flex justify-center items-center rounded-xl drop-shadow-glow">
             <Image src={"/icon.svg"} width={36} height={38} alt="logo" className="invert" />
           </div>
-          <H3>Cek Email Anda</H3>
-          <P>
-            Akun berhasil dibuat. Kami sudah mengirim link verifikasi ke{" "}
-            <span className="font-bold text-black break-all">{registeredEmail}</span>.
-            Buka email tersebut dan klik link verifikasi sebelum login.
-          </P>
+          <H3>{emailTerkirim ? "Cek Email Anda" : "Email Verifikasi Gagal Terkirim"}</H3>
+          {emailTerkirim ? (
+            <P>
+              Akun berhasil dibuat. Kami sudah mengirim link verifikasi ke{" "}
+              <span className="font-bold text-black break-all">{registeredEmail}</span>.
+              Buka email tersebut dan klik link verifikasi sebelum login.
+            </P>
+          ) : (
+            <P>
+              Akun berhasil dibuat, tapi email verifikasi ke{" "}
+              <span className="font-bold text-black break-all">{registeredEmail}</span>{" "}
+              gagal terkirim. Klik &quot;Kirim ulang&quot; di bawah. Jika tetap gagal, hubungi panitia.
+            </P>
+          )}
           <P className="text-sm">
             Tidak menemukan emailnya? Periksa juga folder Spam/Promosi.
           </P>

@@ -6,6 +6,8 @@ import { createUser, findUserByEmail, normalizeEmail, updateUser } from "@/queri
 import { Role } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { getServerSession } from "@/lib/next-auth";
+import { sendMailTo } from "@/lib/mailer";
+import { verifyEmailTemplate } from "@/utils/emailTemplate";
 
 async function akunSendiri(id: string) {
   return (await getServerSession())?.user?.id === id;
@@ -173,5 +175,36 @@ export async function deleteUserForm(id: string) {
     return { success: true };
   } catch {
     return { success: false };
+  }
+}
+
+// Untuk pendaftar yang email verifikasinya tidak sampai: admin kirim ulang
+// tanpa cooldown, dan pesan error SMTP-nya ditampilkan apa adanya supaya
+// panitia tahu penyebabnya (beda dengan resendVerificationEmail yang publik).
+export async function kirimUlangVerifikasiAdmin(id: string) {
+  try {
+    await requireAdmin();
+  } catch {
+    return { success: false, message: "Tidak diizinkan" };
+  }
+  const user = await prisma.user.findUnique({ where: { id } });
+  if (!user) return { success: false, message: "User tidak ditemukan" };
+  if (user.verified) return { success: false, message: "User sudah terverifikasi" };
+
+  const token = crypto.randomUUID();
+  try {
+    await updateUser({ id }, { token, verifyTokenSentAt: new Date() });
+    const verifyLink = `${process.env.NEXTAUTH_URL ?? "http://localhost:3000"}/auth/verify?token=${token}`;
+    await sendMailTo({
+      to: user.email,
+      subject: "Verifikasi Akun Antareja 2026",
+      html: verifyEmailTemplate(user.nama, verifyLink),
+    });
+    revalidatePath("/admin/user");
+    return { success: true };
+  } catch (e) {
+    await updateUser({ id }, { verifyTokenSentAt: null }).catch(() => {});
+    revalidatePath("/admin/user");
+    return { success: false, message: `Gagal kirim: ${e instanceof Error ? e.message : "error tidak dikenal"}` };
   }
 }
