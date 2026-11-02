@@ -4,6 +4,7 @@ import Link from "next/link";
 import { FaTiktok, FaInstagram, FaYoutube, FaWhatsapp } from "react-icons/fa";
 import { siteConfig } from "@/config/site";
 import { whatsappUrl } from "./WhatsAppButton";
+import { labelVersiPublik } from "@/lib/versiAplikasi";
 
 interface FootOption {
   label: string;
@@ -99,6 +100,7 @@ export default function Footer() {
           <div className="w-full h-[1px] bg-[#D9E1EE]"></div>
           <P className="text-sm text-neutral-600 mt-[10px]">
             Copyright&copy; Antareja 2026
+            <span className="ml-2 text-xs text-neutral-500">· {labelVersiPublik}</span>
           </P>
         </div>
       </div>

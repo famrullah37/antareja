@@ -6,6 +6,8 @@ const commit = process.env.NEXT_PUBLIC_APP_COMMIT ?? "dev";
 const waktuBuild = process.env.NEXT_PUBLIC_APP_BUILD_TIME;
 
 export const labelVersi = `v${versi} · ${commit}`;
+// Untuk halaman publik — pengunjung cukup lihat nomor versi, tanpa kode commit.
+export const labelVersiPublik = `v${versi}`;
 
 // Diformat manual (bukan toLocaleString) supaya hasil render server & browser
 // identik — beda data ICU Node vs browser bisa memicu hydration mismatch.

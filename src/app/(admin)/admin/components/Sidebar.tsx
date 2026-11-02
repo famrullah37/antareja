@@ -71,7 +71,7 @@ export default function Sidebar({ active, session }: Readonly<Sidenavprops>) {
             >
               {signingOut ? "Keluar..." : "Sign Out"}
             </PrimaryButton>
-            <p className="text-xs text-neutral-400 text-center" title={labelWaktuBuild ? `Build ${labelWaktuBuild}` : undefined}>
+            <p className="text-xs font-medium text-neutral-700 text-center" title={labelWaktuBuild ? `Build ${labelWaktuBuild}` : undefined}>
               {labelVersi}
               {labelWaktuBuild && <span className="block">Build {labelWaktuBuild}</span>}
             </p>
