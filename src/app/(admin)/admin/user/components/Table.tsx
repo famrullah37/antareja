@@ -173,7 +173,15 @@ export default function TimTable({ data }: { data: User[] }) {
                     onClick={async () => {
                       if (!confirm("Hapus user ini?")) return;
                       const toastId = toast.loading("Menghapus...");
-                      const result = await deleteUserForm(user.id);
+                      let result = await deleteUserForm(user.id);
+                      if (result.perluKonfirmasi) {
+                        toast.dismiss(toastId);
+                        if (!confirm(`PERHATIAN: ${result.message}
+
+Tetap hapus user ini?`)) return;
+                        toast.loading("Menghapus...", { id: toastId });
+                        result = await deleteUserForm(user.id, true);
+                      }
                       if (result.success) toast.success("User dihapus!", { id: toastId });
                       else toast.error(result.message ?? "Gagal menghapus!", { id: toastId });
                     }}

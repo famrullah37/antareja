@@ -31,6 +31,8 @@ const aksiBadge: Record<string, string> = {
   PRESENSI_DP_RESET: "bg-amber-100 text-amber-700",
   TERBIT_KUITANSI_MANUAL: "bg-blue-100 text-blue-700",
   BATAL_KUITANSI_MANUAL: "bg-red-100 text-red-700",
+  HAPUS_TIM: "bg-red-100 text-red-700",
+  HAPUS_USER: "bg-red-100 text-red-700",
 };
 
 function aksiLabel(aksi: string) {

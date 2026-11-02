@@ -8,6 +8,8 @@ import prisma from "@/lib/prisma";
 import { getServerSession } from "@/lib/next-auth";
 import { sendMailTo } from "@/lib/mailer";
 import { verifyEmailTemplate } from "@/utils/emailTemplate";
+import { catatLog } from "@/lib/activityLog";
+import { ringkasTimDihapus, tandaiKasTimDihapus } from "@/lib/hapusTim";
 
 async function akunSendiri(id: string) {
   return (await getServerSession())?.user?.id === id;
@@ -150,17 +152,33 @@ export async function updateRoleUser(userId: string, role: Role) {
   }
 }
 
-export async function deleteUserForm(id: string) {
+// Menghapus user ikut menghapus timnya. Kalau timnya sudah terkonfirmasi,
+// pemanggil harus mengulang dengan paksa=true setelah admin menyetujui
+// peringatan kedua (lihat Table.tsx admin/user).
+export async function deleteUserForm(id: string, paksa = false) {
   try {
     await requireAdmin();
     if (await akunSendiri(id)) return { success: false, message: "Tidak bisa menghapus akun sendiri" };
+    const user = await prisma.user.findUnique({
+      where: { id },
+      include: { tims: { include: { pembayaran: { select: { isDP: true } } } } },
+    });
+    if (!user) return { success: false, message: "User tidak ditemukan" };
+    const timTerkonfirmasi = user.tims.filter((t) => t.confirmed);
+    if (timTerkonfirmasi.length > 0 && !paksa) {
+      return {
+        success: false,
+        perluKonfirmasi: true,
+        message: `User ini punya tim yang pembayarannya SUDAH DIKONFIRMASI: ${timTerkonfirmasi.map(ringkasTimDihapus).join("; ")}. Tim, anggota & data pembayarannya ikut terhapus permanen.`,
+      };
+    }
     await prisma.$transaction(async (tx) => {
-      const tims = await tx.tim.findMany({ where: { userId: id } });
-      for (const tim of tims) {
+      for (const tim of user.tims) {
         await tx.penilaianBaru.deleteMany({ where: { timId: tim.id } });
         await tx.penilaian.deleteMany({ where: { tim_id: tim.id } });
         await tx.tim.delete({ where: { id: tim.id } });
       }
+      await tandaiKasTimDihapus(tx, user.tims.map((t) => t.id));
       await tx.juri.updateMany({ where: { userId: id }, data: { userId: null } });
       await tx.transaksiTiket.updateMany({ where: { userId: id }, data: { userId: null } });
       await tx.transaksiFoto.updateMany({ where: { userId: id }, data: { userId: null } });
@@ -171,6 +189,8 @@ export async function deleteUserForm(id: string) {
       await tx.pesananMerch.updateMany({ where: { userId: id }, data: { userId: null } });
       await tx.user.delete({ where: { id } });
     });
+    const timInfo = user.tims.length ? ` | ${user.tims.map(ringkasTimDihapus).join("; ")}` : "";
+    await catatLog("HAPUS_USER", `${user.nama} <${user.email}> (${user.role})${timInfo}`);
     revalidatePath("/", "layout");
     return { success: true };
   } catch {

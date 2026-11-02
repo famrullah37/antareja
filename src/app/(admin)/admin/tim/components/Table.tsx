@@ -65,11 +65,26 @@ export default function TimTable({ data }: { data: TimWithRelations[] }) {
               const confirmDelete = confirm(
                 `Hapus tim "${row.nama_tim}" (${row.asal_sekolah})?\n\n` +
                   "Ikut terhapus PERMANEN: semua anggota, data pembayaran & kuitansi, nilai penilaian, sertifikat, dan perolehan voting tim ini.\n" +
-                  "Catatan kas pemasukan pendaftaran TIDAK ikut terhapus. Tim lain tidak terpengaruh."
+                  "Catatan kas pemasukan pendaftaran TIDAK ikut terhapus (ditandai [TIM DIHAPUS]). Tim lain tidak terpengaruh."
               );
-              if (confirmDelete) {
+              if (!confirmDelete) return;
+              // Tim terkonfirmasi sudah membayar — minta nama tim diketik ulang
+              // supaya tidak terhapus karena salah klik.
+              let konfirmasiNama: string | undefined;
+              if (row.confirmed) {
+                const ketik = prompt(
+                  `PERHATIAN: pembayaran tim ini SUDAH DIKONFIRMASI${row.pembayaran?.isDP ? " (DP)" : ""}.
+
+` +
+                    `Ketik nama tim persis untuk melanjutkan:
+${row.nama_tim}`
+                );
+                if (ketik === null) return;
+                konfirmasiNama = ketik;
+              }
+              {
                 const toastId = toast.loading("Loading...");
-                const result = await deleteTimForm(row.id);
+                const result = await deleteTimForm(row.id, konfirmasiNama);
                 if (!result.success) {
                   toast.error(result.message ?? "Gagal menghapus tim!", { id: toastId, duration: 6000 });
                 } else {

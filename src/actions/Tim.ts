@@ -10,6 +10,8 @@ import { compressPhoto, imageUploader, validateUploadFile } from "./fileUploader
 import { buildFormulirPdf } from "@/lib/formulir";
 import { buildDataTimWorkbook } from "@/lib/exportTim";
 import { timSlug } from "@/lib/timSlug";
+import { catatLog } from "@/lib/activityLog";
+import { ringkasTimDihapus, tandaiKasTimDihapus } from "@/lib/hapusTim";
 
 // Jumlah pasukan per tipe tim (di luar danton/official/pelatih) — dipakai
 // untuk mengecek kelengkapan data sebelum formulir registrasi bisa diunduh.
@@ -205,18 +207,26 @@ export async function exportDataTim(timId?: string) {
 }
 
 // Hapus tim permanen (ikut anggota, pembayaran, nilai) — khusus ADMIN,
-// Sie Lomba hanya boleh mengelola, bukan menghapus.
-export async function deleteTimForm(id: string) {
+// Sie Lomba hanya boleh mengelola, bukan menghapus. Tim yang pembayarannya
+// sudah dikonfirmasi hanya bisa dihapus dengan mengetik ulang nama timnya.
+export async function deleteTimForm(id: string, konfirmasiNama?: string) {
   const session = await getServerSession();
   if (session?.user?.role !== "ADMIN") {
     return { success: false, message: "Hanya admin yang boleh menghapus tim" };
+  }
+  const tim = await prisma.tim.findUnique({ where: { id }, include: { pembayaran: { select: { isDP: true } } } });
+  if (!tim) return { success: false, message: "Tim tidak ditemukan" };
+  if (tim.confirmed && konfirmasiNama?.trim() !== tim.nama_tim.trim()) {
+    return { success: false, message: "Tim sudah terkonfirmasi — ketik nama tim persis untuk menghapus" };
   }
   try {
     await prisma.$transaction(async (tx) => {
       await tx.penilaianBaru.deleteMany({ where: { timId: id } });
       await tx.penilaian.deleteMany({ where: { tim_id: id } });
       await tx.tim.delete({ where: { id } });
+      await tandaiKasTimDihapus(tx, [id]);
     });
+    await catatLog("HAPUS_TIM", ringkasTimDihapus(tim));
     revalidatePath("/", "layout");
     return { success: true };
   } catch (e: any) {
