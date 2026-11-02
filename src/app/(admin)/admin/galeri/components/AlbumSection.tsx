@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { createAlbumAdmin, deleteAlbumAdmin, publishAlbum } from "@/actions/Galeri";
+import { createAlbumAdmin, deleteAlbumAdmin, publishAlbum, setFotograferAlbum } from "@/actions/Galeri";
 import { toast } from "sonner";
 
 type Album = {
@@ -11,15 +11,34 @@ type Album = {
   harga: number;
   statusPublish: boolean;
   createdAt: Date;
+  fotograferId: string | null;
+  fotografer: { nama: string } | null;
   _count: { fotos: number };
 };
+
+type Fotografer = { id: string; nama: string };
 
 const TIPE_COLORS: Record<string, string> = {
   GRATIS: "bg-green-100 text-green-700",
   BERBAYAR: "bg-orange-100 text-orange-700",
 };
 
-export default function AlbumSection({ albums }: { albums: Album[] }) {
+export default function AlbumSection({
+  albums,
+  fotografers,
+  isAdmin,
+}: {
+  albums: Album[];
+  fotografers: Fotografer[];
+  isAdmin: boolean;
+}) {
+  async function handleFotografer(id: string, fotograferId: string) {
+    const toastId = toast.loading("Menyimpan fotografer...");
+    const result = await setFotograferAlbum(id, fotograferId || null);
+    if (result.success) toast.success("Fotografer album disimpan", { id: toastId });
+    else toast.error(result.message ?? "Gagal", { id: toastId });
+  }
+
   async function handleCreate(data: FormData) {
     const toastId = toast.loading("Membuat album...");
     const result = await createAlbumAdmin(data);
@@ -92,6 +111,19 @@ export default function AlbumSection({ albums }: { albums: Album[] }) {
               className="border border-neutral-300 rounded-lg px-3 py-2 text-sm"
             />
           </div>
+          {isAdmin && (
+            <div className="flex flex-col gap-1">
+              <label className="text-sm">Fotografer — penerima bagi hasil penjualan album ini</label>
+              <select name="fotograferId" defaultValue="" className="border border-neutral-300 rounded-lg px-3 py-2 text-sm">
+                <option value="">— Belum ditentukan —</option>
+                {fotografers.map((f) => (
+                  <option key={f.id} value={f.id}>
+                    {f.nama}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
           <button
             type="submit"
             className="bg-primary-500 text-white rounded-lg py-2 text-sm font-semibold hover:bg-primary-600 transition-colors"
@@ -123,6 +155,24 @@ export default function AlbumSection({ albums }: { albums: Album[] }) {
                         <span>·</span>
                         <span className="text-gray-500">{new Intl.NumberFormat("id-ID",{style:"currency",currency:"IDR",minimumFractionDigits:0}).format(album.harga)}/foto</span>
                       </>
+                    )}
+                    <span>·</span>
+                    {isAdmin ? (
+                      <select
+                        defaultValue={album.fotograferId ?? ""}
+                        onChange={(e) => handleFotografer(album.id, e.target.value)}
+                        className="border border-neutral-200 rounded px-1 py-0.5 text-[11px] text-gray-600"
+                        title="Fotografer (penerima bagi hasil)"
+                      >
+                        <option value="">Fotografer: —</option>
+                        {fotografers.map((f) => (
+                          <option key={f.id} value={f.id}>
+                            📷 {f.nama}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <span>📷 {album.fotografer?.nama ?? "fotografer belum ditentukan"}</span>
                     )}
                     <span>·</span>
                     {album.statusPublish ? (

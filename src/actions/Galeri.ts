@@ -15,6 +15,7 @@ import {
 } from "@/queries/galeri.query";
 import { incrementCounterUrutFoto } from "@/queries/tiket.query";
 import { catatLog } from "@/lib/activityLog";
+import { getKonfigUmum } from "@/queries/konfigUmum.query";
 import { imageUploader, validateUploadFile } from "./fileUploader";
 import { addWatermark } from "@/lib/watermark";
 import { sendMailTo } from "@/lib/mailer";
@@ -60,21 +61,84 @@ async function requireAdminOrBendahara() {
 async function requireAdminOrFotografer() {
   const session = await getServerSession();
   if (!["ADMIN", "FOTOGRAFER"].includes(session?.user?.role ?? "")) throw new Error("Forbidden");
+  return session!.user!;
+}
+
+async function requireAdminOnly() {
+  const session = await getServerSession();
+  if (session?.user?.role !== "ADMIN") throw new Error("Forbidden");
+}
+
+// fotograferId harus akun ber-role FOTOGRAFER (atau kosong = belum ditentukan).
+async function fotograferValid(id: string | null) {
+  if (!id) return true;
+  const u = await prisma.user.findUnique({ where: { id }, select: { role: true } });
+  return u?.role === "FOTOGRAFER";
 }
 
 // ─── Admin: Album ─────────────────────────────────────────────────────────────
 
 export async function createAlbumAdmin(data: FormData) {
-  await requireAdminOrFotografer();
+  const user = await requireAdminOrFotografer();
   const nama = data.get("nama") as string;
   const deskripsi = data.get("deskripsi") as string;
   const tipe = (data.get("tipe") as string) || "BERBAYAR";
   const harga = parseInt((data.get("harga") as string) || "0");
+  // Fotografer yang membuat album otomatis jadi pemiliknya; admin memilih.
+  const fotograferId = user.role === "FOTOGRAFER" ? user.id : (data.get("fotograferId") as string) || null;
+  if (!(await fotograferValid(fotograferId))) return { success: false };
   try {
-    await createAlbum({ nama, deskripsi, tipe, harga });
+    await createAlbum({ nama, deskripsi, tipe, harga, ...(fotograferId ? { fotografer: { connect: { id: fotograferId } } } : {}) });
     revalidatePath("/admin/galeri");
     return { success: true };
   } catch { return { success: false }; }
+}
+
+export async function setFotograferAlbum(albumId: string, fotograferId: string | null) {
+  await requireAdminOnly();
+  if (!(await fotograferValid(fotograferId))) return { success: false, message: "Fotografer tidak valid" };
+  try {
+    const album = await prisma.album.update({ where: { id: albumId }, data: { fotograferId }, include: { fotografer: true } });
+    await catatLog("UBAH_FOTOGRAFER_ALBUM", `${album.nama} → ${album.fotografer?.nama ?? "(kosong)"}`);
+    revalidatePath("/admin/galeri");
+    return { success: true };
+  } catch {
+    return { success: false, message: "Gagal mengubah fotografer album" };
+  }
+}
+
+// Persentase bagian fotografer dari harga jual foto (tanpa kode unik).
+// Hanya berlaku untuk transaksi yang diverifikasi setelah diubah — yang sudah
+// terverifikasi memakai snapshot persentase saat itu.
+export async function setPersenFotografer(persen: number) {
+  await requireAdminOnly();
+  if (!Number.isInteger(persen) || persen < 0 || persen > 100)
+    return { success: false, message: "Persentase harus bilangan bulat 0–100" };
+  try {
+    await getKonfigUmum();
+    await prisma.konfigUmum.update({ where: { id: "singleton" }, data: { persenFotografer: persen } });
+    await catatLog("UBAH_BAGI_HASIL_FOTO", `Fotografer ${persen}% / Panitia ${100 - persen}%`);
+    revalidatePath("/admin/galeri/bagi-hasil");
+    return { success: true };
+  } catch {
+    return { success: false, message: "Gagal menyimpan persentase" };
+  }
+}
+
+export async function setBiayaAdminPenarikan(biaya: number) {
+  await requireAdminOnly();
+  if (!Number.isInteger(biaya) || biaya < 0 || biaya > 100000)
+    return { success: false, message: "Biaya admin harus bilangan bulat 0–100.000" };
+  try {
+    await getKonfigUmum();
+    await prisma.konfigUmum.update({ where: { id: "singleton" }, data: { biayaAdminPenarikan: biaya } });
+    await catatLog("UBAH_BIAYA_PENARIKAN_FOTO", `Biaya admin transfer Rp${biaya.toLocaleString("id-ID")}`);
+    revalidatePath("/admin/galeri/bagi-hasil");
+    revalidatePath("/admin/galeri/pendapatan");
+    return { success: true };
+  } catch {
+    return { success: false, message: "Gagal menyimpan biaya admin" };
+  }
 }
 
 export async function publishAlbum(albumId: string, publish: boolean) {
@@ -207,15 +271,25 @@ export async function beliFoto(data: FormData) {
     // fotoList inilah yang nanti dibuka di halaman unduhan setelah verifikasi.
     const fotos = await prisma.foto.findMany({
       where: { id: { in: fotoList }, statusPublish: true, album: { statusPublish: true } },
-      select: { albumId: true, album: { select: { harga: true } } },
+      select: { albumId: true, album: { select: { nama: true, harga: true } } },
     });
     if (fotos.length !== fotoList.length)
       return { success: false, message: "Ada foto yang tidak tersedia, muat ulang halaman" };
-    const uniqueAlbumPrices = Array.from(new Map(fotos.map((f) => [f.albumId, f.album.harga])).values());
-    // Nominal akhir = total harga album + kode unik — kalau tidak ditambahkan,
-    // dua pembelian album yang sama tercatat dengan nominal identik di
-    // laporan kas (lihat juga totalBayar di Voting.ts/registrationForm.ts).
-    const harga = uniqueAlbumPrices.reduce((sum, h) => sum + h, 0) + parseInt(kodeUnik);
+    // Harga per foto: tiap foto dikenai harga albumnya. Snapshot per album
+    // (harga = harga satuan × jumlah foto) untuk kuitansi & bagi hasil fotografer
+    // (lib/bagiHasilFoto.ts) — tidak ikut berubah kalau harga album diubah nanti.
+    const perAlbum = new Map<string, { albumId: string; nama: string; hargaSatuan: number; jumlahFoto: number; harga: number }>();
+    for (const f of fotos) {
+      const r = perAlbum.get(f.albumId) ?? { albumId: f.albumId, nama: f.album.nama, hargaSatuan: f.album.harga, jumlahFoto: 0, harga: 0 };
+      r.jumlahFoto += 1;
+      r.harga += f.album.harga;
+      perAlbum.set(f.albumId, r);
+    }
+    const rincianAlbum = Array.from(perAlbum.values());
+    // Nominal akhir = total harga foto + kode unik — kalau tidak ditambahkan,
+    // dua pembelian yang sama tercatat dengan nominal identik di laporan kas
+    // (lihat juga totalBayar di Voting.ts/registrationForm.ts).
+    const harga = rincianAlbum.reduce((sum, r) => sum + r.harga, 0) + parseInt(kodeUnik);
     const expiredAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 
     // Cegah dua transaksi memakai kodeUnik yang sama — nominal transfer harus
@@ -237,6 +311,7 @@ export async function beliFoto(data: FormData) {
     const transaksi = await createTransaksiFoto({
       fotoList,
       harga,
+      rincianAlbum,
       ...(buktiUrl ? { bukti: buktiUrl } : {}),
       status: "PENDING",
       expiredAt,
@@ -288,7 +363,7 @@ export async function verifikasiFoto(transaksiId: string) {
     // cek-lalu-update biasa lolos dua kali bila tombol terkirim ganda (kas dobel).
     const klaim = await prisma.transaksiFoto.updateMany({
       where: { id: transaksiId, status: "PENDING" },  // hanya PENDING: transaksi DITOLAK tidak bisa diverifikasi ulang (kode unik-nya mungkin sudah dipakai transaksi lain)
-      data: { status: "VERIFIED" },
+      data: { status: "VERIFIED", persenFotografer: (await getKonfigUmum()).persenFotografer },
     });
     if (klaim.count === 0) return { success: false, message: "Transaksi foto sudah diproses (diverifikasi/ditolak) sebelumnya" };
     const t = transaksi as any;

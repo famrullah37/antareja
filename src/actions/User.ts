@@ -162,6 +162,8 @@ export async function deleteUserForm(id: string) {
       await tx.juri.updateMany({ where: { userId: id }, data: { userId: null } });
       await tx.transaksiTiket.updateMany({ where: { userId: id }, data: { userId: null } });
       await tx.transaksiFoto.updateMany({ where: { userId: id }, data: { userId: null } });
+      await tx.album.updateMany({ where: { fotograferId: id }, data: { fotograferId: null } });
+      await tx.penarikanFotografer.deleteMany({ where: { fotograferId: id } });
       await tx.transaksiVoting.updateMany({ where: { userId: id }, data: { userId: null } });
       await tx.pesananMerch.updateMany({ where: { userId: id }, data: { userId: null } });
       await tx.user.delete({ where: { id } });

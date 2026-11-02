@@ -89,10 +89,9 @@ export default function GaleriClient({
     });
   }
 
-  // Hitung total harga dari album unik yang dipilih
+  // Harga per foto: tiap foto dikenai harga albumnya (sama dengan beliFoto di server).
   const cartFotos = fotos.filter((f) => cart.has(f.id));
-  const albumPriceMap = new Map(cartFotos.map((f) => [f.albumId, f.album.harga]));
-  const totalHarga = Array.from(albumPriceMap.values()).reduce((s, h) => s + h, 0);
+  const totalHarga = cartFotos.reduce((s, f) => s + f.album.harga, 0);
 
   const totalBayar = kodeUnik ? totalHarga + parseInt(kodeUnik) : 0;
 
@@ -189,7 +188,7 @@ export default function GaleriClient({
                 <span className="text-[9px] font-bold bg-green-500 text-white px-1.5 py-0.5 rounded-full">GRATIS</span>
               ) : (
                 <span className="text-[9px] font-bold bg-primary-500 text-white px-1.5 py-0.5 rounded-full">
-                  {formatRupiah(a.harga)}
+                  {formatRupiah(a.harga)}/foto
                 </span>
               )}
             </button>

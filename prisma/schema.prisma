@@ -28,6 +28,8 @@ model User {
   transaksiTiket    TransaksiTiket[]
   pesananMerch      PesananMerch[]
   transaksiFoto     TransaksiFoto[]
+  albumFotografer   Album[]           @relation("AlbumFotografer")
+  penarikanFoto     PenarikanFotografer[]
   transaksiVoting   TransaksiVoting[]
   activityLogs      ActivityLog[]
 }
@@ -448,7 +450,12 @@ model Album {
   harga         Int      @default(0)
   statusPublish Boolean  @default(false)
   createdAt     DateTime @default(now())
+  // Fotografer pemilik album — penerima bagi hasil penjualan fotonya.
+  fotograferId  String?
+  fotografer    User?    @relation("AlbumFotografer", fields: [fotograferId], references: [id], onDelete: SetNull)
   fotos         Foto[]
+
+  @@index([fotograferId])
 }
 
 model Foto {
@@ -480,6 +487,10 @@ model TransaksiFoto {
   // Kuitansi PDF — lihat TransaksiTiket.nomorKuitansi.
   nomorKuitansi    String?   @unique
   kuitansiTanggal  DateTime?
+  // Snapshot saat beli: [{albumId, nama, harga}] — dasar bagi hasil fotografer.
+  rincianAlbum     Json?
+  // Snapshot KonfigUmum.persenFotografer saat diverifikasi.
+  persenFotografer Int?
   createdAt        DateTime  @default(now())
   user             User?     @relation(fields: [userId], references: [id])
 }
@@ -673,6 +684,10 @@ model KonfigUmum {
   makananInfo            String?
   // Counter kode unik pembayaran pesanan makanan (0-999, siklus ulang).
   counterUrutMakanan     Int       @default(0)
+  // Bagian fotografer (%) dari harga jual foto tanpa kode unik; sisanya panitia.
+  persenFotografer       Int       @default(0)
+  // Biaya admin transfer per penarikan fotografer, dipotong dari jumlah yang ditarik.
+  biayaAdminPenarikan    Int       @default(2500)
 }
 
 // ─── Ruangan Basecamp ────────────────────────────────────────────────────────
@@ -944,4 +959,29 @@ model KuitansiManual {
   batalAlasan     String?
   batalOleh       String?
   createdAt       DateTime  @default(now())
+}
+
+// Penarikan (withdraw) saldo bagi hasil foto oleh fotografer. status: PENDING
+// (diajukan) → DIBAYAR (bendahara transfer, tercatat sebagai pengeluaran Kas)
+// atau DITOLAK. Saldo = bagian fotografer − penarikan PENDING/DIBAYAR.
+model PenarikanFotografer {
+  id            String    @id @default(uuid())
+  fotograferId  String
+  jumlah        Int
+  // Snapshot biaya admin transfer saat diajukan; diterima = jumlah − biayaAdmin.
+  biayaAdmin    Int       @default(0)
+  bankNama      String
+  bankNoRek     String
+  bankAtasNama  String
+  catatan       String?
+  status        String    @default("PENDING")
+  catatanAdmin  String?
+  buktiTransfer String?
+  kasId         String?
+  diprosesOleh  String?
+  diprosesAt    DateTime?
+  createdAt     DateTime  @default(now())
+  fotografer    User      @relation(fields: [fotograferId], references: [id], onDelete: Cascade)
+
+  @@index([fotograferId])
 }

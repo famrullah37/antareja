@@ -40,6 +40,14 @@ export async function buatKuitansiTiket(id: string): Promise<HasilKuitansi | nul
   return { pdf, nomor: terbit.nomor, filename: namaFile(terbit.nomor) };
 }
 
+// Harga jual foto tanpa kode unik: dari snapshot harga album saat beli kalau
+// ada (transaksi baru), selain itu harga tersimpan dikurangi kode unik.
+export function hargaJualFoto(tr: { harga: number; kodeUnik: string | null; rincianAlbum: unknown }) {
+  if (Array.isArray(tr.rincianAlbum) && tr.rincianAlbum.length > 0)
+    return (tr.rincianAlbum as { harga: number }[]).reduce((s, r) => s + (r.harga || 0), 0);
+  return tr.harga - (tr.kodeUnik ? parseInt(tr.kodeUnik, 10) || 0 : 0);
+}
+
 export async function buatKuitansiFoto(id: string): Promise<HasilKuitansi | null> {
   const tr = await prisma.transaksiFoto.findUnique({ where: { id } });
   if (!tr || tr.status !== "VERIFIED") return null;
@@ -55,7 +63,7 @@ export async function buatKuitansiFoto(id: string): Promise<HasilKuitansi | null
       ["Pembelian", `Foto Premium (${jumlahFoto} foto)`],
       ["Pembayaran", `${metode(tr.metodePembayaran)} — Lunas`],
     ],
-    total: tr.harga - (tr.kodeUnik ? parseInt(tr.kodeUnik, 10) : 0),
+    total: hargaJualFoto(tr),
     tanggal: terbit.tanggal,
     catatan:
       "Kuitansi ini digenerate otomatis oleh sistem setelah pembayaran diverifikasi. " +

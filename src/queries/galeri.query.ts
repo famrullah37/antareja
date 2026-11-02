@@ -6,7 +6,7 @@ import { Prisma } from "@prisma/client";
 export async function findAlbums(where?: Prisma.AlbumWhereInput) {
   return prisma.album.findMany({
     where,
-    include: { _count: { select: { fotos: true } } },
+    include: { _count: { select: { fotos: true } }, fotografer: { select: { nama: true } } },
     orderBy: { createdAt: "desc" },
   });
 }
