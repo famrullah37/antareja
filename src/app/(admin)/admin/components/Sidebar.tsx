@@ -8,6 +8,7 @@ import { useSignOut } from "@/app/components/global/useSignOut";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { FaArrowRight } from "react-icons/fa";
+import { labelVersi, labelWaktuBuild } from "@/lib/versiAplikasi";
 
 interface Sidenavprops {
   active: boolean;
@@ -70,6 +71,10 @@ export default function Sidebar({ active, session }: Readonly<Sidenavprops>) {
             >
               {signingOut ? "Keluar..." : "Sign Out"}
             </PrimaryButton>
+            <p className="text-xs text-neutral-400 text-center" title={labelWaktuBuild ? `Build ${labelWaktuBuild}` : undefined}>
+              {labelVersi}
+              {labelWaktuBuild && <span className="block">Build {labelWaktuBuild}</span>}
+            </p>
           </div>
         </div>
       </div>

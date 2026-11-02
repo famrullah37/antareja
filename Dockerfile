@@ -14,6 +14,9 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN npx prisma generate
+# Kode commit untuk label versi di sidebar admin (lihat next.config.mjs).
+ARG GIT_SHA=dev
+ENV GIT_SHA=$GIT_SHA
 RUN npm run build
 
 # Production image

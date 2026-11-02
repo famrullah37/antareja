@@ -1,6 +1,18 @@
+import { readFileSync } from "node:fs";
+
+const { version } = JSON.parse(readFileSync(new URL("./package.json", import.meta.url), "utf8"));
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: "standalone",
+  // Versi aplikasi yang tampil di sidebar admin (lihat src/lib/versiAplikasi.ts).
+  // GIT_SHA dikirim sebagai build-arg dari deploy.sh / GitHub Actions, karena
+  // folder .git tidak ikut masuk ke Docker build (.dockerignore).
+  env: {
+    NEXT_PUBLIC_APP_VERSION: version,
+    NEXT_PUBLIC_APP_COMMIT: (process.env.GIT_SHA || "dev").slice(0, 7),
+    NEXT_PUBLIC_APP_BUILD_TIME: new Date().toISOString(),
+  },
   experimental: {
     serverActions: {
       // 20mb: cukup untuk sertifikat scan (maks 15MB/file di validateUploadFile)

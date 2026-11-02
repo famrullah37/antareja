@@ -9,6 +9,7 @@ import Sidebar from "./components/Sidebar";
 import { HamburgerIcon } from "@/app/components/global/Icons";
 import { protectedRoutes } from "@/utils/protectedRoutes";
 import Image from "next/image";
+import { labelVersi, labelWaktuBuild } from "@/lib/versiAplikasi";
 
 export default function AdminLayout({
   children,
@@ -86,6 +87,10 @@ export default function AdminLayout({
             >
               {signingOut ? "Keluar..." : "Sign Out"}
             </button>
+            <p className="text-xs text-neutral-200">
+              {labelVersi}
+              {labelWaktuBuild && <span className="block">Build {labelWaktuBuild}</span>}
+            </p>
           </div>
         </div>
       </nav>

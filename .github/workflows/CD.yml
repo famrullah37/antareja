@@ -29,6 +29,7 @@ jobs:
           tags: ghcr.io/famrullah37/antareja:latest
           build-args: |
             DATABASE_URL=${{ secrets.DATABASE_URL }}
+            GIT_SHA=${{ github.sha }}
 
   deploy:
     needs: build-and-push

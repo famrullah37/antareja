@@ -16,7 +16,7 @@ echo "==> Menarik perubahan terbaru dari git..."
 git pull
 
 echo "==> Build image Docker lokal ($IMAGE_TAG)..."
-docker build -t "$IMAGE_TAG" .
+docker build --build-arg GIT_SHA="$(git rev-parse --short HEAD)" -t "$IMAGE_TAG" .
 
 echo "==> Restart container dengan image baru..."
 # Sengaja TIDAK menjalankan "docker compose pull" — image di atas sudah ada
