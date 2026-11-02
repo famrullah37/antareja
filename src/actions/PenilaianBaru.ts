@@ -101,6 +101,34 @@ export async function tugaskanJuriKategori(juriId: string, kategori: string) {
   } catch { return { success: false }; }
 }
 
+// Ganti kategori sebuah penugasan. Nilai yang sudah diinput juri tidak ikut
+// berubah/hilang — penugasan hanya menentukan kategori mana yang bisa dia isi.
+export async function ubahJuriKategori(id: string, kategori: string) {
+  await requireAdmin();
+  if (!kategori) return { success: false, message: "Pilih kategori" };
+  try {
+    const jk = await prisma.juriKategori.update({ where: { id }, data: { kategori }, include: { juri: true } });
+    await catatLog("UBAH_PENUGASAN_JURI", `${jk.juri.nama} → ${kategori}`);
+    revalidatePath("/admin/penilaian-baru");
+    return { success: true };
+  } catch (e: any) {
+    if (e?.code === "P2002") return { success: false, message: "Juri ini sudah ditugaskan di kategori tersebut" };
+    return { success: false, message: "Gagal mengubah penugasan" };
+  }
+}
+
+export async function hapusJuriKategori(id: string) {
+  await requireAdmin();
+  try {
+    const jk = await prisma.juriKategori.delete({ where: { id }, include: { juri: true } });
+    await catatLog("HAPUS_PENUGASAN_JURI", `${jk.juri.nama} — ${jk.kategori}`);
+    revalidatePath("/admin/penilaian-baru");
+    return { success: true };
+  } catch {
+    return { success: false, message: "Gagal menghapus penugasan" };
+  }
+}
+
 // Siapa juri pemberi nilai:
 // - JURI: selalu juri milik akun yang login (Juri.userId) — pilihan dari klien
 //   diabaikan, jadi juri tidak bisa mengisi atas nama juri lain.
