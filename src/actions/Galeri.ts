@@ -130,7 +130,9 @@ export async function setTimAlbum(albumId: string, timId: string | null) {
       prisma.album.update({ where: { id: albumId }, data: { timId: tim?.id ?? null } }),
       tim
         ? prisma.foto.updateMany({ where: { albumId }, data: { timId: tim.id, tagTim: tim.nama_tim } })
-        : prisma.foto.updateMany({ where: { albumId, timId: album.timId ?? "-" }, data: { timId: null } }),
+        : // tagTim ikut dikosongkan — kalau tidak, pencarian teks di galeri masih
+          // menemukan foto ini lewat nama tim lama.
+          prisma.foto.updateMany({ where: { albumId, timId: album.timId ?? "-" }, data: { timId: null, tagTim: null } }),
     ]);
     await catatLog("UBAH_TIM_ALBUM", `${album.nama} → ${tim?.nama_tim ?? "(album umum)"}`);
     revalidatePath("/admin/galeri");

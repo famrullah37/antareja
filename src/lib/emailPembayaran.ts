@@ -105,13 +105,18 @@ export async function kirimEmailPesananDiterima(input: {
 
 // Notifikasi ke panitia setiap ada pembayaran baru masuk (status PENDING),
 // supaya bendahara tidak perlu bolak-balik membuka panel admin. Penerima =
-// email admin (env EMAIL_NOTIF_PEMBAYARAN, default antareja@) + semua akun
-// ber-role BENDAHARA — diambil tiap kirim, jadi bendahara baru langsung ikut.
+// email panitia (env EMAIL_NOTIF_PEMBAYARAN, default antareja@) + semua akun
+// ber-role ADMIN & BENDAHARA — diambil tiap kirim, jadi akun baru langsung ikut.
+// Catatan: kalau alamat env sama dengan SMTP_USER (pengirim), Gmail hanya
+// menaruhnya di "Terkirim" — karena itu akun ADMIN/BENDAHARA ikut dikirimi.
 const EMAIL_NOTIF_PEMBAYARAN = process.env.EMAIL_NOTIF_PEMBAYARAN || "antareja@smktelkom-mlg.sch.id";
 
 async function penerimaNotifPembayaran() {
-  const bendahara = await prisma.user.findMany({ where: { role: "BENDAHARA" }, select: { email: true } });
-  const semua = [EMAIL_NOTIF_PEMBAYARAN, ...bendahara.map((b) => b.email)].map((e) => e.trim().toLowerCase());
+  const panitia = await prisma.user.findMany({
+    where: { role: { in: ["ADMIN", "BENDAHARA"] } },
+    select: { email: true },
+  });
+  const semua = [EMAIL_NOTIF_PEMBAYARAN, ...panitia.map((b) => b.email ?? "")].map((e) => e.trim().toLowerCase());
   return Array.from(new Set(semua.filter(Boolean)));
 }
 

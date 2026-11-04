@@ -47,7 +47,7 @@ export default function TiketWajibSection({ items }: { items: ItemTiketWajib[] }
         <p className="text-sm">{PESAN[status]}</p>
         <ul className="flex flex-col gap-2">
           {items.map((it) => (
-            <li key={it.jenis} className="flex flex-wrap items-center gap-2 text-sm text-gray-800">
+            <li key={it.tiketId} className="flex flex-wrap items-center gap-2 text-sm text-gray-800">
               <span className="font-medium">
                 {namaTiket(it.jenis)} — {it.jumlahPerTim} tiket
               </span>
