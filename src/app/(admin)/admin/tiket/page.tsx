@@ -5,6 +5,38 @@ import TiketMasterTable from "./components/TiketMasterTable";
 import TransaksiTiketTable from "./components/TransaksiTiketTable";
 import TiketForm from "./components/TiketForm";
 import KonfigPembayaranForm from "./components/KonfigPembayaranForm";
+import StatusTiketWajibTim, { type BarisStatusTiketTim } from "./components/StatusTiketWajibTim";
+import prisma from "@/lib/prisma";
+
+// Rekap per tim: berapa tiket wajib (khususTim) yang sudah lunas / masih
+// menunggu verifikasi. Transaksi terhubung ke tim lewat akun (userId).
+async function rekapTiketWajibTim(): Promise<BarisStatusTiketTim[]> {
+  const [tims, transaksi] = await Promise.all([
+    prisma.tim.findMany({
+      select: { id: true, nama_tim: true, asal_sekolah: true, jenjang: true, confirmed: true, userId: true },
+      orderBy: { nama_tim: "asc" },
+    }),
+    prisma.transaksiTiket.findMany({
+      where: { tiket: { khususTim: true }, status: { in: ["PENDING", "VERIFIED"] }, userId: { not: null } },
+      select: { userId: true, status: true, jumlah: true },
+    }),
+  ]);
+  const perUser = new Map<string, { lunas: number; menunggu: number }>();
+  for (const t of transaksi) {
+    const r = perUser.get(t.userId!) ?? { lunas: 0, menunggu: 0 };
+    if (t.status === "VERIFIED") r.lunas += t.jumlah;
+    else r.menunggu += t.jumlah;
+    perUser.set(t.userId!, r);
+  }
+  return tims.map((tim) => ({
+    timId: tim.id,
+    namaTim: tim.nama_tim,
+    asalSekolah: tim.asal_sekolah,
+    jenjang: tim.jenjang,
+    confirmed: tim.confirmed,
+    ...(perUser.get(tim.userId) ?? { lunas: 0, menunggu: 0 }),
+  }));
+}
 
 export default async function AdminTiketPage() {
   const [tikets, transaksis, konfig] = await Promise.all([
@@ -12,6 +44,8 @@ export default async function AdminTiketPage() {
     findTransaksiTikets(),
     findKonfigTiket(),
   ]);
+  const adaTiketWajib = tikets.some((t) => t.khususTim);
+  const rekapTim = adaTiketWajib ? await rekapTiketWajibTim() : [];
 
   return (
     <div className="flex flex-col gap-8">
@@ -26,6 +60,17 @@ export default async function AdminTiketPage() {
         <h2 className="text-xl font-semibold mb-3">Master Tiket</h2>
         <TiketMasterTable tikets={tikets} />
       </div>
+
+      {adaTiketWajib && (
+        <div>
+          <h2 className="text-xl font-semibold mb-1">Status Tiket Wajib per Tim</h2>
+          <p className="text-sm text-neutral-500 mb-3">
+            Dihitung dari pembelian online akun tim untuk tiket bertanda &quot;Wajib tim&quot;. Pesanan yang
+            ditolak tidak dihitung.
+          </p>
+          <StatusTiketWajibTim baris={rekapTim} />
+        </div>
+      )}
 
       <div>
         <div className="flex items-center justify-between mb-3">

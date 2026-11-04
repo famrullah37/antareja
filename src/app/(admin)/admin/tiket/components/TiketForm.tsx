@@ -46,6 +46,15 @@ export default function TiketForm() {
         type="number"
         required
       />
+      <label className="flex items-start gap-2 text-sm cursor-pointer">
+        <input type="checkbox" name="khususTim" className="mt-1" />
+        <span>
+          <span className="font-medium">Tiket wajib tim</span>
+          <span className="block text-xs text-neutral-500">
+            Hanya bisa dibeli online oleh akun yang sudah mendaftarkan tim — penonton umum tidak bisa membelinya.
+          </span>
+        </span>
+      </label>
       <div className="border-t border-neutral-100 pt-4 flex flex-col gap-3">
         <div>
           <p className="font-medium text-sm">Bundling (opsional)</p>

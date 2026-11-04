@@ -1,15 +1,16 @@
 import { H2 } from "@/app/components/global/Text";
 import SectionWrapper from "@/app/components/global/Wrapper";
+import InfoBelumDibuka from "./parts/InfoBelumDibuka";
 
 // Grup WhatsApp peserta (KonfigUmum.grupWaUrl). Link hanya dirender untuk tim
 // yang pembayarannya sudah diverifikasi — tim lain hanya melihat keterangan.
 export default function GrupWaSection({ confirmed, url }: { confirmed: boolean; url: string | null }) {
-  if (!url) return null;
-
   return (
     <SectionWrapper id="grup-wa">
       <H2 className="mb-2">Grup WhatsApp Peserta</H2>
-      {!confirmed ? (
+      {!url ? (
+        <InfoBelumDibuka>Link grup WhatsApp peserta belum tersedia dari panitia.</InfoBelumDibuka>
+      ) : !confirmed ? (
         <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 rounded-xl p-4 text-sm">
           Link grup WhatsApp peserta tersedia setelah pembayaran tim diverifikasi panitia.
         </div>

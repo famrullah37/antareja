@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { deleteTiketAdmin, updateBundlingTiket } from "@/actions/Tiket";
+import { deleteTiketAdmin, setKhususTimTiket, updateBundlingTiket } from "@/actions/Tiket";
 import { Tiket } from "@prisma/client";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -25,6 +25,14 @@ export default function TiketMasterTable({ tikets }: { tikets: Tiket[] }) {
     } else toast.error("Gagal menyimpan bundling", { id: toastId });
   }
 
+  async function handleKhususTim(id: string, khususTim: boolean) {
+    const toastId = toast.loading("Menyimpan...");
+    const result = await setKhususTimTiket(id, khususTim);
+    if (result.success)
+      toast.success(khususTim ? "Tiket kini wajib tim (hanya akun tim)" : "Tiket kini terbuka untuk umum", { id: toastId });
+    else toast.error("Gagal menyimpan", { id: toastId });
+  }
+
   async function handleDelete(id: string) {
     const toastId = toast.loading("Menghapus...");
     const result = await deleteTiketAdmin(id);
@@ -46,6 +54,7 @@ export default function TiketMasterTable({ tikets }: { tikets: Tiket[] }) {
             <th className="px-4 py-3 text-left">Harga</th>
             <th className="px-4 py-3 text-left">Kuota</th>
             <th className="px-4 py-3 text-left">Sisa</th>
+            <th className="px-4 py-3 text-left">Pembeli</th>
             <th className="px-4 py-3 text-left">Bundling</th>
             <th className="px-4 py-3 text-left">Aksi</th>
           </tr>
@@ -57,6 +66,21 @@ export default function TiketMasterTable({ tikets }: { tikets: Tiket[] }) {
               <td className="px-4 py-3">{formatRupiah(t.harga)}</td>
               <td className="px-4 py-3">{t.kuota}</td>
               <td className="px-4 py-3">{t.sisa}</td>
+              <td className="px-4 py-3">
+                <div className="flex items-center gap-2">
+                  {t.khususTim ? (
+                    <span className="text-xs font-semibold text-primary-700 bg-primary-50 rounded px-2 py-0.5">Wajib tim</span>
+                  ) : (
+                    <span className="text-xs text-gray-500">Umum</span>
+                  )}
+                  <button
+                    onClick={() => handleKhususTim(t.id, !t.khususTim)}
+                    className="text-blue-500 hover:underline text-xs"
+                  >
+                    Ubah
+                  </button>
+                </div>
+              </td>
               <td className="px-4 py-3">
                 {editBundling === t.id ? (
                   <form

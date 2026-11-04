@@ -83,8 +83,10 @@ export async function createTiketAdmin(data: FormData) {
   const jenis = data.get("jenis") as string;
   const harga = parseInt(data.get("harga") as string);
   const kuota = parseInt(data.get("kuota") as string);
+  const khususTim = data.get("khususTim") === "on";
   try {
-    await createTiket({ jenis, harga, kuota, sisa: kuota, ...parseBundling(data) });
+    await createTiket({ jenis, harga, kuota, sisa: kuota, khususTim, ...parseBundling(data) });
+    revalidatePath("/tiket");
     revalidatePath("/admin/tiket");
     return { success: true };
   } catch { return { success: false }; }
@@ -116,6 +118,22 @@ export async function updateBundlingTiket(data: FormData, id: string) {
     revalidatePath("/admin/tiket");
     revalidatePath("/admin/tiket/pos");
     revalidatePath("/tiket");
+    return { success: true };
+  } catch { return { success: false }; }
+}
+
+// Tandai/lepas tiket sebagai "wajib tim" (hanya bisa dibeli online oleh akun tim).
+export async function setKhususTimTiket(id: string, khususTim: boolean) {
+  await requireAdmin();
+  try {
+    const tiket = await updateTiket({ id }, { khususTim });
+    await catatLog(
+      "UBAH_TIKET_KHUSUS_TIM",
+      `Tiket ${tiket.jenis}: ${khususTim ? "wajib tim (hanya akun tim)" : "terbuka untuk umum"}`
+    );
+    revalidatePath("/admin/tiket");
+    revalidatePath("/tiket");
+    revalidatePath("/");
     return { success: true };
   } catch { return { success: false }; }
 }
@@ -242,8 +260,15 @@ export async function beliTiket(data: FormData) {
 
   // Cek tiket & stok SEBELUM upload — jangan buang kuota Cloudinary untuk pembelian
   // yang pasti gagal (stok tetap dicek ulang secara atomik di transaksi bawah).
-  const tiketCek = await prisma.tiket.findUnique({ where: { id: tiketId }, select: { sisa: true } });
+  const tiketCek = await prisma.tiket.findUnique({ where: { id: tiketId }, select: { sisa: true, khususTim: true } });
   if (!tiketCek) return { success: false, message: "Tiket tidak ditemukan" };
+  // Tiket wajib tim hanya untuk akun yang sudah mendaftarkan tim.
+  if (tiketCek.khususTim) {
+    const punyaTim = userId ? (await prisma.tim.count({ where: { userId } })) > 0 : false;
+    if (!punyaTim) {
+      return { success: false, message: "Tiket ini wajib untuk tim peserta — login dengan akun tim untuk membelinya" };
+    }
+  }
   if (tiketCek.sisa < jumlah) return { success: false, message: "Stok tiket tidak mencukupi" };
 
   // Upload bukti dulu sebelum transaksi DB

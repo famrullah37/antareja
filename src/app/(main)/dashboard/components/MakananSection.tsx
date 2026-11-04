@@ -4,6 +4,7 @@ import { sesiTerbuka, type ItemMakanan } from "@/lib/makanan";
 import { findPesananMakananByTim, findSesiMakanTim } from "@/queries/makanan.query";
 import { findKonfigTiket } from "@/queries/tiket.query";
 import FormMakanan from "./parts/FormMakanan";
+import InfoBelumDibuka from "./parts/InfoBelumDibuka";
 
 // Pemesanan makanan: tampil kalau panitia membuka pemesanan (KonfigUmum.makananAktif)
 // atau tim sudah pernah memesan (statusnya tetap terlihat).
@@ -23,7 +24,7 @@ export default async function MakananSection({
     aktif ? findSesiMakanTim() : [],
     findKonfigTiket(),
   ]);
-  if (!aktif && pesanan.length === 0) return null;
+  const belumDibuka = !aktif && pesanan.length === 0;
 
   const sesiTersedia = sesiList
     .filter((s) => sesiTerbuka(s) && s.menus.length > 0)
@@ -42,6 +43,8 @@ export default async function MakananSection({
         <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 rounded-xl p-4 text-sm">
           Pemesanan makanan dibuka setelah pembayaran tim diverifikasi panitia.
         </div>
+      ) : belumDibuka ? (
+        <InfoBelumDibuka>Pemesanan makanan belum dibuka panitia. Pantau pengumuman di dashboard ini.</InfoBelumDibuka>
       ) : (
         <>
           {info && <p className="text-sm text-gray-500 mb-4 whitespace-pre-line">{info}</p>}

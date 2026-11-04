@@ -26,9 +26,13 @@ type KonfigTiket = {
 export default function BeliTiketForm({
   tikets,
   konfig,
+  punyaTim,
+  sudahLogin,
 }: {
   tikets: Tiket[];
   konfig: KonfigTiket;
+  punyaTim: boolean;
+  sudahLogin: boolean;
 }) {
   const [selected, setSelected] = useState<Tiket | null>(null);
   const [jumlah, setJumlah] = useState(1);
@@ -157,17 +161,27 @@ export default function BeliTiketForm({
     <div className="flex flex-col gap-6">
       {/* Pilih Jenis Tiket */}
       <div className="grid sm:grid-cols-3 gap-4">
-        {tikets.map((t) => (
+        {tikets.map((t) => {
+          const terkunci = t.khususTim && !punyaTim;
+          return (
           <button
             key={t.id}
             type="button"
+            disabled={terkunci}
             onClick={() => setSelected(t)}
             className={`rounded-2xl border-2 p-5 text-left transition-all ${
-              selected?.id === t.id
+              terkunci
+                ? "border-gray-200 bg-gray-50 opacity-70 cursor-not-allowed"
+                : selected?.id === t.id
                 ? "border-primary-500 bg-primary-50"
                 : "border-gray-200 bg-white hover:border-gray-400"
             }`}
           >
+            {t.khususTim && (
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-primary-700 bg-primary-100 rounded px-2 py-0.5 mb-2 inline-block">
+                Wajib tim peserta
+              </div>
+            )}
             <div className="font-bold text-lg mb-1">Tiket {t.jenis}</div>
             <div className="text-primary-600 font-semibold text-xl">
               {formatRupiah(t.harga)}
@@ -180,8 +194,16 @@ export default function BeliTiketForm({
             <div className="text-xs text-gray-400 mt-1">
               Sisa: {t.sisa} tiket
             </div>
+            {terkunci && (
+              <div className="text-xs text-gray-600 mt-2">
+                {sudahLogin
+                  ? "Hanya untuk akun yang sudah mendaftarkan tim."
+                  : "Login dengan akun tim untuk membeli tiket ini."}
+              </div>
+            )}
           </button>
-        ))}
+          );
+        })}
       </div>
 
       {selected && (

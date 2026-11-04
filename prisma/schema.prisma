@@ -330,6 +330,9 @@ model Tiket {
   // bundleHarga null/0 = tidak ada bundling. Maksimal 1 paket per tiket.
   bundleHarga Int?
   bundleIsi   String?
+  // Tiket wajib tim peserta: hanya bisa dibeli online oleh akun yang punya tim
+  // (dicek di actions/Tiket.ts beliTiket). false = tiket penonton umum.
+  khususTim   Boolean          @default(false)
   transaksi TransaksiTiket[]
 }
 

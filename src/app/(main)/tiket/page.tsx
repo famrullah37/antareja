@@ -8,6 +8,8 @@ import InfoHalaman from "../components/InfoHalaman";
 import { getKonfigUmum, type TimelineItem } from "@/queries/konfigUmum.query";
 import { getInfoAcara } from "@/lib/acara";
 import { siteConfig } from "@/config/site";
+import { getServerSession } from "@/lib/next-auth";
+import prisma from "@/lib/prisma";
 
 import type { Metadata } from "next";
 
@@ -18,11 +20,16 @@ export const metadata: Metadata = {
 };
 
 export default async function TiketPage() {
-  const [tikets, konfig, konfigUmum] = await Promise.all([
+  const [tikets, konfig, konfigUmum, session] = await Promise.all([
     findTikets(),
     findKonfigTiket(),
     getKonfigUmum(),
+    getServerSession(),
   ]);
+  // Tiket wajib tim hanya bisa dipilih akun yang sudah mendaftarkan tim
+  // (dicek ulang di server, actions/Tiket.ts beliTiket).
+  const userId = session?.user?.id;
+  const punyaTim = userId ? (await prisma.tim.count({ where: { userId } })) > 0 : false;
   // Tanggal & jam dari tahap terakhir timeline di Pengaturan (lihat lib/acara.ts).
   const acara = getInfoAcara(konfigUmum.timeline as TimelineItem[] | null);
 
@@ -41,7 +48,7 @@ export default async function TiketPage() {
           Penjualan tiket belum dibuka. Pantau terus website ini.
         </div>
       ) : (
-        <BeliTiketForm tikets={tikets} konfig={konfig} />
+        <BeliTiketForm tikets={tikets} konfig={konfig} punyaTim={punyaTim} sudahLogin={!!userId} />
       )}
       <div className="mt-10">
         <ShareButtons

@@ -3,6 +3,7 @@ import SectionWrapper from "@/app/components/global/Wrapper";
 import { findSesiUjiCobaPublik } from "@/queries/ujiCoba.query";
 import { formatTanggalWib, formatJamWib, ujiCobaTerkunci } from "@/lib/ujiCoba";
 import PilihSlotUjiCoba from "./parts/PilihSlotUjiCoba";
+import InfoBelumDibuka from "./parts/InfoBelumDibuka";
 
 // Pendaftaran uji coba lapangan: tampil begitu admin membuat sesi. Tim yang
 // pembayarannya sudah diverifikasi memilih satu slot (lihat actions/UjiCoba.ts).
@@ -16,7 +17,14 @@ export default async function UjiCobaSection({
   batas: Date | null;
 }) {
   const sesiDb = await findSesiUjiCobaPublik();
-  if (sesiDb.length === 0) return null;
+  if (sesiDb.length === 0) {
+    return (
+      <SectionWrapper id="uji-coba">
+        <H2 className="mb-2">Uji Coba Lapangan</H2>
+        <InfoBelumDibuka>Jadwal uji coba lapangan belum dibuka panitia.</InfoBelumDibuka>
+      </SectionWrapper>
+    );
+  }
 
   // Ke browser hanya dikirim "terisi atau tidak" — siapa pengisinya tidak.
   const sesi = sesiDb.map(({ bookings, ...s }) => ({

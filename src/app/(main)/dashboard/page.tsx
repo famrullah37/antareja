@@ -18,6 +18,9 @@ import BasecampSection from "./components/BasecampSection";
 import MakananSection from "./components/MakananSection";
 import GrupWaSection from "./components/GrupWaSection";
 import PelunasanSection from "./components/PelunasanSection";
+import MenuDashboard from "./components/MenuDashboard";
+import TiketWajibSection from "./components/TiketWajibSection";
+import { findTikets } from "@/queries/tiket.query";
 import { siapkanPelunasan } from "@/lib/pelunasan";
 import { biayaPendaftaran } from "@/actions/pembayaran";
 import { getKonfigUmum } from "@/queries/konfigUmum.query";
@@ -43,13 +46,18 @@ export default async function TimDashboard() {
 
   const tim = tims[0] as TimWithRelations;
 
-  const [transaksiTikets, penilaianBaru, sertifikat, biayaDasar, konfig] = await Promise.all([
+  const [transaksiTikets, penilaianBaru, sertifikat, biayaDasar, konfig, tiketWajib] = await Promise.all([
     findTransaksiTikets({ userId: session.user!.id }),
     findPenilaianBaru({ timId: tim.id }),
     findSertifikatByTim(tim.id),
     biayaPendaftaran(tim.jenjang, tim.pembayaran?.isDP ?? false),
     getKonfigUmum(),
+    findTikets({ khususTim: true }),
   ]);
+  // Jumlah tiket wajib (khususTim) milik akun tim ini, per status.
+  const trWajib = transaksiTikets.filter((t) => t.tiket.khususTim);
+  const tiketWajibLunas = trWajib.filter((t) => t.status === "VERIFIED").reduce((n, t) => n + t.jumlah, 0);
+  const tiketWajibMenunggu = trWajib.filter((t) => t.status === "PENDING").reduce((n, t) => n + t.jumlah, 0);
   const pelunasan = tim.confirmed && tim.pembayaran?.isDP ? await siapkanPelunasan(tim.id) : null;
 
   // Surat undangan & surat rekomendasi Diknas sesuai jenjang tim (hanya SMP/SMA).
@@ -61,8 +69,14 @@ export default async function TimDashboard() {
   });
 
   return (
-    <>
+    // scroll-mt: anchor menu tidak tertutup navbar yang fixed di atas
+    <div className="[&_section]:scroll-mt-28">
       <Heading />
+      <MenuDashboard
+        adaPelunasan={!!pelunasan}
+        adaTiket={transaksiTikets.length > 0}
+        adaTiketWajib={tiketWajib.length > 0}
+      />
       <ProfileTim tim={tim} penilaian={tim.penilaian ?? null} biayaDasar={biayaDasar} dokumen={dokumen} />
       {pelunasan && (
         <PelunasanSection
@@ -80,6 +94,11 @@ export default async function TimDashboard() {
           }
         />
       )}
+      <TiketWajibSection
+        jenisWajib={tiketWajib.map((t) => t.jenis)}
+        lunas={tiketWajibLunas}
+        menunggu={tiketWajibMenunggu}
+      />
       <GrupWaSection confirmed={tim.confirmed} url={konfig.grupWaUrl} />
       <BasecampSection timId={tim.id} ruanganId={tim.ruanganId} />
       <UjiCobaSection timId={tim.id} confirmed={tim.confirmed} batas={konfig.ujiCobaBatas} />
@@ -98,6 +117,6 @@ export default async function TimDashboard() {
       <NilaiAkhirSection penilaianBaru={penilaianBaru as any} />
       <SertifikatSection sertifikat={sertifikat as any} />
       <TiketSayaSection transaksis={transaksiTikets as any} />
-    </>
+    </div>
   );
 }

@@ -1,13 +1,24 @@
 import { H2 } from "@/app/components/global/Text";
 import SectionWrapper from "@/app/components/global/Wrapper";
 import { findRuanganTim } from "@/queries/ruangan.query";
+import InfoBelumDibuka from "./parts/InfoBelumDibuka";
 
-// Ruangan basecamp tim, ditempatkan panitia di /admin/basecamp. Tidak tampil
-// sebelum tim ditempatkan. Ikut menampilkan tim lain yang satu ruangan.
+// Ruangan basecamp tim, ditempatkan panitia di /admin/basecamp. Sebelum tim
+// ditempatkan, section tetap tampil dengan keterangan. Ikut menampilkan tim
+// lain yang satu ruangan.
 export default async function BasecampSection({ timId, ruanganId }: { timId: string; ruanganId: string | null }) {
-  if (!ruanganId) return null;
-  const ruangan = await findRuanganTim(ruanganId);
-  if (!ruangan) return null;
+  const ruangan = ruanganId ? await findRuanganTim(ruanganId) : null;
+  if (!ruangan) {
+    return (
+      <SectionWrapper id="basecamp">
+        <H2 className="mb-2">Basecamp</H2>
+        <InfoBelumDibuka>
+          Ruangan basecamp tim kamu belum ditentukan panitia. Informasi ruangan akan muncul di sini setelah tim
+          ditempatkan.
+        </InfoBelumDibuka>
+      </SectionWrapper>
+    );
+  }
   const timLain = ruangan.tims.filter((t) => t.id !== timId);
 
   return (

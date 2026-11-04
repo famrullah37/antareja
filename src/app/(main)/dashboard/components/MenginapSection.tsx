@@ -2,9 +2,11 @@ import { H2 } from "@/app/components/global/Text";
 import SectionWrapper from "@/app/components/global/Wrapper";
 import { findPengajuanMenginapByTim } from "@/queries/menginap.query";
 import FormMenginap from "./parts/FormMenginap";
+import InfoBelumDibuka from "./parts/InfoBelumDibuka";
 
-// Pengajuan menginap: tampil kalau panitia membuka pengajuan (KonfigUmum.menginapAktif)
-// atau tim sudah pernah mengajukan (statusnya tetap terlihat).
+// Pengajuan menginap: form muncul kalau panitia membuka pengajuan (KonfigUmum.menginapAktif)
+// atau tim sudah pernah mengajukan (statusnya tetap terlihat). Selain itu section
+// tetap tampil dengan keterangan "belum dibuka".
 export default async function MenginapSection({
   timId,
   confirmed,
@@ -17,7 +19,7 @@ export default async function MenginapSection({
   info: string | null;
 }) {
   const pengajuan = await findPengajuanMenginapByTim(timId);
-  if (!aktif && !pengajuan) return null;
+  const belumDibuka = !aktif && !pengajuan;
 
   return (
     <SectionWrapper id="menginap">
@@ -26,6 +28,8 @@ export default async function MenginapSection({
         <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 rounded-xl p-4 text-sm">
           Pengajuan menginap dibuka setelah pembayaran tim diverifikasi panitia.
         </div>
+      ) : belumDibuka ? (
+        <InfoBelumDibuka>Pengajuan menginap belum dibuka panitia. Pantau pengumuman di dashboard ini.</InfoBelumDibuka>
       ) : (
         <>
           {info && <p className="text-sm text-gray-500 mb-4 whitespace-pre-line">{info}</p>}
