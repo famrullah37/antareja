@@ -1,7 +1,10 @@
 ﻿"use client";
 
-import { createAlbumAdmin, deleteAlbumAdmin, publishAlbum, setFotograferAlbum } from "@/actions/Galeri";
+import { createAlbumAdmin, deleteAlbumAdmin, publishAlbum, setFotograferAlbum, setTimAlbum } from "@/actions/Galeri";
+import { useState } from "react";
 import { toast } from "sonner";
+
+type TimOpsi = { id: string; nama: string; sekolah: string };
 
 type Album = {
   id: string;
@@ -13,6 +16,7 @@ type Album = {
   createdAt: Date;
   fotograferId: string | null;
   fotografer: { nama: string } | null;
+  timId: string | null;
   _count: { fotos: number };
 };
 
@@ -26,12 +30,28 @@ const TIPE_COLORS: Record<string, string> = {
 export default function AlbumSection({
   albums,
   fotografers,
+  tims,
   isAdmin,
 }: {
   albums: Album[];
   fotografers: Fotografer[];
+  tims: TimOpsi[];
   isAdmin: boolean;
 }) {
+  const [cariTim, setCariTim] = useState("");
+  const [timBaru, setTimBaru] = useState("");
+  const q = cariTim.trim().toLowerCase();
+  const timTersaring = q
+    ? tims.filter((t) => t.id === timBaru || t.nama.toLowerCase().includes(q) || t.sekolah.toLowerCase().includes(q))
+    : tims;
+
+  async function handleTim(id: string, timId: string) {
+    const toastId = toast.loading("Menyimpan tim album...");
+    const result = await setTimAlbum(id, timId || null);
+    if (result.success) toast.success(timId ? "Album dihubungkan ke tim — semua fotonya ikut" : "Album dijadikan album umum", { id: toastId });
+    else toast.error(result.message ?? "Gagal", { id: toastId });
+  }
+
   async function handleFotografer(id: string, fotograferId: string) {
     const toastId = toast.loading("Menyimpan fotografer...");
     const result = await setFotograferAlbum(id, fotograferId || null);
@@ -42,8 +62,11 @@ export default function AlbumSection({
   async function handleCreate(data: FormData) {
     const toastId = toast.loading("Membuat album...");
     const result = await createAlbumAdmin(data);
-    if (result.success) toast.success("Album dibuat!", { id: toastId });
-    else toast.error("Gagal", { id: toastId });
+    if (result.success) {
+      toast.success("Album dibuat!", { id: toastId });
+      setTimBaru("");
+      setCariTim("");
+    } else toast.error(result.message ?? "Gagal", { id: toastId });
   }
 
   async function handlePublish(id: string, current: boolean) {
@@ -80,6 +103,31 @@ export default function AlbumSection({
               placeholder="Dokumentasi Hari H"
               className="border border-neutral-300 rounded-lg px-3 py-2 text-sm"
             />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-sm">Tim (opsional) — satu album untuk satu tim</label>
+            <input
+              value={cariTim}
+              onChange={(e) => setCariTim(e.target.value)}
+              placeholder="Cari nama tim / sekolah..."
+              className="border border-neutral-300 rounded-lg px-3 py-2 text-sm"
+            />
+            <select
+              name="timId"
+              value={timBaru}
+              onChange={(e) => setTimBaru(e.target.value)}
+              className="border border-neutral-300 rounded-lg px-3 py-2 text-sm"
+            >
+              <option value="">— Album umum (tanpa tim) —</option>
+              {timTersaring.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.nama} — {t.sekolah}
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-gray-500">
+              Semua foto yang di-upload ke album ini otomatis menjadi foto tim tersebut.
+            </p>
           </div>
           <div className="flex flex-col gap-1">
             <label className="text-sm">Deskripsi (opsional)</label>
@@ -144,6 +192,19 @@ export default function AlbumSection({
               >
                 <div className="min-w-0">
                   <div className="font-medium text-sm truncate">{album.nama}</div>
+                  <select
+                    defaultValue={album.timId ?? ""}
+                    onChange={(e) => handleTim(album.id, e.target.value)}
+                    className="mt-1 border border-neutral-200 rounded px-1 py-0.5 text-[11px] text-gray-600 max-w-full"
+                    title="Tim album — semua foto di album ikut tim ini"
+                  >
+                    <option value="">👥 Album umum (tanpa tim)</option>
+                    {tims.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        👥 {t.nama} — {t.sekolah}
+                      </option>
+                    ))}
+                  </select>
                   <div className="text-xs text-gray-400 flex items-center gap-1.5 flex-wrap mt-0.5">
                     <span>{album._count.fotos} foto</span>
                     <span>·</span>

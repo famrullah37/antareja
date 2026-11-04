@@ -20,6 +20,7 @@ import GrupWaSection from "./components/GrupWaSection";
 import PelunasanSection from "./components/PelunasanSection";
 import MenuDashboard from "./components/MenuDashboard";
 import TiketWajibSection from "./components/TiketWajibSection";
+import FotoTimSection from "./components/FotoTimSection";
 import { findTikets } from "@/queries/tiket.query";
 import { statusPerJenis } from "@/lib/tiketWajib";
 import { siapkanPelunasan } from "@/lib/pelunasan";
@@ -112,6 +113,7 @@ export default async function TimDashboard() {
         aktif={konfig.makananAktif}
         info={konfig.makananInfo}
       />
+      <FotoTimSection timId={tim.id} />
       <NilaiAkhirSection penilaianBaru={penilaianBaru as any} />
       <SertifikatSection sertifikat={sertifikat as any} />
       <TiketSayaSection transaksis={transaksiTikets as any} />

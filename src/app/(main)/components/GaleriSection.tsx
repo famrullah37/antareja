@@ -6,7 +6,8 @@ import { RightArrow } from "@/app/components/global/Icons";
 import Image from "next/image";
 
 export default async function GaleriSection() {
-  const fotos = await findFotos({ statusPublish: true });
+  // Hanya foto dari album yang sudah dipublish (lihat galeri/page.tsx).
+  const fotos = await findFotos({ statusPublish: true, album: { statusPublish: true } });
 
   if (fotos.length === 0) return null;
 

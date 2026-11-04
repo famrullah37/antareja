@@ -470,9 +470,13 @@ model Album {
   // Fotografer pemilik album — penerima bagi hasil penjualan fotonya.
   fotograferId  String?
   fotografer    User?    @relation("AlbumFotografer", fields: [fotograferId], references: [id], onDelete: SetNull)
+  // Satu album = satu tim (opsional; album umum tanpa tim). Foto di album ini
+  // otomatis ikut timId album (lihat actions/Galeri.ts). Tanpa FK (lihat 0047).
+  timId         String?
   fotos         Foto[]
 
   @@index([fotograferId])
+  @@index([timId])
 }
 
 model Foto {
@@ -481,6 +485,10 @@ model Foto {
   pathAsli      String
   pathWatermark String
   tagTim        String?
+  // Tim peserta di foto (dipilih dari daftar tim saat upload) — dipakai
+  // pencarian galeri per tim & "Foto Tim Kamu" di dashboard. Tanpa FK supaya
+  // migrasi idempotent (lihat db/sql/0046); tagTim tetap teks tampilannya.
+  timId         String?
   statusPublish Boolean  @default(false)
   createdAt     DateTime @default(now())
   // Fotografer foto ini (penerima bagi hasil); kosong = ikut fotografer album.
@@ -489,6 +497,7 @@ model Foto {
   album         Album    @relation(fields: [albumId], references: [id])
 
   @@index([fotograferId])
+  @@index([timId])
 }
 
 model TransaksiFoto {

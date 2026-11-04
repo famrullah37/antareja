@@ -13,9 +13,12 @@ type FotoItem = {
   pathWatermark: string;
   pathAsli: string;
   tagTim: string | null;
+  timId: string | null;
   albumId: string;
   album: { nama: string; tipe: string; harga: number };
 };
+
+type TimItem = { id: string; nama: string; sekolah: string };
 
 type AlbumItem = {
   id: string;
@@ -23,6 +26,7 @@ type AlbumItem = {
   tipe: string;
   harga: number;
   deskripsi: string | null;
+  timId: string | null;
   _count: { fotos: number };
 };
 
@@ -45,12 +49,34 @@ export default function GaleriClient({
   albums,
   fotos,
   konfig,
+  tims,
+  timAwal,
 }: {
   albums: AlbumItem[];
   fotos: FotoItem[];
   konfig: KonfigTiket;
+  tims: TimItem[];
+  timAwal: string;
 }) {
   const [selectedAlbum, setSelectedAlbum] = useState<string>("all");
+  const [timFilter, setTimFilter] = useState<string>(timAwal);
+  const [cari, setCari] = useState("");
+  const timTerpilih = tims.find((t) => t.id === timFilter) ?? null;
+
+  // Simpan tim terpilih di URL (/galeri?tim=<id>) supaya link bisa dibagikan.
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (timFilter) url.searchParams.set("tim", timFilter);
+    else url.searchParams.delete("tim");
+    window.history.replaceState(null, "", url.toString());
+  }, [timFilter]);
+
+  const q = cari.trim().toLowerCase();
+  const timById = new Map(tims.map((t) => [t.id, t]));
+  // Saran tim saat mengetik: cocok nama tim atau asal sekolah.
+  const saranTim = q
+    ? tims.filter((t) => t.nama.toLowerCase().includes(q) || t.sekolah.toLowerCase().includes(q)).slice(0, 8)
+    : [];
   const [cart, setCart] = useState<Set<string>>(new Set());
   const [showCheckout, setShowCheckout] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -75,10 +101,14 @@ export default function GaleriClient({
     else toast.error("Gagal menyiapkan kode pembayaran, coba lagi");
   }
 
-  const filtered =
-    selectedAlbum === "all"
-      ? fotos
-      : fotos.filter((f) => f.albumId === selectedAlbum);
+  const filtered = fotos.filter((f) => {
+    if (selectedAlbum !== "all" && f.albumId !== selectedAlbum) return false;
+    if (timFilter) return f.timId === timFilter;
+    if (!q) return true;
+    // Teks pencarian: nama tim / sekolah dari data tim, atau tag lama (teks bebas).
+    const tim = f.timId ? timById.get(f.timId) : undefined;
+    return [f.tagTim, tim?.nama, tim?.sekolah].some((s) => s?.toLowerCase().includes(q));
+  });
 
   function toggleCart(id: string) {
     setCart((prev) => {
@@ -157,6 +187,53 @@ export default function GaleriClient({
   return (
     <div className="flex flex-col gap-8">
 
+      {/* Cari foto per tim peserta */}
+      <div className="flex flex-col gap-3">
+        <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Cari Foto Tim</h2>
+        {timTerpilih ? (
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="inline-flex items-center gap-2 bg-primary-50 border border-primary-200 text-primary-700 rounded-xl px-4 py-2 text-sm font-medium">
+              {timTerpilih.nama}
+              <span className="text-primary-500 font-normal">— {timTerpilih.sekolah}</span>
+            </span>
+            <button
+              type="button"
+              onClick={() => setTimFilter("")}
+              className="text-sm text-gray-500 hover:text-neutral-800 underline"
+            >
+              Tampilkan semua tim
+            </button>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-2">
+            <input
+              type="search"
+              value={cari}
+              onChange={(e) => setCari(e.target.value)}
+              placeholder="Ketik nama tim atau sekolah..."
+              className="border-2 border-neutral-200 focus:border-primary-400 rounded-xl px-4 py-2.5 text-sm outline-none w-full sm:max-w-md"
+            />
+            {saranTim.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {saranTim.map((t) => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => {
+                      setTimFilter(t.id);
+                      setCari("");
+                    }}
+                    className="px-3 py-1.5 rounded-lg text-xs font-medium border border-neutral-200 hover:border-primary-400 hover:text-primary-600 text-neutral-600"
+                  >
+                    {t.nama} <span className="opacity-60">— {t.sekolah}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
       {/* Album Tabs */}
       <div className="flex flex-col gap-3">
         <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Album</h2>
@@ -172,17 +249,30 @@ export default function GaleriClient({
             Semua Foto
             <span className="ml-1.5 opacity-70">({fotos.length})</span>
           </button>
-          {albums.map((a) => (
+          {albums.map((a) => {
+            const timAlbum = a.timId ? timById.get(a.timId) : undefined;
+            return (
             <button
               key={a.id}
-              onClick={() => setSelectedAlbum(a.id)}
+              onClick={() => {
+                setSelectedAlbum(a.id);
+                // Album milik tim lain dari filter tim aktif → lepas filter tim.
+                if (timFilter && a.timId !== timFilter) setTimFilter("");
+              }}
               className={`px-4 py-2 rounded-xl text-sm font-medium border-2 transition-colors flex items-center gap-2 ${
                 selectedAlbum === a.id
                   ? "border-primary-500 bg-primary-500 text-white"
                   : "border-neutral-200 hover:border-neutral-400 text-neutral-600"
               }`}
             >
-              {a.nama}
+              {timAlbum ? (
+                <span className="flex flex-col items-start leading-tight text-left">
+                  <span>👥 {timAlbum.nama}</span>
+                  <span className="text-[11px] opacity-70 font-normal">{timAlbum.sekolah}</span>
+                </span>
+              ) : (
+                a.nama
+              )}
               <span className="opacity-70">({a._count.fotos})</span>
               {a.tipe === "GRATIS" ? (
                 <span className="text-[9px] font-bold bg-green-500 text-white px-1.5 py-0.5 rounded-full">GRATIS</span>
@@ -192,7 +282,8 @@ export default function GaleriClient({
                 </span>
               )}
             </button>
-          ))}
+            );
+          })}
         </div>
       </div>
 
@@ -226,6 +317,14 @@ export default function GaleriClient({
               Beli Foto →
             </button>
           </div>
+        </div>
+      )}
+
+      {filtered.length === 0 && (
+        <div className="bg-gray-50 rounded-2xl p-8 text-center text-gray-500 text-sm">
+          {timFilter || q
+            ? "Belum ada foto untuk tim/sekolah ini. Coba kata kunci lain atau cek lagi nanti."
+            : "Belum ada foto di album ini."}
         </div>
       )}
 

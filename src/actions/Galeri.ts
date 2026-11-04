@@ -87,8 +87,14 @@ export async function createAlbumAdmin(data: FormData) {
   // Fotografer yang membuat album otomatis jadi pemiliknya; admin memilih.
   const fotograferId = user.role === "FOTOGRAFER" ? user.id : (data.get("fotograferId") as string) || null;
   if (!(await fotograferValid(fotograferId))) return { success: false };
+  // Satu album = satu tim (opsional).
+  const timId = ((data.get("timId") as string) || "").trim() || null;
+  if (timId && !(await prisma.tim.count({ where: { id: timId } }))) return { success: false, message: "Tim tidak ditemukan" };
   try {
-    await createAlbum({ nama, deskripsi, tipe, harga, ...(fotograferId ? { fotografer: { connect: { id: fotograferId } } } : {}) });
+    await createAlbum({
+      nama, deskripsi, tipe, harga, timId,
+      ...(fotograferId ? { fotografer: { connect: { id: fotograferId } } } : {}),
+    });
     revalidatePath("/admin/galeri");
     return { success: true };
   } catch { return { success: false }; }
@@ -104,6 +110,34 @@ export async function setFotograferAlbum(albumId: string, fotograferId: string |
     return { success: true };
   } catch {
     return { success: false, message: "Gagal mengubah fotografer album" };
+  }
+}
+
+// Hubungkan album ke satu tim (null = album umum). Semua foto di album ikut
+// pindah ke tim baru; foto yang tadinya ikut tim lama album dilepas.
+// Admin, atau fotografer pemilik album.
+export async function setTimAlbum(albumId: string, timId: string | null) {
+  const user = await requireAdminOrFotografer();
+  try {
+    const album = await prisma.album.findUnique({ where: { id: albumId }, select: { nama: true, timId: true, fotograferId: true } });
+    if (!album) return { success: false, message: "Album tidak ditemukan" };
+    if (user.role === "FOTOGRAFER" && album.fotograferId !== user.id)
+      return { success: false, message: "Hanya bisa mengubah album milik Anda" };
+    const tim = timId ? await prisma.tim.findUnique({ where: { id: timId }, select: { id: true, nama_tim: true } }) : null;
+    if (timId && !tim) return { success: false, message: "Tim tidak ditemukan" };
+
+    await prisma.$transaction([
+      prisma.album.update({ where: { id: albumId }, data: { timId: tim?.id ?? null } }),
+      tim
+        ? prisma.foto.updateMany({ where: { albumId }, data: { timId: tim.id, tagTim: tim.nama_tim } })
+        : prisma.foto.updateMany({ where: { albumId, timId: album.timId ?? "-" }, data: { timId: null } }),
+    ]);
+    await catatLog("UBAH_TIM_ALBUM", `${album.nama} → ${tim?.nama_tim ?? "(album umum)"}`);
+    revalidatePath("/admin/galeri");
+    revalidatePath("/galeri");
+    return { success: true };
+  } catch {
+    return { success: false, message: "Gagal mengubah tim album" };
   }
 }
 
@@ -169,8 +203,17 @@ export async function deleteAlbumAdmin(albumId: string) {
 export async function uploadFoto(data: FormData) {
   const user = await requireAdminOrFotografer();
   const albumId = data.get("albumId") as string;
-  const tagTim = data.get("tagTim") as string;
   const files = data.getAll("fotos") as File[];
+  // Tim dipilih dari daftar tim terdaftar (bukan diketik) supaya foto pasti
+  // terhubung ke tim yang benar; tagTim diisi nama tim sebagai teks tampilan.
+  // Album yang sudah terhubung ke tim menang: semua fotonya milik tim album.
+  const albumTim = await prisma.album.findUnique({ where: { id: albumId }, select: { timId: true } });
+  const timIdInput = albumTim?.timId || ((data.get("timId") as string) || "").trim();
+  const tim = timIdInput
+    ? await prisma.tim.findUnique({ where: { id: timIdInput }, select: { id: true, nama_tim: true } })
+    : null;
+  if (timIdInput && !tim) return { success: false, uploaded: 0, failed: files.length, failedReasons: ["Tim tidak ditemukan"] };
+  const tagTim = tim?.nama_tim;
   // Fotografer yang upload otomatis jadi pemilik fotonya (bagi hasil per foto);
   // admin boleh memilih — kosong = ikut fotografer album.
   const fotograferId = user.role === "FOTOGRAFER" ? user.id : (data.get("fotograferId") as string) || null;
@@ -197,6 +240,7 @@ export async function uploadFoto(data: FormData) {
         pathAsli: uploaded.data.url,
         pathWatermark: uploadedWatermark.data?.url ?? uploaded.data.url,
         tagTim: tagTim || undefined,
+        timId: tim?.id,
         statusPublish: true,
         ...(fotograferId ? { fotografer: { connect: { id: fotograferId } } } : {}),
       });

@@ -10,6 +10,7 @@ const MENU = [
   { label: "Uji Coba", href: "#uji-coba" },
   { label: "Menginap", href: "#menginap" },
   { label: "Makanan", href: "#makanan" },
+  { label: "Foto Tim", href: "#foto-tim" },
   { label: "Nilai", href: "#nilai-akhir" },
   { label: "Sertifikat", href: "#sertifikat-saya" },
   { label: "Tiket Saya", href: "#tiket-saya" },
