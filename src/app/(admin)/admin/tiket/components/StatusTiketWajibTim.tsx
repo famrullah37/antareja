@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import type { StatusTiketWajib } from "@/lib/tiketWajib";
 
 export type BarisStatusTiketTim = {
   timId: string;
@@ -8,17 +9,14 @@ export type BarisStatusTiketTim = {
   asalSekolah: string;
   jenjang: string;
   confirmed: boolean;
+  status: StatusTiketWajib; // gabungan semua jenis tiket wajib (lib/tiketWajib.ts)
   lunas: number; // jumlah tiket wajib VERIFIED
   menunggu: number; // jumlah tiket wajib PENDING
 };
 
-type Filter = "SEMUA" | "SUDAH" | "MENUNGGU" | "BELUM";
+type Filter = "SEMUA" | StatusTiketWajib;
 
-function statusBaris(b: BarisStatusTiketTim): Exclude<Filter, "SEMUA"> {
-  if (b.lunas > 0) return "SUDAH";
-  if (b.menunggu > 0) return "MENUNGGU";
-  return "BELUM";
-}
+const statusBaris = (b: BarisStatusTiketTim) => b.status;
 
 const LABEL: Record<Exclude<Filter, "SEMUA">, { teks: string; kelas: string }> = {
   SUDAH: { teks: "Sudah beli", kelas: "bg-green-50 text-green-700" },

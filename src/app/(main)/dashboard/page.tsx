@@ -21,6 +21,7 @@ import PelunasanSection from "./components/PelunasanSection";
 import MenuDashboard from "./components/MenuDashboard";
 import TiketWajibSection from "./components/TiketWajibSection";
 import { findTikets } from "@/queries/tiket.query";
+import { statusPerJenis } from "@/lib/tiketWajib";
 import { siapkanPelunasan } from "@/lib/pelunasan";
 import { biayaPendaftaran } from "@/actions/pembayaran";
 import { getKonfigUmum } from "@/queries/konfigUmum.query";
@@ -54,10 +55,11 @@ export default async function TimDashboard() {
     getKonfigUmum(),
     findTikets({ khususTim: true }),
   ]);
-  // Jumlah tiket wajib (khususTim) milik akun tim ini, per status.
-  const trWajib = transaksiTikets.filter((t) => t.tiket.khususTim);
-  const tiketWajibLunas = trWajib.filter((t) => t.status === "VERIFIED").reduce((n, t) => n + t.jumlah, 0);
-  const tiketWajibMenunggu = trWajib.filter((t) => t.status === "PENDING").reduce((n, t) => n + t.jumlah, 0);
+  // Status tiket wajib (khususTim) milik akun tim ini, per jenis tiket.
+  const itemTiketWajib = statusPerJenis(
+    tiketWajib.map((t) => t.id),
+    transaksiTikets
+  ).map((s, i) => ({ ...s, jenis: tiketWajib[i].jenis, jumlahPerTim: tiketWajib[i].jumlahPerTim }));
   const pelunasan = tim.confirmed && tim.pembayaran?.isDP ? await siapkanPelunasan(tim.id) : null;
 
   // Surat undangan & surat rekomendasi Diknas sesuai jenjang tim (hanya SMP/SMA).
@@ -94,11 +96,7 @@ export default async function TimDashboard() {
           }
         />
       )}
-      <TiketWajibSection
-        jenisWajib={tiketWajib.map((t) => `${t.jenis} — ${t.jumlahPerTim} tiket`)}
-        lunas={tiketWajibLunas}
-        menunggu={tiketWajibMenunggu}
-      />
+      <TiketWajibSection items={itemTiketWajib} />
       <GrupWaSection confirmed={tim.confirmed} url={konfig.grupWaUrl} />
       <BasecampSection timId={tim.id} ruanganId={tim.ruanganId} />
       <UjiCobaSection timId={tim.id} confirmed={tim.confirmed} batas={konfig.ujiCobaBatas} />

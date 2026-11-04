@@ -7,10 +7,11 @@ import TiketForm from "./components/TiketForm";
 import KonfigPembayaranForm from "./components/KonfigPembayaranForm";
 import StatusTiketWajibTim, { type BarisStatusTiketTim } from "./components/StatusTiketWajibTim";
 import prisma from "@/lib/prisma";
+import { statusGabungan, statusPerJenis } from "@/lib/tiketWajib";
 
 // Rekap per tim: berapa tiket wajib (khususTim) yang sudah lunas / masih
 // menunggu verifikasi. Transaksi terhubung ke tim lewat akun (userId).
-async function rekapTiketWajibTim(): Promise<BarisStatusTiketTim[]> {
+async function rekapTiketWajibTim(tiketWajibIds: string[]): Promise<BarisStatusTiketTim[]> {
   const [tims, transaksi] = await Promise.all([
     prisma.tim.findMany({
       select: { id: true, nama_tim: true, asal_sekolah: true, jenjang: true, confirmed: true, userId: true },
@@ -18,24 +19,25 @@ async function rekapTiketWajibTim(): Promise<BarisStatusTiketTim[]> {
     }),
     prisma.transaksiTiket.findMany({
       where: { tiket: { khususTim: true }, status: { in: ["PENDING", "VERIFIED"] }, userId: { not: null } },
-      select: { userId: true, status: true, jumlah: true },
+      select: { userId: true, tiketId: true, status: true, jumlah: true },
     }),
   ]);
-  const perUser = new Map<string, { lunas: number; menunggu: number }>();
-  for (const t of transaksi) {
-    const r = perUser.get(t.userId!) ?? { lunas: 0, menunggu: 0 };
-    if (t.status === "VERIFIED") r.lunas += t.jumlah;
-    else r.menunggu += t.jumlah;
-    perUser.set(t.userId!, r);
-  }
-  return tims.map((tim) => ({
-    timId: tim.id,
-    namaTim: tim.nama_tim,
-    asalSekolah: tim.asal_sekolah,
-    jenjang: tim.jenjang,
-    confirmed: tim.confirmed,
-    ...(perUser.get(tim.userId) ?? { lunas: 0, menunggu: 0 }),
-  }));
+  const perUser = new Map<string, typeof transaksi>();
+  for (const t of transaksi) perUser.set(t.userId!, [...(perUser.get(t.userId!) ?? []), t]);
+  return tims.map((tim) => {
+    // Status per jenis tiket wajib — "Sudah beli" hanya kalau semua jenis lunas.
+    const perJenis = statusPerJenis(tiketWajibIds, perUser.get(tim.userId) ?? []);
+    return {
+      timId: tim.id,
+      namaTim: tim.nama_tim,
+      asalSekolah: tim.asal_sekolah,
+      jenjang: tim.jenjang,
+      confirmed: tim.confirmed,
+      status: statusGabungan(perJenis),
+      lunas: perJenis.reduce((n, j) => n + j.lunas, 0),
+      menunggu: perJenis.reduce((n, j) => n + j.menunggu, 0),
+    };
+  });
 }
 
 export default async function AdminTiketPage() {
@@ -44,8 +46,9 @@ export default async function AdminTiketPage() {
     findTransaksiTikets(),
     findKonfigTiket(),
   ]);
-  const adaTiketWajib = tikets.some((t) => t.khususTim);
-  const rekapTim = adaTiketWajib ? await rekapTiketWajibTim() : [];
+  const tiketWajibIds = tikets.filter((t) => t.khususTim).map((t) => t.id);
+  const adaTiketWajib = tiketWajibIds.length > 0;
+  const rekapTim = adaTiketWajib ? await rekapTiketWajibTim(tiketWajibIds) : [];
 
   return (
     <div className="flex flex-col gap-8">
