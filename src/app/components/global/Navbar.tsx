@@ -32,9 +32,9 @@ const PublicNav: NavOption[] = [
 
 // Setelah login: ringkas — buang pintasan promosi halaman utama (Alur Daftar, Timeline, Juri, dst.)
 // yang tidak relevan lagi, tambah link ke Dashboard/Admin Panel langsung di navbar.
+// "Beranda" juga dibuang — logo Antareja di kiri sudah mengarah ke beranda.
 function memberNav(role?: string): NavOption[] {
   return [
-    { label: "Beranda", href: "/" },
     role === "USER" ? { label: "Dashboard", href: "/dashboard" } : { label: "Admin Panel", href: "/admin" },
     { label: "Tiket", href: "/#tiket" },
     { label: "Merch", href: "/merchandise" },
