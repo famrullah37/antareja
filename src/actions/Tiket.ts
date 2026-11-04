@@ -533,23 +533,36 @@ export async function verifikasiTiket(transaksiId: string) {
 
     // Klaim atomik: hanya satu request yang bisa mengubah status ke VERIFIED —
     // cek-lalu-update biasa lolos dua kali bila tombol terkirim ganda (kas dobel).
-    const klaim = await prisma.transaksiTiket.updateMany({
-      where: { id: transaksiId, status: "PENDING" },  // hanya PENDING: transaksi DITOLAK tidak bisa diverifikasi ulang (kode unik-nya mungkin sudah dipakai transaksi lain)
-      data: { status: "VERIFIED" },
-    });
-    if (klaim.count === 0) return { success: false, message: "Tiket sudah diproses (diverifikasi/ditolak) sebelumnya" };
+    // Klaim status + QR + potong stok dalam SATU transaksi: kalau stok ternyata
+    // tidak cukup (pesanan PENDING bisa melebihi kuota), semuanya dibatalkan —
+    // dulu status sudah VERIFIED & QR terbuat tapi kas/email tidak jalan.
+    const hasil = await prisma.$transaction(async (tx) => {
+      const klaim = await tx.transaksiTiket.updateMany({
+        where: { id: transaksiId, status: "PENDING" },  // hanya PENDING: transaksi DITOLAK tidak bisa diverifikasi ulang (kode unik-nya mungkin sudah dipakai transaksi lain)
+        data: { status: "VERIFIED" },
+      });
+      if (klaim.count === 0) return "SUDAH_DIPROSES" as const;
 
-    await prisma.qRTiket.createMany({
-      data: Array.from({ length: transaksi.jumlah }, (_, i) => ({
-        transaksiId,
-        bundle: i < transaksi.bundleJumlah,
-      })),
-    });
+      const stok = await tx.tiket.updateMany({
+        where: { id: transaksi.tiketId, sisa: { gte: transaksi.jumlah } },
+        data: { sisa: { decrement: transaksi.jumlah } },
+      });
+      if (stok.count === 0) throw new Error("STOK_KURANG");
 
-    await prisma.tiket.update({
-      where: { id: transaksi.tiketId, sisa: { gte: transaksi.jumlah } },
-      data: { sisa: { decrement: transaksi.jumlah } },
+      await tx.qRTiket.createMany({
+        data: Array.from({ length: transaksi.jumlah }, (_, i) => ({
+          transaksiId,
+          bundle: i < transaksi.bundleJumlah,
+        })),
+      });
+      return "OK" as const;
+    }).catch((e) => {
+      if (e?.message === "STOK_KURANG") return "STOK_KURANG" as const;
+      throw e;
     });
+    if (hasil === "SUDAH_DIPROSES") return { success: false, message: "Tiket sudah diproses (diverifikasi/ditolak) sebelumnya" };
+    if (hasil === "STOK_KURANG")
+      return { success: false, message: "Sisa kuota tiket tidak cukup untuk pesanan ini — tambah kuota atau tolak pesanan" };
 
     // Auto-kas — jumlah yang dicatat harus sama dengan nominal yang benar-benar
     // ditransfer (harga tiket + kode unik), bukan cuma harga dasarnya, supaya

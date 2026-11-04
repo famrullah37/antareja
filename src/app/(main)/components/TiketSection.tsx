@@ -8,7 +8,9 @@ function formatRupiah(n: number) {
 }
 
 export default async function TiketSection() {
-  const tikets = await findTikets();
+  // Landing page hanya untuk tiket penonton umum — tiket wajib tim (khususTim)
+  // diumumkan lewat dashboard tim & tetap bisa dibeli di /tiket oleh akun tim.
+  const tikets = await findTikets({ khususTim: false });
   const available = tikets.filter((t) => t.sisa > 0);
 
   return (
@@ -64,11 +66,6 @@ export default async function TiketSection() {
                       <span className={`text-xs font-bold uppercase tracking-widest ${habis ? "text-gray-400" : "text-primary-500"}`}>
                         {tiket.jenis}
                       </span>
-                      {tiket.khususTim && (
-                        <span className="text-[11px] font-semibold text-primary-700 bg-primary-50 rounded px-2 py-0.5 self-start">
-                          Wajib tim peserta — beli lewat akun tim
-                        </span>
-                      )}
                       <span className="text-3xl font-extrabold text-black leading-none">
                         {formatRupiah(tiket.harga)}
                       </span>

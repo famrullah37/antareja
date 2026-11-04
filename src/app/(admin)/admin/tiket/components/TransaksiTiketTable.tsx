@@ -77,14 +77,14 @@ export default function TransaksiTiketTable({
     const toastId = toast.loading("Memverifikasi...");
     const result = await verifikasiTiket(id);
     if (result.success) toast.success("Tiket diverifikasi!", { id: toastId });
-    else toast.error("Gagal verifikasi", { id: toastId });
+    else toast.error(result.message ?? "Gagal verifikasi", { id: toastId });
   }
 
   async function handleReject(id: string) {
     const toastId = toast.loading("Menolak...");
     const result = await rejectTiket(id);
     if (result.success) toast.success("Tiket ditolak", { id: toastId });
-    else toast.error("Gagal", { id: toastId });
+    else toast.error(result.message ?? "Gagal", { id: toastId });
   }
 
   if (!transaksis.length)
