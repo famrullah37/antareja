@@ -327,8 +327,13 @@ export async function beliTiket(data: FormData) {
         throw new Error("BUNDLE_INVALID");
       if (bundleJumlah > 0 && !punyaBundling(tiket)) throw new Error("BUNDLE_INVALID");
       // Cek ulang di dalam transaksi: cegah dua klik/tab membuat dua pesanan wajib.
-      if (tiket.khususTim && (!userId || jumlah !== tiket.jumlahPerTim || (await pesananWajibAktif(tx, tiketId, userId))))
-        throw new Error("WAJIB_TIM_INVALID");
+      // Advisory lock per (akun, tiket) — tanpa ini dua request bersamaan sama-sama
+      // melihat "belum ada pesanan" (READ COMMITTED) dan dua-duanya lolos.
+      if (tiket.khususTim) {
+        if (!userId || jumlah !== tiket.jumlahPerTim) throw new Error("WAJIB_TIM_INVALID");
+        await tx.$queryRaw`SELECT 1 FROM (SELECT pg_advisory_xact_lock(hashtext(${`tiket-wajib:${userId}:${tiketId}`}))) AS kunci`;
+        if (await pesananWajibAktif(tx, tiketId, userId)) throw new Error("WAJIB_TIM_INVALID");
+      }
 
       // Cegah dua transaksi memakai kodeUnik yang sama — nominal transfer
       // harus presisi unik supaya admin gampang cocokkan mutasi/QRIS.

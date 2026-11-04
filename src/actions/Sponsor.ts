@@ -10,6 +10,8 @@ import {
 } from "@/queries/sponsor.query";
 import { revalidatePath } from "next/cache";
 
+const TIPE_SPONSOR = ["SPONSOR", "MEDIA_PARTNER", "SUPPORT_BY"];
+
 async function requireAdmin() {
   const session = await getServerSession();
   if (!["ADMIN", "SIE_HUMAS"].includes(session?.user?.role ?? "")) throw new Error("Forbidden");
@@ -21,6 +23,7 @@ export async function createSponsorForm(data: FormData) {
   const linkUrl = ((data.get("linkUrl") as string) || "").trim() || undefined;
   if (linkUrl && !isHttpUrl(linkUrl)) return { success: false, message: "Link harus diawali https://" };
   const tipe = (data.get("tipe") as string) || "SPONSOR";
+  if (!TIPE_SPONSOR.includes(tipe)) return { success: false, message: "Tipe tidak valid" };
   const urutan = parseInt((data.get("urutan") as string) || "0");
   const logo = data.get("logo") as File;
 
@@ -44,10 +47,11 @@ export async function createSponsorForm(data: FormData) {
 export async function updateSponsorForm(id: string, data: FormData) {
   await requireAdmin();
   const nama = ((data.get("nama") as string) || "").trim();
-  if (!nama) return { success: false, message: "Nama wajib diisi" };
+  if (!nama || nama.length > 100) return { success: false, message: "Nama wajib diisi (maks. 100 karakter)" };
   const linkUrl = ((data.get("linkUrl") as string) || "").trim() || null;
   if (linkUrl && !isHttpUrl(linkUrl)) return { success: false, message: "Link harus diawali https://" };
   const tipe = (data.get("tipe") as string) || "SPONSOR";
+  if (!TIPE_SPONSOR.includes(tipe)) return { success: false, message: "Tipe tidak valid" };
   const urutan = parseInt((data.get("urutan") as string) || "0");
   const logo = data.get("logo") as File | null;
 
