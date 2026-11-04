@@ -8,7 +8,7 @@ import { sendMailTo } from "@/lib/mailer";
 import QRCode from "qrcode";
 import { buildDynamicQrisImage, decodeQrisFromImage } from "@/lib/qris";
 import { catatLog } from "@/lib/activityLog";
-import { awalanDariKodePendek, kodeTiketPendek, labelBundling, punyaBundling, totalBayarTiket } from "@/lib/tiket";
+import { awalanDariKodePendek, kodeTiketPendek, labelBundling, namaTiket, punyaBundling, totalBayarTiket } from "@/lib/tiket";
 
 // Pengaturan tiket (master, harga, bundling, rekening/QRIS): ADMIN & BENDAHARA.
 async function requireAdmin() {
@@ -60,7 +60,7 @@ function ringkasanTiket(tr: {
     metodePembayaran: tr.metodePembayaran,
     tanggal: tr.createdAt,
     rincian: [
-      { label: `Tiket ${tr.tiket.jenis} × ${tr.jumlah}`, nominal: tr.tiket.harga * tr.jumlah },
+      { label: `${namaTiket(tr.tiket.jenis)} × ${tr.jumlah}`, nominal: tr.tiket.harga * tr.jumlah },
       ...(tr.bundleJumlah > 0
         ? [{ label: `Bundling ${tr.bundleIsi ?? ""} × ${tr.bundleJumlah}`.trim(), nominal: tr.bundleHarga * tr.bundleJumlah }]
         : []),

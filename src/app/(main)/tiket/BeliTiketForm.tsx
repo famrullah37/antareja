@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import MasaBerlakuQris, { type KodeTerbit } from "@/app/components/global/MasaBerlakuQris";
 import { usePeringatanKeluar } from "@/lib/usePeringatanKeluar";
+import { namaTiket } from "@/lib/tiket";
 
 function formatRupiah(n: number) {
   return new Intl.NumberFormat("id-ID", {
@@ -29,15 +30,21 @@ export default function BeliTiketForm({
   punyaTim,
   sudahLogin,
   sudahDipesan,
+  pilihAwal,
 }: {
   tikets: Tiket[];
   konfig: KonfigTiket;
   punyaTim: boolean;
   sudahLogin: boolean;
   sudahDipesan: string[];
+  pilihAwal: string | null;
 }) {
-  const [selected, setSelected] = useState<Tiket | null>(null);
-  const [jumlah, setJumlah] = useState(1);
+  // Tiket wajib hanya bisa dipilih akun tim, satu pesanan aktif per tim.
+  const terkunci = (t: Tiket) => t.khususTim && (!punyaTim || sudahDipesan.includes(t.id));
+  // ?pilih=<id> (dari dashboard tim): langsung terpilih kalau boleh dipilih.
+  const awal = tikets.find((t) => t.id === pilihAwal && !terkunci(t)) ?? null;
+  const [selected, setSelected] = useState<Tiket | null>(awal);
+  const [jumlah, setJumlah] = useState(awal?.khususTim ? awal.jumlahPerTim : 1);
   const [bundleJumlah, setBundleJumlah] = useState(0);
   const [metode, setMetode] = useState<"TRANSFER" | "QRIS">("TRANSFER");
   const [submitted, setSubmitted] = useState<{ linkPesanan?: string; adaBukti?: boolean } | null>(null);
@@ -165,19 +172,19 @@ export default function BeliTiketForm({
       <div className="grid sm:grid-cols-3 gap-4">
         {tikets.map((t) => {
           const dipesan = t.khususTim && sudahDipesan.includes(t.id);
-          const terkunci = t.khususTim && (!punyaTim || dipesan);
+          const dikunci = terkunci(t);
           return (
           <button
             key={t.id}
             type="button"
-            disabled={terkunci}
+            disabled={dikunci}
             onClick={() => {
               setSelected(t);
               // Tiket wajib: jumlah ditetapkan admin, tidak bisa diubah pembeli.
               setJumlah(t.khususTim ? t.jumlahPerTim : 1);
             }}
             className={`rounded-2xl border-2 p-5 text-left transition-all ${
-              terkunci
+              dikunci
                 ? "border-gray-200 bg-gray-50 opacity-70 cursor-not-allowed"
                 : selected?.id === t.id
                 ? "border-primary-500 bg-primary-50"
@@ -189,7 +196,7 @@ export default function BeliTiketForm({
                 Wajib tim peserta
               </div>
             )}
-            <div className="font-bold text-lg mb-1">Tiket {t.jenis}</div>
+            <div className="font-bold text-lg mb-1">{namaTiket(t.jenis)}</div>
             <div className="text-primary-600 font-semibold text-xl">
               {formatRupiah(t.harga)}
             </div>
@@ -204,7 +211,7 @@ export default function BeliTiketForm({
             {t.khususTim && (
               <div className="text-xs text-gray-600 mt-1">Wajib {t.jumlahPerTim} tiket per tim</div>
             )}
-            {terkunci && (
+            {dikunci && (
               <div className="text-xs text-gray-600 mt-2">
                 {dipesan
                   ? "Tim kamu sudah memesan tiket ini — cek status di dashboard tim."

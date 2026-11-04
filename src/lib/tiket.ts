@@ -37,3 +37,11 @@ export function awalanDariKodePendek(input: string) {
   const h = input.trim().replace(/[\s-]/g, "").toLowerCase();
   return /^[0-9a-f]{8}$/.test(h) ? h : null;
 }
+
+// Nama tampilan jenis tiket untuk pembeli: "Tiket <jenis>", kecuali jenisnya
+// sudah diawali kata "Tiket" (mis. admin menamai "Tiket Wajib") — supaya tidak
+// tampil "Tiket Tiket Wajib".
+export function namaTiket(jenis: string) {
+  const j = jenis.trim();
+  return /^tiket\b/i.test(j) ? j : `Tiket ${j}`;
+}

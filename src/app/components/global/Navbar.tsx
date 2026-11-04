@@ -36,7 +36,9 @@ const PublicNav: NavOption[] = [
 function memberNav(role?: string): NavOption[] {
   return [
     role === "USER" ? { label: "Dashboard", href: "/dashboard" } : { label: "Admin Panel", href: "/admin" },
-    { label: "Tiket", href: "/#tiket" },
+    // Langsung ke /tiket (bukan /#tiket): bagian tiket di beranda hanya tiket
+    // penonton, tiket wajib tim hanya ada di /tiket.
+    { label: "Tiket", href: "/tiket" },
     { label: "Merch", href: "/merchandise" },
     { label: "Galeri", href: "/galeri" },
     { label: "Berita", href: "/berita" },

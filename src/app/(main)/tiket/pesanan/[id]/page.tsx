@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import prisma from "@/lib/prisma";
 import { cekTandaPesanan } from "@/lib/linkPesanan";
-import { totalBayarTiket } from "@/lib/tiket";
+import { namaTiket, totalBayarTiket } from "@/lib/tiket";
 import type { Metadata } from "next";
 import Link from "next/link";
 import UploadBuktiForm from "./UploadBuktiForm";
@@ -65,7 +65,7 @@ export default async function PesananTiketPage({
         <p className="text-gray-600">{status.ket}</p>
         <div className="border-t border-gray-100 pt-3 flex flex-col gap-1">
           <div className="flex justify-between">
-            <span>Tiket {tr.tiket.jenis}</span>
+            <span>{namaTiket(tr.tiket.jenis)}</span>
             <span>× {tr.jumlah}</span>
           </div>
           {tr.bundleJumlah > 0 && (

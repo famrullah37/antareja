@@ -2,8 +2,10 @@ import { H2 } from "@/app/components/global/Text";
 import SectionWrapper from "@/app/components/global/Wrapper";
 import Link from "next/link";
 import { statusGabungan, type StatusTiketWajib } from "@/lib/tiketWajib";
+import { namaTiket } from "@/lib/tiket";
 
 export type ItemTiketWajib = {
+  tiketId: string;
   jenis: string;
   jumlahPerTim: number;
   lunas: number;
@@ -34,6 +36,9 @@ const PESAN: Record<StatusTiketWajib, string> = {
 export default function TiketWajibSection({ items }: { items: ItemTiketWajib[] }) {
   if (items.length === 0) return null;
   const status = statusGabungan(items);
+  // Tombol beli langsung membuka /tiket dengan tiket wajib pertama yang belum dibeli terpilih.
+  const belum = items.find((it) => it.status === "BELUM");
+  const linkBeli = belum ? `/tiket?pilih=${encodeURIComponent(belum.tiketId)}` : "/tiket";
 
   return (
     <SectionWrapper id="tiket-wajib">
@@ -44,7 +49,7 @@ export default function TiketWajibSection({ items }: { items: ItemTiketWajib[] }
           {items.map((it) => (
             <li key={it.jenis} className="flex flex-wrap items-center gap-2 text-sm text-gray-800">
               <span className="font-medium">
-                Tiket {it.jenis} — {it.jumlahPerTim} tiket
+                {namaTiket(it.jenis)} — {it.jumlahPerTim} tiket
               </span>
               <span className={`text-xs font-semibold rounded px-2 py-0.5 ${LABEL[it.status].kelas}`}>
                 {LABEL[it.status].teks}
@@ -54,7 +59,7 @@ export default function TiketWajibSection({ items }: { items: ItemTiketWajib[] }
         </ul>
         {status === "BELUM" && (
           <Link
-            href="/tiket"
+            href={linkBeli}
             className="self-start bg-primary-500 hover:bg-primary-600 text-white text-sm font-semibold px-5 py-2.5 rounded-lg transition-colors"
           >
             Beli Tiket Wajib

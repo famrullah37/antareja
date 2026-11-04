@@ -19,7 +19,7 @@ export const metadata: Metadata = {
     "Beli tiket penonton LPKBB Antareja 2026 secara online dan saksikan langsung aksi tim paskibra se-Jawa Timur di SMK Telkom Malang. Tiket berupa QR code.",
 };
 
-export default async function TiketPage() {
+export default async function TiketPage({ searchParams }: { searchParams?: { pilih?: string } }) {
   const [tikets, konfig, konfigUmum, session] = await Promise.all([
     findTikets(),
     findKonfigTiket(),
@@ -40,6 +40,11 @@ export default async function TiketPage() {
         })
       ).map((t) => t.tiketId)
     : [];
+  // Akun tim: tiket wajib di depan supaya langsung terlihat.
+  const tiketUrut = punyaTim ? [...tikets].sort((a, b) => Number(b.khususTim) - Number(a.khususTim)) : tikets;
+  // ?pilih=<id> dari tombol "Beli Tiket Wajib" di dashboard: tiket langsung terpilih
+  // (form tetap menolak kalau tiket itu tidak boleh dipilih akun ini).
+  const pilihAwal = searchParams?.pilih ?? null;
   // Tanggal & jam dari tahap terakhir timeline di Pengaturan (lihat lib/acara.ts).
   const acara = getInfoAcara(konfigUmum.timeline as TimelineItem[] | null);
 
@@ -58,7 +63,14 @@ export default async function TiketPage() {
           Penjualan tiket belum dibuka. Pantau terus website ini.
         </div>
       ) : (
-        <BeliTiketForm tikets={tikets} konfig={konfig} punyaTim={punyaTim} sudahLogin={!!userId} sudahDipesan={sudahDipesan} />
+        <BeliTiketForm
+          tikets={tiketUrut}
+          konfig={konfig}
+          punyaTim={punyaTim}
+          sudahLogin={!!userId}
+          sudahDipesan={sudahDipesan}
+          pilihAwal={pilihAwal}
+        />
       )}
       <div className="mt-10">
         <ShareButtons

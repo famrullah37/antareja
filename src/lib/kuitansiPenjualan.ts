@@ -4,6 +4,7 @@ import { buildKuitansiUmumPdf } from "@/lib/kuitansi";
 import { ensureNomorKuitansiFoto, ensureNomorKuitansiTiket } from "@/lib/nomorKuitansi";
 import { getKonfigUmum } from "@/queries/konfigUmum.query";
 import { METODE_KUITANSI_MANUAL } from "@/lib/kuitansiManual";
+import { namaTiket } from "@/lib/tiket";
 
 // Kuitansi PDF tiket penonton & foto premium (online, sudah VERIFIED).
 // Nominal di kuitansi = harga tanpa kode unik — sama dengan aturan kuitansi
@@ -25,7 +26,7 @@ export async function buatKuitansiTiket(id: string): Promise<HasilKuitansi | nul
     judul: "KUITANSI PEMBELIAN TIKET",
     baris: [
       ["Diterima dari", tr.nama],
-      ["Pembelian", `Tiket ${tr.tiket.jenis} × ${tr.jumlah}`],
+      ["Pembelian", `${namaTiket(tr.tiket.jenis)} × ${tr.jumlah}`],
       ...(tr.bundleJumlah > 0 ? [["Bundling", `${tr.bundleIsi ?? "Bundling"} × ${tr.bundleJumlah}`] as [string, string]] : []),
       ["Pembayaran", `${metode(tr.metodePembayaran)} — Lunas`],
     ],
