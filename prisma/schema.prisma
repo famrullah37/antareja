@@ -333,6 +333,9 @@ model Tiket {
   // Tiket wajib tim peserta: hanya bisa dibeli online oleh akun yang punya tim
   // (dicek di actions/Tiket.ts beliTiket). false = tiket penonton umum.
   khususTim   Boolean          @default(false)
+  // Jumlah tiket yang wajib dibeli tiap tim (hanya berlaku kalau khususTim).
+  // Diatur admin; tim tidak bisa mengubah, dan hanya boleh satu pesanan aktif.
+  jumlahPerTim Int             @default(1)
   transaksi TransaksiTiket[]
 }
 

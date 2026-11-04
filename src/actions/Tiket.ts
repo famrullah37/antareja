@@ -68,6 +68,25 @@ function ringkasanTiket(tr: {
   };
 }
 
+// Pesanan tiket wajib yang masih berlaku (PENDING/VERIFIED) milik akun ini.
+// Pesanan DITOLAK tidak dihitung — tim boleh memesan ulang.
+async function pesananWajibAktif(
+  db: Pick<typeof prisma, "transaksiTiket">,
+  tiketId: string,
+  userId: string
+) {
+  const n = await db.transaksiTiket.count({
+    where: { tiketId, userId, status: { in: ["PENDING", "VERIFIED"] } },
+  });
+  return n > 0;
+}
+
+// Jumlah tiket wajib per tim dari form admin (minimal 1).
+function parseJumlahPerTim(data: FormData) {
+  const n = parseInt((data.get("jumlahPerTim") as string) || "1");
+  return Number.isInteger(n) && n >= 1 ? n : 1;
+}
+
 // ─── Admin: Master Tiket ──────────────────────────────────────────────────────
 
 // Bundling kosong/0 = nonaktif (disimpan null supaya jelas tidak ada bundling)
@@ -85,7 +104,9 @@ export async function createTiketAdmin(data: FormData) {
   const kuota = parseInt(data.get("kuota") as string);
   const khususTim = data.get("khususTim") === "on";
   try {
-    await createTiket({ jenis, harga, kuota, sisa: kuota, khususTim, ...parseBundling(data) });
+    await createTiket({
+      jenis, harga, kuota, sisa: kuota, khususTim, jumlahPerTim: parseJumlahPerTim(data), ...parseBundling(data),
+    });
     revalidatePath("/tiket");
     revalidatePath("/admin/tiket");
     return { success: true };
@@ -123,13 +144,14 @@ export async function updateBundlingTiket(data: FormData, id: string) {
 }
 
 // Tandai/lepas tiket sebagai "wajib tim" (hanya bisa dibeli online oleh akun tim).
-export async function setKhususTimTiket(id: string, khususTim: boolean) {
+export async function setKhususTimTiket(id: string, khususTim: boolean, jumlahPerTim = 1) {
   await requireAdmin();
+  if (!Number.isInteger(jumlahPerTim) || jumlahPerTim < 1) return { success: false, message: "Jumlah per tim minimal 1" };
   try {
-    const tiket = await updateTiket({ id }, { khususTim });
+    const tiket = await updateTiket({ id }, khususTim ? { khususTim, jumlahPerTim } : { khususTim });
     await catatLog(
       "UBAH_TIKET_KHUSUS_TIM",
-      `Tiket ${tiket.jenis}: ${khususTim ? "wajib tim (hanya akun tim)" : "terbuka untuk umum"}`
+      `Tiket ${tiket.jenis}: ${khususTim ? `wajib tim, ${jumlahPerTim} tiket per tim` : "terbuka untuk umum"}`
     );
     revalidatePath("/admin/tiket");
     revalidatePath("/tiket");
@@ -260,13 +282,23 @@ export async function beliTiket(data: FormData) {
 
   // Cek tiket & stok SEBELUM upload — jangan buang kuota Cloudinary untuk pembelian
   // yang pasti gagal (stok tetap dicek ulang secara atomik di transaksi bawah).
-  const tiketCek = await prisma.tiket.findUnique({ where: { id: tiketId }, select: { sisa: true, khususTim: true } });
+  const tiketCek = await prisma.tiket.findUnique({
+    where: { id: tiketId },
+    select: { sisa: true, khususTim: true, jumlahPerTim: true },
+  });
   if (!tiketCek) return { success: false, message: "Tiket tidak ditemukan" };
-  // Tiket wajib tim hanya untuk akun yang sudah mendaftarkan tim.
+  // Tiket wajib tim: wajib login dengan akun yang sudah mendaftarkan tim,
+  // jumlah ditetapkan admin (jumlahPerTim), dan hanya satu pesanan aktif per tim.
   if (tiketCek.khususTim) {
     const punyaTim = userId ? (await prisma.tim.count({ where: { userId } })) > 0 : false;
     if (!punyaTim) {
       return { success: false, message: "Tiket ini wajib untuk tim peserta — login dengan akun tim untuk membelinya" };
+    }
+    if (jumlah !== tiketCek.jumlahPerTim) {
+      return { success: false, message: `Jumlah tiket wajib untuk tiap tim adalah ${tiketCek.jumlahPerTim} tiket` };
+    }
+    if (await pesananWajibAktif(prisma, tiketId, userId!)) {
+      return { success: false, message: "Tim kamu sudah memesan tiket wajib ini — cek di dashboard tim" };
     }
   }
   if (tiketCek.sisa < jumlah) return { success: false, message: "Stok tiket tidak mencukupi" };
@@ -294,6 +326,9 @@ export async function beliTiket(data: FormData) {
       if (!Number.isInteger(bundleJumlah) || bundleJumlah < 0 || bundleJumlah > jumlah)
         throw new Error("BUNDLE_INVALID");
       if (bundleJumlah > 0 && !punyaBundling(tiket)) throw new Error("BUNDLE_INVALID");
+      // Cek ulang di dalam transaksi: cegah dua klik/tab membuat dua pesanan wajib.
+      if (tiket.khususTim && (!userId || jumlah !== tiket.jumlahPerTim || (await pesananWajibAktif(tx, tiketId, userId))))
+        throw new Error("WAJIB_TIM_INVALID");
 
       // Cegah dua transaksi memakai kodeUnik yang sama — nominal transfer
       // harus presisi unik supaya admin gampang cocokkan mutasi/QRIS.
@@ -351,6 +386,8 @@ export async function beliTiket(data: FormData) {
     if (msg === "STOK_KURANG") return { success: false, message: "Stok tiket tidak mencukupi" };
     if (msg === "BUNDLE_INVALID") return { success: false, message: "Jumlah paket bundling tidak valid (maksimal 1 per tiket)" };
     if (msg === "KODE_UNIK_DIPAKAI") return { success: false, message: "Kode unik sudah terpakai, silakan coba lagi" };
+    if (msg === "WAJIB_TIM_INVALID")
+      return { success: false, message: "Tim kamu sudah memesan tiket wajib ini, atau jumlahnya tidak sesuai ketentuan panitia" };
     console.error("beliTiket error:", e);
     return { success: false };
   }

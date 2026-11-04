@@ -25,12 +25,20 @@ export default function TiketMasterTable({ tikets }: { tikets: Tiket[] }) {
     } else toast.error("Gagal menyimpan bundling", { id: toastId });
   }
 
-  async function handleKhususTim(id: string, khususTim: boolean) {
+  const [editWajib, setEditWajib] = useState<string | null>(null);
+
+  async function handleSaveWajib(data: FormData, id: string) {
+    const khususTim = data.get("khususTim") === "on";
+    const jumlahPerTim = parseInt((data.get("jumlahPerTim") as string) || "1");
     const toastId = toast.loading("Menyimpan...");
-    const result = await setKhususTimTiket(id, khususTim);
-    if (result.success)
-      toast.success(khususTim ? "Tiket kini wajib tim (hanya akun tim)" : "Tiket kini terbuka untuk umum", { id: toastId });
-    else toast.error("Gagal menyimpan", { id: toastId });
+    const result = await setKhususTimTiket(id, khususTim, jumlahPerTim);
+    if (result.success) {
+      toast.success(
+        khususTim ? `Tiket wajib tim: ${jumlahPerTim} tiket per tim` : "Tiket kini terbuka untuk umum",
+        { id: toastId }
+      );
+      setEditWajib(null);
+    } else toast.error(result.message ?? "Gagal menyimpan", { id: toastId });
   }
 
   async function handleDelete(id: string) {
@@ -67,19 +75,45 @@ export default function TiketMasterTable({ tikets }: { tikets: Tiket[] }) {
               <td className="px-4 py-3">{t.kuota}</td>
               <td className="px-4 py-3">{t.sisa}</td>
               <td className="px-4 py-3">
-                <div className="flex items-center gap-2">
-                  {t.khususTim ? (
-                    <span className="text-xs font-semibold text-primary-700 bg-primary-50 rounded px-2 py-0.5">Wajib tim</span>
-                  ) : (
-                    <span className="text-xs text-gray-500">Umum</span>
-                  )}
-                  <button
-                    onClick={() => handleKhususTim(t.id, !t.khususTim)}
-                    className="text-blue-500 hover:underline text-xs"
-                  >
-                    Ubah
-                  </button>
-                </div>
+                {editWajib === t.id ? (
+                  <form action={(data) => handleSaveWajib(data, t.id)} className="flex flex-wrap items-center gap-2">
+                    <label className="flex items-center gap-1 text-xs">
+                      <input type="checkbox" name="khususTim" defaultChecked={t.khususTim} />
+                      Wajib tim
+                    </label>
+                    <input
+                      name="jumlahPerTim"
+                      type="number"
+                      min={1}
+                      defaultValue={t.jumlahPerTim}
+                      className="border border-neutral-200 rounded-lg px-2 py-1 text-xs w-16"
+                    />
+                    <span className="text-xs text-neutral-500">/tim</span>
+                    <button type="submit" className="text-green-600 hover:underline text-xs">
+                      Simpan
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditWajib(null)}
+                      className="text-neutral-500 hover:underline text-xs"
+                    >
+                      Batal
+                    </button>
+                  </form>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    {t.khususTim ? (
+                      <span className="text-xs font-semibold text-primary-700 bg-primary-50 rounded px-2 py-0.5">
+                        Wajib tim · {t.jumlahPerTim}/tim
+                      </span>
+                    ) : (
+                      <span className="text-xs text-gray-500">Umum</span>
+                    )}
+                    <button onClick={() => setEditWajib(t.id)} className="text-blue-500 hover:underline text-xs">
+                      Ubah
+                    </button>
+                  </div>
+                )}
               </td>
               <td className="px-4 py-3">
                 {editBundling === t.id ? (

@@ -28,11 +28,13 @@ export default function BeliTiketForm({
   konfig,
   punyaTim,
   sudahLogin,
+  sudahDipesan,
 }: {
   tikets: Tiket[];
   konfig: KonfigTiket;
   punyaTim: boolean;
   sudahLogin: boolean;
+  sudahDipesan: string[];
 }) {
   const [selected, setSelected] = useState<Tiket | null>(null);
   const [jumlah, setJumlah] = useState(1);
@@ -162,13 +164,18 @@ export default function BeliTiketForm({
       {/* Pilih Jenis Tiket */}
       <div className="grid sm:grid-cols-3 gap-4">
         {tikets.map((t) => {
-          const terkunci = t.khususTim && !punyaTim;
+          const dipesan = t.khususTim && sudahDipesan.includes(t.id);
+          const terkunci = t.khususTim && (!punyaTim || dipesan);
           return (
           <button
             key={t.id}
             type="button"
             disabled={terkunci}
-            onClick={() => setSelected(t)}
+            onClick={() => {
+              setSelected(t);
+              // Tiket wajib: jumlah ditetapkan admin, tidak bisa diubah pembeli.
+              setJumlah(t.khususTim ? t.jumlahPerTim : 1);
+            }}
             className={`rounded-2xl border-2 p-5 text-left transition-all ${
               terkunci
                 ? "border-gray-200 bg-gray-50 opacity-70 cursor-not-allowed"
@@ -194,9 +201,14 @@ export default function BeliTiketForm({
             <div className="text-xs text-gray-400 mt-1">
               Sisa: {t.sisa} tiket
             </div>
+            {t.khususTim && (
+              <div className="text-xs text-gray-600 mt-1">Wajib {t.jumlahPerTim} tiket per tim</div>
+            )}
             {terkunci && (
               <div className="text-xs text-gray-600 mt-2">
-                {sudahLogin
+                {dipesan
+                  ? "Tim kamu sudah memesan tiket ini — cek status di dashboard tim."
+                  : sudahLogin
                   ? "Hanya untuk akun yang sudah mendaftarkan tim."
                   : "Login dengan akun tim untuk membeli tiket ini."}
               </div>
@@ -256,9 +268,15 @@ export default function BeliTiketForm({
                 max={selected.sisa}
                 value={jumlah}
                 onChange={(e) => setJumlah(parseInt(e.target.value))}
+                readOnly={selected.khususTim}
                 required
-                className="border border-gray-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
+                className={`border border-gray-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400 ${
+                  selected.khususTim ? "bg-gray-100 text-gray-600 cursor-not-allowed" : ""
+                }`}
               />
+              {selected.khususTim && (
+                <span className="text-xs text-gray-500">Jumlah tiket wajib per tim ditetapkan panitia.</span>
+              )}
             </div>
 
             {adaBundling && (

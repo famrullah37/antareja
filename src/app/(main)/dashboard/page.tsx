@@ -95,7 +95,7 @@ export default async function TimDashboard() {
         />
       )}
       <TiketWajibSection
-        jenisWajib={tiketWajib.map((t) => t.jenis)}
+        jenisWajib={tiketWajib.map((t) => `${t.jenis} — ${t.jumlahPerTim} tiket`)}
         lunas={tiketWajibLunas}
         menunggu={tiketWajibMenunggu}
       />

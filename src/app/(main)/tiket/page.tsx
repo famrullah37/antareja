@@ -30,6 +30,16 @@ export default async function TiketPage() {
   // (dicek ulang di server, actions/Tiket.ts beliTiket).
   const userId = session?.user?.id;
   const punyaTim = userId ? (await prisma.tim.count({ where: { userId } })) > 0 : false;
+  // Tiket wajib yang sudah dipesan tim ini (PENDING/VERIFIED) — tidak bisa dipesan lagi.
+  const sudahDipesan = punyaTim
+    ? (
+        await prisma.transaksiTiket.findMany({
+          where: { userId, tiket: { khususTim: true }, status: { in: ["PENDING", "VERIFIED"] } },
+          select: { tiketId: true },
+          distinct: ["tiketId"],
+        })
+      ).map((t) => t.tiketId)
+    : [];
   // Tanggal & jam dari tahap terakhir timeline di Pengaturan (lihat lib/acara.ts).
   const acara = getInfoAcara(konfigUmum.timeline as TimelineItem[] | null);
 
@@ -48,7 +58,7 @@ export default async function TiketPage() {
           Penjualan tiket belum dibuka. Pantau terus website ini.
         </div>
       ) : (
-        <BeliTiketForm tikets={tikets} konfig={konfig} punyaTim={punyaTim} sudahLogin={!!userId} />
+        <BeliTiketForm tikets={tikets} konfig={konfig} punyaTim={punyaTim} sudahLogin={!!userId} sudahDipesan={sudahDipesan} />
       )}
       <div className="mt-10">
         <ShareButtons

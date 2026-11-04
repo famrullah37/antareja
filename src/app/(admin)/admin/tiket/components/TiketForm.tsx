@@ -46,15 +46,28 @@ export default function TiketForm() {
         type="number"
         required
       />
-      <label className="flex items-start gap-2 text-sm cursor-pointer">
-        <input type="checkbox" name="khususTim" className="mt-1" />
-        <span>
-          <span className="font-medium">Tiket wajib tim</span>
-          <span className="block text-xs text-neutral-500">
-            Hanya bisa dibeli online oleh akun yang sudah mendaftarkan tim — penonton umum tidak bisa membelinya.
+      <div className="flex flex-col gap-2">
+        <label className="flex items-start gap-2 text-sm cursor-pointer">
+          <input type="checkbox" name="khususTim" className="mt-1" />
+          <span>
+            <span className="font-medium">Tiket wajib tim</span>
+            <span className="block text-xs text-neutral-500">
+              Hanya bisa dibeli online oleh akun tim yang sedang login, satu kali per tim, dengan jumlah di bawah.
+            </span>
           </span>
-        </span>
-      </label>
+        </label>
+        <label className="flex items-center gap-2 text-sm pl-6">
+          Jumlah per tim
+          <input
+            name="jumlahPerTim"
+            type="number"
+            min={1}
+            defaultValue={1}
+            className="border border-neutral-200 rounded-lg px-2 py-1 text-sm w-20"
+          />
+          <span className="text-xs text-neutral-500">tiket (hanya untuk tiket wajib tim)</span>
+        </label>
+      </div>
       <div className="border-t border-neutral-100 pt-4 flex flex-col gap-3">
         <div>
           <p className="font-medium text-sm">Bundling (opsional)</p>
