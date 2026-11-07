@@ -7,7 +7,7 @@ import Heading from "./components/Heading";
 import ProfileTim from "./components/ProfileTim";
 import { TimWithRelations } from "@/types/entityRelations";
 import { findTransaksiTikets } from "@/queries/tiket.query";
-import { findPenilaianBaru } from "@/queries/penilaianBaru.query";
+import { hasilPenilaianUntukTim } from "@/lib/hasilPenilaianTim";
 import { findSertifikatByTim } from "@/queries/sertifikat.query";
 import TiketSayaSection from "./components/TiketSayaSection";
 import NilaiAkhirSection from "./components/NilaiAkhirSection";
@@ -50,7 +50,7 @@ export default async function TimDashboard() {
 
   const [transaksiTikets, penilaianBaru, sertifikat, biayaDasar, konfig, tiketWajib] = await Promise.all([
     findTransaksiTikets({ userId: session.user!.id }),
-    findPenilaianBaru({ timId: tim.id }),
+    hasilPenilaianUntukTim(tim.id),
     findSertifikatByTim(tim.id),
     biayaPendaftaran(tim.jenjang, tim.pembayaran?.isDP ?? false),
     getKonfigUmum(),
@@ -80,7 +80,13 @@ export default async function TimDashboard() {
         adaTiket={transaksiTikets.length > 0}
         adaTiketWajib={tiketWajib.length > 0}
       />
-      <ProfileTim tim={tim} penilaian={tim.penilaian ?? null} biayaDasar={biayaDasar} dokumen={dokumen} />
+      {/* Penilaian sistem lama: hanya dikirim ke browser setelah dipublish (ProfileTim komponen klien). */}
+      <ProfileTim
+        tim={{ ...tim, penilaian: tim.penilaian?.published ? tim.penilaian : null }}
+        penilaian={tim.penilaian?.published ? tim.penilaian : null}
+        biayaDasar={biayaDasar}
+        dokumen={dokumen}
+      />
       {pelunasan && (
         <PelunasanSection
           info={pelunasan}

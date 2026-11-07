@@ -18,6 +18,7 @@ import { catatLog } from "@/lib/activityLog";
 import { findOrLinkJuriByUser } from "@/queries/juri.query";
 import { deleteUploadFile, saveUploadFile } from "@/lib/localUpload";
 import { PREDIKAT_TIDAK_DILAKUKAN } from "@/lib/kelengkapanNilai";
+import { Jenjang } from "@prisma/client";
 
 async function requireAdmin() {
   const session = await getServerSession();
@@ -434,6 +435,27 @@ export async function hitungUlangSemuaNilai() {
   } catch (e) {
     console.error("hitungUlangSemuaNilai error:", e);
     return { success: false, total: 0, berubah: [] as string[] };
+  }
+}
+
+// Pengumuman: publish/sembunyikan nilai SEMUA tim satu jenjang sekaligus, supaya
+// semua tim melihat hasilnya bersamaan (publish satu per satu membuat tim yang
+// lebih dulu dipublish tahu nilainya sebelum tim lain).
+const JENJANG_VALID: Jenjang[] = ["SD", "SMP", "SMA", "PURNA"];
+export async function publishNilaiJenjang(jenjang: string, publish: boolean) {
+  await requireAdmin();
+  if (!JENJANG_VALID.includes(jenjang as Jenjang)) return { success: false, count: 0 };
+  try {
+    const r = await prisma.penilaianBaru.updateMany({
+      where: { tim: { jenjang: jenjang as Jenjang }, published: !publish },
+      data: { published: publish, publishedAt: publish ? new Date() : null, status: publish ? "FINAL" : "DRAFT" },
+    });
+    await catatLog(publish ? "PUBLISH_NILAI_JENJANG" : "SEMBUNYIKAN_NILAI_JENJANG", `${jenjang}: ${r.count} tim`);
+    revalidatePath("/", "layout");
+    return { success: true, count: r.count };
+  } catch (e) {
+    console.error("publishNilaiJenjang error:", e);
+    return { success: false, count: 0 };
   }
 }
 

@@ -66,7 +66,7 @@ export default function HeadingClient({ session, pengumumans, juklakUrl }: Headi
                 </dd>
               </dl>
               <div className="w-full md:w-[80%]">
-                <P className="pl-0 md:pl-12">{pengumuman.content}</P>
+                <P className="pl-0 md:pl-12 whitespace-pre-line">{pengumuman.content}</P>
               </div>
             </div>
           ))}

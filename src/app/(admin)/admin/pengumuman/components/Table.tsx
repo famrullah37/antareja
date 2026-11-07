@@ -35,7 +35,7 @@ export default function PengumumanTable({ data }: { data: Pengumuman[] }) {
       name: "Content",
       selector: (row: Pengumuman) => row.content,
       cell: (row: Pengumuman) => (
-        <span className="whitespace-normal py-2">{row.content}</span>
+        <span className="whitespace-pre-line py-2">{row.content}</span>
       ),
       grow: 2,
       sortable: true,

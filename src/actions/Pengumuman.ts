@@ -11,7 +11,8 @@ async function requireAdmin() {
 
 export async function createPengumumanForm(data: FormData) {
   await requireAdmin();
-  const content = data.get("content") as string;
+  const content = ((data.get("content") as string) ?? "").trim().slice(0, 3000);
+  if (!content) return { success: false };
   try {
     await createPengumuman({ content });
     revalidatePath("/", "layout");

@@ -1,6 +1,6 @@
 "use client";
 
-import { hitungUlangSemuaNilai, publishNilaiBaru } from "@/actions/PenilaianBaru";
+import { hitungUlangSemuaNilai, publishNilaiBaru, publishNilaiJenjang } from "@/actions/PenilaianBaru";
 import { useState } from "react";
 import { toast } from "sonner";
 import { bandingkanRanking, labelSeri, nilaiPenentuSeri, statusSeri } from "@/lib/rankingNilai";
@@ -85,6 +85,32 @@ export default function RankingSection({
   timBelumDinilai: { timId: string; label: string }[];
 }) {
   const belumLengkap = penilaians.filter((p) => (kelengkapan[p.timId]?.kosong ?? 0) > 0);
+
+  // Publish/sembunyikan semua tim satu jenjang sekaligus (momen pengumuman).
+  async function handlePublishJenjang(jenjang: string, publish: boolean, daftar: (PenilaianBaruItem & { nilaiPBB: number })[]) {
+    if (publish) {
+      const kosong = daftar.filter((p) => (kelengkapan[p.timId]?.kosong ?? 0) > 0);
+      const belumDinilai = timBelumDinilai.filter((t) => t.label.startsWith(`${jenjang}-`));
+      const adaSeri = daftar.some((_, i) => statusSeri(daftar, i).seri);
+      const peringatan = [
+        kosong.length ? `• ${kosong.length} tim nilainya masih ada yang KOSONG` : "",
+        belumDinilai.length ? `• ${belumDinilai.length} tim belum dinilai sama sekali (tidak ikut dipublish)` : "",
+        adaSeri ? "• Ada tim SERI (nilai akhir & PBB sama) yang perlu diputuskan panitia" : "",
+      ].filter(Boolean);
+      const pesan =
+        `Publish nilai SEMUA ${daftar.length} tim jenjang ${jenjang}? Semua tim langsung bisa melihat hasilnya di dashboard.` +
+        (peringatan.length ? `\n\nPERHATIAN:\n${peringatan.join("\n")}` : "\n\nSemua nilai lengkap.") +
+        `\n\nSarannya: klik "Hitung ulang semua nilai" dulu sebelum publish.`;
+      if (!confirm(pesan)) return;
+    } else if (!confirm(`Sembunyikan nilai semua tim jenjang ${jenjang}? Tim tidak lagi bisa melihat hasilnya.`)) {
+      return;
+    }
+    const toastId = toast.loading(publish ? `Mempublish nilai ${jenjang}...` : `Menyembunyikan nilai ${jenjang}...`);
+    const r = await publishNilaiJenjang(jenjang, publish);
+    if (r.success)
+      toast.success(`${r.count} tim ${jenjang} ${publish ? "dipublish" : "disembunyikan"}`, { id: toastId });
+    else toast.error("Gagal", { id: toastId });
+  }
 
   async function handlePublish(id: string, current: boolean) {
     const p = penilaians.find((x) => x.id === id);
@@ -180,9 +206,30 @@ export default function RankingSection({
 
         return (
           <div key={jenjang} className="mb-6">
-            <h3 className="font-semibold text-base mb-2 text-neutral-600">
-              Jenjang {jenjang}
-            </h3>
+            <div className="flex flex-wrap items-center gap-2 mb-2">
+              <h3 className="font-semibold text-base text-neutral-600 mr-auto">
+                Jenjang {jenjang}{" "}
+                <span className="text-xs font-normal text-gray-400">
+                  ({grouped.filter((p) => p.published).length}/{grouped.length} dipublish)
+                </span>
+              </h3>
+              {grouped.some((p) => !p.published) && (
+                <button
+                  onClick={() => handlePublishJenjang(jenjang, true, grouped)}
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-primary-500 text-white hover:bg-primary-600"
+                >
+                  Publish semua {jenjang}
+                </button>
+              )}
+              {grouped.some((p) => p.published) && (
+                <button
+                  onClick={() => handlePublishJenjang(jenjang, false, grouped)}
+                  className="px-3 py-1.5 rounded-lg text-xs font-medium border border-neutral-300 hover:bg-neutral-50"
+                >
+                  Sembunyikan semua {jenjang}
+                </button>
+              )}
+            </div>
             <div className="overflow-x-auto rounded-xl border border-neutral-200">
               <table className="w-full text-sm">
                 <thead className="bg-neutral-50">
