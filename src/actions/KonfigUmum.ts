@@ -39,6 +39,13 @@ export async function saveKonfigUmum(data: FormData) {
 
   // Video Antareja — kosong = tidak ada video; kalau diisi harus YouTube / Google Drive / file video langsung.
   const videoUrlRaw = ((data.get("videoUrl") as string) || "").trim();
+  if (videoUrlRaw && /drive\.google\.com\/drive\/(u\/\d+\/)?folders\//i.test(videoUrlRaw)) {
+    return {
+      success: false,
+      message:
+        "Link video berupa folder Google Drive, bukan file. Buka foldernya, klik kanan file videonya → Bagikan → Salin link (formatnya drive.google.com/file/d/...).",
+    };
+  }
   if (videoUrlRaw && !parseVideoUrl(videoUrlRaw)) {
     return {
       success: false,
