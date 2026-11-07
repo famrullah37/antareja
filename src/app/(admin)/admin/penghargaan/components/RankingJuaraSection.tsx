@@ -1,5 +1,7 @@
 ﻿"use client";
 
+import { labelSeri, statusSeri } from "@/lib/rankingNilai";
+
 type RankingItem = {
   timId: string;
   nama: string;
@@ -7,6 +9,7 @@ type RankingItem = {
   nilaiKotor: number;
   totalPengurang: number;
   nilaiAkhir: number;
+  nilaiPBB: number;
 };
 
 type KonfigJuara = {
@@ -23,13 +26,22 @@ export default function RankingJuaraSection({
   rankingData,
   konfigs,
 }: {
-  rankingData: { jenjang: string; ranking: RankingItem[] }[];
+  // ranking = urutan total semua kategori (dasar predikat peringkat/Juara Utama).
+  // juaraUmum = peringkat 1 menurut kategori Juara Umum — bisa tim yang berbeda
+  // dari Juara Utama 1 kalau kategorinya dibatasi (kategoriUmum != null).
+  rankingData: {
+    jenjang: string;
+    ranking: RankingItem[];
+    juaraUmum: RankingItem | null;
+    kategoriUmum: string[] | null;
+    belumLengkap: string[]; // tim dengan nilai juri kosong (kosong ≠ 0)
+  }[];
   konfigs: KonfigJuara[];
 }) {
   return (
     <div className="flex flex-col gap-8">
       <h2 className="text-xl font-semibold">Ranking Otomatis</h2>
-      {rankingData.map(({ jenjang, ranking }) => {
+      {rankingData.map(({ jenjang, ranking, juaraUmum, kategoriUmum, belumLengkap }) => {
         if (ranking.length === 0) return null;
 
         const peringkatKonfigs = konfigs
@@ -38,9 +50,27 @@ export default function RankingJuaraSection({
 
         return (
           <div key={jenjang}>
-            <h3 className="font-semibold text-base mb-2 text-neutral-600">
+            <h3 className="font-semibold text-base mb-1 text-neutral-600">
               Jenjang {jenjang}
             </h3>
+            <p className="text-xs text-gray-500 mb-2">
+              Urutan & predikat peringkat: total semua kategori (nilai sama → PBB lebih tinggi di atas). Juara Umum:{" "}
+              {kategoriUmum ? (
+                <>
+                  hanya kategori <b>{kategoriUmum.join(", ")}</b>
+                  {juaraUmum && ` (nilai ${juaraUmum.nilaiAkhir})`}
+                </>
+              ) : (
+                "total semua kategori"
+              )}
+              .
+            </p>
+            {belumLengkap.length > 0 && (
+              <div className="bg-amber-50 border border-amber-300 text-amber-900 rounded-lg px-3 py-2 text-xs mb-2">
+                <b>⚠ Juara jenjang {jenjang} BELUM FINAL</b> — {belumLengkap.length} tim masih punya nilai kosong
+                (dihitung 0): {belumLengkap.join("; ")}.
+              </div>
+            )}
             <div className="overflow-x-auto rounded-xl border border-neutral-200">
               <table className="w-full text-sm">
                 <thead className="bg-neutral-50">
@@ -50,13 +80,14 @@ export default function RankingJuaraSection({
                     <th className="px-4 py-3 text-right">Nilai Kotor</th>
                     <th className="px-4 py-3 text-right">Pengurang</th>
                     <th className="px-4 py-3 text-right font-bold">Nilai Akhir</th>
+                    <th className="px-4 py-3 text-right" title="Penentu bila nilai akhir sama">PBB</th>
                     <th className="px-4 py-3 text-left">Predikat Juara</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-100">
                   {ranking.map((tim, idx) => {
                     const juara = peringkatKonfigs[idx];
-                    const isJuaraUmum = idx === 0;
+                    const isJuaraUmum = juaraUmum?.timId === tim.timId;
 
                     return (
                       <tr
@@ -97,8 +128,20 @@ export default function RankingJuaraSection({
                         <td className="px-4 py-3 text-right font-bold text-lg">
                           {tim.nilaiAkhir}
                         </td>
+                        <td className="px-4 py-3 text-right text-gray-500">{tim.nilaiPBB}</td>
                         <td className="px-4 py-3">
                           <div className="flex flex-col gap-0.5">
+                            {labelSeri(statusSeri(ranking, idx)) && (
+                              <span
+                                className={`text-xs px-2 py-0.5 rounded-full font-medium w-fit ${
+                                  statusSeri(ranking, idx).seri
+                                    ? "bg-red-100 text-red-700"
+                                    : "bg-neutral-100 text-neutral-600"
+                                }`}
+                              >
+                                {labelSeri(statusSeri(ranking, idx))}
+                              </span>
+                            )}
                             {isJuaraUmum && (
                               <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full font-medium w-fit">
                                 🏆 Juara Umum {jenjang}

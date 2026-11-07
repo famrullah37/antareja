@@ -121,29 +121,34 @@ export async function upsertPenilaianBaru(timId: string) {
   });
 }
 
+// Hitung ulang total dari NilaiJuri & PelanggaranTim. Baris PenilaianBaru dikunci
+// (FOR UPDATE) selama baca-hitung-tulis: dulu dua juri yang menyimpan nilai tim yang
+// sama hampir bersamaan bisa saling menimpa — hitungan yang membaca data lama
+// (sebelum nilai juri lain masuk) tertulis terakhir, sehingga nilaiAkhir tersimpan
+// lebih rendah dari seharusnya walau NilaiJuri-nya benar. Dengan kunci, penghitungan
+// berjalan bergantian dan yang terakhir selalu membaca semua nilai yang sudah tersimpan.
 export async function recalcPenilaianBaru(penilaianId: string) {
-  const penilaian = await prisma.penilaianBaru.findUnique({
-    where: { id: penilaianId },
-    include: {
-      nilaiJuri: true,
-      pelanggaranTim: true,
-    },
-  });
-  if (!penilaian) return;
+  return prisma.$transaction(async (tx) => {
+    const kunci = await tx.$queryRaw<{ id: string }[]>`
+      SELECT id FROM "PenilaianBaru" WHERE id = ${penilaianId} FOR UPDATE`;
+    if (kunci.length === 0) return null;
 
-  const nilaiKotor = penilaian.nilaiJuri.reduce(
-    (sum, n) => sum + n.nilaiDipilih,
-    0
-  );
-  const totalPengurang = penilaian.pelanggaranTim.reduce(
-    (sum, p) => sum + p.totalPengurang,
-    0
-  );
-  const nilaiAkhir = Math.max(0, nilaiKotor - totalPengurang);
+    const nilai = await tx.nilaiJuri.aggregate({
+      where: { penilaianId },
+      _sum: { nilaiDipilih: true },
+    });
+    const pengurang = await tx.pelanggaranTim.aggregate({
+      where: { penilaianId },
+      _sum: { totalPengurang: true },
+    });
+    const nilaiKotor = nilai._sum.nilaiDipilih ?? 0;
+    const totalPengurang = pengurang._sum.totalPengurang ?? 0;
+    const nilaiAkhir = Math.max(0, nilaiKotor - totalPengurang);
 
-  return prisma.penilaianBaru.update({
-    where: { id: penilaianId },
-    data: { nilaiKotor, totalPengurang, nilaiAkhir },
+    return tx.penilaianBaru.update({
+      where: { id: penilaianId },
+      data: { nilaiKotor, totalPengurang, nilaiAkhir },
+    });
   });
 }
 

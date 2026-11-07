@@ -17,6 +17,7 @@ import prisma from "@/lib/prisma";
 import { catatLog } from "@/lib/activityLog";
 import { findOrLinkJuriByUser } from "@/queries/juri.query";
 import { deleteUploadFile, saveUploadFile } from "@/lib/localUpload";
+import { PREDIKAT_TIDAK_DILAKUKAN } from "@/lib/kelengkapanNilai";
 
 async function requireAdmin() {
   const session = await getServerSession();
@@ -194,10 +195,13 @@ export async function inputNilaiJuri(
     const master = masters.find(
       (m) => m.kategori.toLowerCase() === sub.kategori.toLowerCase() && (m.nilai as number[]).includes(nilai)
     );
-    if (!Number.isInteger(nilai) || !master)
+    // Aturan lomba: peserta yang tidak melakukan perintah mendapat nilai 0 — selalu
+    // boleh walau 0 tidak tercantum di master nilai diskrit kategori itu.
+    const predikat = master?.predikat ?? (nilai === 0 ? PREDIKAT_TIDAK_DILAKUKAN : null);
+    if (!Number.isInteger(nilai) || !predikat)
       return { success: false, message: `Nilai ${s.nilai} tidak valid untuk ${sub.nama}` };
     const catatan = (s.catatan ?? "").toString().trim().slice(0, MAKS_CATATAN) || null;
-    valid.push({ subKategoriId: sub.id, nilai, predikat: master.predikat, catatan });
+    valid.push({ subKategoriId: sub.id, nilai, predikat, catatan });
   }
 
   try {
@@ -403,6 +407,34 @@ export async function removeKategoriLomba(id: string) {
     revalidatePath("/admin/penilaian-baru");
     return { success: true };
   } catch { return { success: false }; }
+}
+
+// Pengaman sebelum juara diumumkan: hitung ulang total SEMUA tim dari nilai juri
+// & pelanggaran yang tersimpan, lalu laporkan berapa yang ternyata berubah
+// (seharusnya 0 — kalau tidak, ada total yang sebelumnya tidak sinkron).
+export async function hitungUlangSemuaNilai() {
+  await requireAdmin();
+  try {
+    const semua = await prisma.penilaianBaru.findMany({
+      select: { id: true, nilaiAkhir: true, tim: { select: { nama_tim: true, jenjang: true } } },
+    });
+    const berubah: string[] = [];
+    for (const p of semua) {
+      const baru = await recalcPenilaianBaru(p.id);
+      if (baru && baru.nilaiAkhir !== p.nilaiAkhir)
+        berubah.push(`${p.tim.jenjang} ${p.tim.nama_tim}: ${p.nilaiAkhir} → ${baru.nilaiAkhir}`);
+    }
+    await catatLog(
+      "HITUNG_ULANG_NILAI",
+      `${semua.length} tim dihitung ulang, ${berubah.length} berubah${berubah.length ? `: ${berubah.join("; ")}` : ""}`
+    );
+    revalidatePath("/admin/penilaian-baru", "layout");
+    revalidatePath("/admin/penghargaan");
+    return { success: true, total: semua.length, berubah };
+  } catch (e) {
+    console.error("hitungUlangSemuaNilai error:", e);
+    return { success: false, total: 0, berubah: [] as string[] };
+  }
 }
 
 export async function publishNilaiBaru(penilaianId: string, publish: boolean) {

@@ -7,12 +7,14 @@ import KonfigJuaraPeringkatForm from "./components/KonfigJuaraPeringkatForm";
 import KonfigJuaraTable from "./components/KonfigJuaraTable";
 import RankingJuaraSection from "./components/RankingJuaraSection";
 import RankingTimSection from "./components/RankingTimSection";
+import { hitungKelengkapanNilai, ringkasKosong } from "@/lib/kelengkapanNilai";
 
 export default async function PenghargaanPage() {
-  const [konfigs, kategoriLombas, penilaians] = await Promise.all([
+  const [konfigs, kategoriLombas, penilaians, kelengkapan] = await Promise.all([
     findKonfigJuaras(),
     findKategoriLombas(),
     findPenilaianBarus(),
+    hitungKelengkapanNilai(),
   ]);
 
   const kategoriNames = kategoriLombas.map((k) => k.nama);
@@ -25,11 +27,29 @@ export default async function PenghargaanPage() {
       const umumKonfig = konfigs.find(
         (k: any) => k.jenisJuara === "UMUM" && k.jenjang === j
       );
-      const kategori = umumKonfig
-        ? (umumKonfig.kategoriList as string[])
-        : kategoriNames;
-      const ranking = await getRankingPerJenjang(j as any, kategori);
-      return { jenjang: j, ranking };
+      // Peringkat (Juara Utama, dst) = total semua kategori; Juara Umum = hanya
+      // kategori yang dicentang di konfigurasinya. Semua kategori tercentang
+      // (atau belum dikonfigurasi) sama dengan total.
+      const kategoriUmum = umumKonfig ? (umumKonfig.kategoriList as string[]) : [];
+      const semuaDicentang =
+        kategoriUmum.length === 0 ||
+        kategoriNames.every((n) => kategoriUmum.some((k) => k.toLowerCase() === n.toLowerCase()));
+      const [ranking, rankingUmum] = await Promise.all([
+        getRankingPerJenjang(j as any, []),
+        semuaDicentang ? null : getRankingPerJenjang(j as any, kategoriUmum),
+      ]);
+      // Tim jenjang ini yang nilainya masih ada yang kosong / belum dinilai sama
+      // sekali → juara belum bisa dianggap final.
+      const belumLengkap = Object.values(kelengkapan)
+        .filter((k) => k.jenjang === j && k.kosong > 0)
+        .map((k) => `${k.namaTim} (${k.terisi === 0 ? "belum dinilai" : ringkasKosong(k)})`);
+      return {
+        jenjang: j,
+        ranking,
+        juaraUmum: (rankingUmum ?? ranking)[0] ?? null,
+        kategoriUmum: semuaDicentang ? null : kategoriUmum,
+        belumLengkap,
+      };
     })
   );
 

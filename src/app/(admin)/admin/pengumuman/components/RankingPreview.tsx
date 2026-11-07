@@ -1,5 +1,7 @@
 ﻿"use client";
 
+import { bandingkanRanking, nilaiPenentuSeri } from "@/lib/rankingNilai";
+
 type PenilaianEntry = {
   id: string;
   nilaiAkhir: number;
@@ -7,6 +9,7 @@ type PenilaianEntry = {
   totalPengurang: number;
   published: boolean;
   tim: { nama_tim: string; asal_sekolah: string; jenjang: string };
+  nilaiJuri: { nilaiDipilih: number; subKategori: { kategori: string } }[];
 };
 
 const JENJANG_COLORS: Record<string, string> = {
@@ -55,7 +58,13 @@ export default function RankingPreview({ rankings }: { rankings: PenilaianEntry[
               </thead>
               <tbody className="divide-y divide-neutral-50">
                 {rows
-                  .sort((a, b) => b.nilaiAkhir - a.nilaiAkhir)
+                  // Nilai sama → PBB lebih tinggi di atas (juklak), lihat lib/rankingNilai.ts.
+                  .sort((a, b) =>
+                    bandingkanRanking(
+                      { nilaiAkhir: a.nilaiAkhir, nilaiPBB: nilaiPenentuSeri(a.nilaiJuri ?? []) },
+                      { nilaiAkhir: b.nilaiAkhir, nilaiPBB: nilaiPenentuSeri(b.nilaiJuri ?? []) }
+                    )
+                  )
                   .map((row, i) => (
                     <tr key={row.id} className={`hover:bg-neutral-50 ${i === 0 ? "bg-yellow-50" : i === 1 ? "bg-gray-50" : i === 2 ? "bg-orange-50" : ""}`}>
                       <td className="px-4 py-2.5 text-center font-bold">

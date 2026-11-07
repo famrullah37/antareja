@@ -1,7 +1,43 @@
 "use client";
 
-import { publishNilaiBaru } from "@/actions/PenilaianBaru";
+import { hitungUlangSemuaNilai, publishNilaiBaru } from "@/actions/PenilaianBaru";
+import { useState } from "react";
 import { toast } from "sonner";
+import { bandingkanRanking, labelSeri, nilaiPenentuSeri, statusSeri } from "@/lib/rankingNilai";
+
+// Dijalankan panitia sebelum mengumumkan juara — memastikan total tiap tim sesuai
+// nilai juri & pelanggaran yang tersimpan.
+function TombolHitungUlang() {
+  const [proses, setProses] = useState(false);
+  async function jalankan() {
+    setProses(true);
+    const toastId = toast.loading("Menghitung ulang nilai semua tim...");
+    const r = await hitungUlangSemuaNilai();
+    setProses(false);
+    if (!r.success) {
+      toast.error("Gagal menghitung ulang", { id: toastId });
+      return;
+    }
+    if (r.berubah.length === 0) {
+      toast.success(`Semua ${r.total} nilai tim sudah sesuai`, { id: toastId });
+    } else {
+      toast.warning(`${r.berubah.length} nilai tim diperbaiki: ${r.berubah.join("; ")}`, {
+        id: toastId,
+        duration: 15000,
+      });
+    }
+  }
+  return (
+    <button
+      onClick={jalankan}
+      disabled={proses}
+      className="px-3 py-1.5 rounded-lg border border-neutral-300 text-sm hover:bg-neutral-50 disabled:opacity-50"
+      title="Hitung ulang total semua tim dari nilai juri & pelanggaran yang tersimpan"
+    >
+      {proses ? "Menghitung..." : "Hitung ulang semua nilai"}
+    </button>
+  );
+}
 
 type NilaiJuriItem = {
   nilaiDipilih: number;
@@ -34,14 +70,34 @@ type KategoriLomba = { id: string; nama: string };
 
 const JENJANG_ORDER = ["SD", "SMP", "SMA", "PURNA"];
 
+type Kelengkapan = { kosong: number; diharapkan: number; detail: string };
+
 export default function RankingSection({
   penilaians,
   kategoris,
+  kelengkapan,
+  timBelumDinilai,
 }: {
   penilaians: PenilaianBaruItem[];
   kategoris: KategoriLomba[];
+  // Per timId: jumlah nilai juri yang belum diisi (kosong ≠ 0) — lib/kelengkapanNilai.ts.
+  kelengkapan: Record<string, Kelengkapan>;
+  timBelumDinilai: { timId: string; label: string }[];
 }) {
+  const belumLengkap = penilaians.filter((p) => (kelengkapan[p.timId]?.kosong ?? 0) > 0);
+
   async function handlePublish(id: string, current: boolean) {
+    const p = penilaians.find((x) => x.id === id);
+    const k = p ? kelengkapan[p.timId] : undefined;
+    if (
+      !current &&
+      k &&
+      k.kosong > 0 &&
+      !confirm(
+        `Nilai ${p!.tim.nama_tim} BELUM LENGKAP: ${k.kosong} nilai juri masih kosong (${k.detail}).\n\nNilai kosong dihitung 0. Tetap publish?`
+      )
+    )
+      return;
     const toastId = toast.loading(current ? "Menyembunyikan..." : "Mempublish...");
     const result = await publishNilaiBaru(id, !current);
     if (result.success)
@@ -64,10 +120,43 @@ export default function RankingSection({
       .reduce((sum, n) => sum + n.nilaiDipilih, 0);
   }
 
+  // Peringatan nilai kosong — ditampilkan di atas tabel (juga saat belum ada penilaian sama sekali).
+  const peringatan = (belumLengkap.length > 0 || timBelumDinilai.length > 0) && (
+    <div className="bg-amber-50 border border-amber-300 text-amber-900 rounded-xl p-4 text-sm mb-4 flex flex-col gap-2">
+      <p className="font-semibold">
+        ⚠ Ada nilai yang masih KOSONG — dihitung 0 di total. Lengkapi sebelum menentukan juara. (Nilai 0 yang
+        sengaja diberikan juri karena peserta tidak melakukan perintah tidak termasuk di sini.)
+      </p>
+      {belumLengkap.length > 0 && (
+        <div>
+          <p className="font-medium">Nilai belum lengkap ({belumLengkap.length} tim):</p>
+          <ul className="list-disc ml-5">
+            {belumLengkap.map((p) => (
+              <li key={p.id}>
+                {p.tim.jenjang} · {p.tim.nama_tim} — {kelengkapan[p.timId].detail}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {timBelumDinilai.length > 0 && (
+        <div>
+          <p className="font-medium">Belum dinilai sama sekali ({timBelumDinilai.length} tim, tidak masuk tabel):</p>
+          <ul className="list-disc ml-5">
+            {timBelumDinilai.map((t) => (
+              <li key={t.timId}>{t.label}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+
   if (penilaians.length === 0) {
     return (
       <section>
         <h2 className="text-xl font-semibold mb-3">Rekap Nilai</h2>
+        {peringatan}
         <p className="text-gray-400 text-sm">Belum ada data penilaian.</p>
       </section>
     );
@@ -75,11 +164,17 @@ export default function RankingSection({
 
   return (
     <section>
-      <h2 className="text-xl font-semibold mb-3">Rekap Nilai</h2>
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+        <h2 className="text-xl font-semibold">Rekap Nilai</h2>
+        <TombolHitungUlang />
+      </div>
+      {peringatan}
       {JENJANG_ORDER.map((jenjang) => {
+        // Nilai sama → PBB lebih tinggi di atas (juklak), lihat lib/rankingNilai.ts.
         const grouped = penilaians
           .filter((p) => p.tim.jenjang === jenjang)
-          .sort((a, b) => b.nilaiAkhir - a.nilaiAkhir);
+          .map((p) => ({ ...p, nilaiPBB: nilaiPenentuSeri(p.nilaiJuri) }))
+          .sort(bandingkanRanking);
 
         if (grouped.length === 0) return null;
 
@@ -102,6 +197,7 @@ export default function RankingSection({
                     <th className="px-4 py-3 text-right">Nilai Kotor</th>
                     <th className="px-4 py-3 text-right">Pengurang</th>
                     <th className="px-4 py-3 text-right font-bold">Nilai Akhir</th>
+                    <th className="px-4 py-3 text-center">Kelengkapan</th>
                     <th className="px-4 py-3 text-center">Status</th>
                     <th className="px-4 py-3 text-center">Publish</th>
                   </tr>
@@ -115,6 +211,13 @@ export default function RankingSection({
                       <td className="px-4 py-3">
                         <div className="font-medium">{p.tim.nama_tim}</div>
                         <div className="text-xs text-gray-400">{p.tim.asal_sekolah}</div>
+                        {labelSeri(statusSeri(grouped, idx)) && (
+                          <div
+                            className={`text-xs mt-0.5 ${statusSeri(grouped, idx).seri ? "text-red-600 font-semibold" : "text-gray-500"}`}
+                          >
+                            {labelSeri(statusSeri(grouped, idx))}
+                          </div>
+                        )}
                       </td>
                       {kategoriNama.map((k) => (
                         <td key={k} className="px-4 py-3 text-right">
@@ -127,6 +230,25 @@ export default function RankingSection({
                       </td>
                       <td className="px-4 py-3 text-right font-bold text-lg">
                         {p.nilaiAkhir}
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        {(() => {
+                          const k = kelengkapan[p.timId];
+                          if (!k || k.diharapkan === 0)
+                            return <span className="text-xs text-gray-400" title="Belum ada penugasan juri">–</span>;
+                          return k.kosong === 0 ? (
+                            <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
+                              Lengkap
+                            </span>
+                          ) : (
+                            <span
+                              className="px-2 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800 whitespace-nowrap"
+                              title={k.detail}
+                            >
+                              {k.kosong} kosong
+                            </span>
+                          );
+                        })()}
                       </td>
                       <td className="px-4 py-3 text-center">
                         <span

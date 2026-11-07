@@ -1,5 +1,7 @@
 ﻿"use client";
 
+import { bandingkanRanking, nilaiPenentuSeri } from "@/lib/rankingNilai";
+
 type NilaiJuri = {
   id: string;
   subKategori: { kategori: string };
@@ -36,8 +38,16 @@ export default function RankingTimSection({
   }
 
   const jenjangList = [...jenjangMap.keys()].sort();
+  // Nilai sama → PBB lebih tinggi di atas (juklak), lihat lib/rankingNilai.ts.
   for (const j of jenjangList) {
-    jenjangMap.get(j)!.sort((a, b) => b.nilaiAkhir - a.nilaiAkhir);
+    jenjangMap
+      .get(j)!
+      .sort((a, b) =>
+        bandingkanRanking(
+          { nilaiAkhir: a.nilaiAkhir, nilaiPBB: nilaiPenentuSeri(a.nilaiJuri) },
+          { nilaiAkhir: b.nilaiAkhir, nilaiPBB: nilaiPenentuSeri(b.nilaiJuri) }
+        )
+      );
   }
 
   const rankColor = (idx: number) =>

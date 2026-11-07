@@ -15,9 +15,10 @@ import PelanggaranSection from "./components/PelanggaranSection";
 import JuriKategoriSection from "./components/JuriKategoriSection";
 import KategoriLombaSection from "./components/KategoriLombaSection";
 import RankingSection from "./components/RankingSection";
+import { hitungKelengkapanNilai, ringkasKosong } from "@/lib/kelengkapanNilai";
 
 export default async function PenilaianBaruPage() {
-  const [nilaiMasters, subKategoris, pelanggarans, juris, juriKategoris, kategoriLombas, penilaians] =
+  const [nilaiMasters, subKategoris, pelanggarans, juris, juriKategoris, kategoriLombas, penilaians, kelengkapan] =
     await Promise.all([
       findNilaiDiskritMasters(),
       findSubKategoriMasters(),
@@ -26,7 +27,11 @@ export default async function PenilaianBaruPage() {
       findJuriKategoris(),
       findKategoriLombas(),
       findPenilaianBarus(),
+      hitungKelengkapanNilai(),
     ]);
+  // Tim terkonfirmasi yang belum punya satu nilai pun — tidak muncul di tabel rekap.
+  const adaPenilaian = new Set(penilaians.map((p) => p.timId));
+  const timBelumDinilai = Object.values(kelengkapan).filter((k) => !adaPenilaian.has(k.timId));
 
   return (
     <div className="flex flex-col gap-10">
@@ -42,7 +47,20 @@ export default async function PenilaianBaruPage() {
 
       <PelanggaranSection pelanggarans={pelanggarans} />
 
-      <RankingSection penilaians={penilaians} kategoris={kategoriLombas} />
+      <RankingSection
+        penilaians={penilaians}
+        kategoris={kategoriLombas}
+        kelengkapan={Object.fromEntries(
+          Object.values(kelengkapan).map((k) => [
+            k.timId,
+            { kosong: k.kosong, diharapkan: k.diharapkan, detail: ringkasKosong(k) },
+          ])
+        )}
+        timBelumDinilai={timBelumDinilai.map((k) => ({
+          timId: k.timId,
+          label: `${k.jenjang}-${String(k.noUrut ?? "?").padStart(2, "0")} ${k.namaTim} — ${k.asalSekolah}`,
+        }))}
+      />
     </div>
   );
 }

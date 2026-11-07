@@ -1,5 +1,6 @@
 import prisma from "@/lib/prisma";
 import { Jenjang, Prisma } from "@prisma/client";
+import { bandingkanRanking, nilaiPenentuSeri } from "@/lib/rankingNilai";
 
 export async function findKonfigJuaras(where?: Prisma.KonfigJuaraWhereInput) {
   return prisma.konfigJuara.findMany({
@@ -27,22 +28,38 @@ export async function deleteKonfigJuara(where: Prisma.KonfigJuaraWhereUniqueInpu
   return prisma.konfigJuara.delete({ where });
 }
 
-export async function getRankingPerJenjang(
-  jenjang: Jenjang,
-  _kategoriList: string[]
-) {
+// kategoriList kosong = semua kategori (nilaiAkhir tersimpan). Kalau diisi (centang
+// "Kategori yang Dihitung" di konfigurasi Juara Umum), nilai kotor hanya dari
+// sub-kategori yang kategorinya dicentang; pelanggaran tetap dikurangkan seluruhnya
+// karena pelanggaran adalah pengurang tim, bukan bagian kategori tertentu.
+// Dulu parameter ini diabaikan sehingga centang kategori tidak berpengaruh.
+export async function getRankingPerJenjang(jenjang: Jenjang, kategoriList: string[]) {
   const penilaians = await prisma.penilaianBaru.findMany({
     where: { tim: { jenjang } },
-    include: { tim: true },
+    include: {
+      tim: true,
+      nilaiJuri: { select: { nilaiDipilih: true, subKategori: { select: { kategori: true } } } },
+    },
     orderBy: { nilaiAkhir: "desc" },
   });
 
-  return penilaians.map((p) => ({
-    timId: p.timId,
-    nama: p.tim.nama_tim,
-    sekolah: p.tim.asal_sekolah,
-    nilaiKotor: p.nilaiKotor,
-    totalPengurang: p.totalPengurang,
-    nilaiAkhir: p.nilaiAkhir,
-  }));
+  const dihitung = new Set(kategoriList.map((k) => k.toLowerCase()));
+  const hasil = penilaians.map((p) => {
+    const nilaiKotor = kategoriList.length
+      ? p.nilaiJuri
+          .filter((n) => dihitung.has(n.subKategori.kategori.toLowerCase()))
+          .reduce((s, n) => s + n.nilaiDipilih, 0)
+      : p.nilaiKotor;
+    return {
+      timId: p.timId,
+      nama: p.tim.nama_tim,
+      sekolah: p.tim.asal_sekolah,
+      nilaiKotor,
+      totalPengurang: p.totalPengurang,
+      nilaiAkhir: kategoriList.length ? Math.max(0, nilaiKotor - p.totalPengurang) : p.nilaiAkhir,
+      nilaiPBB: nilaiPenentuSeri(p.nilaiJuri),
+    };
+  });
+  // Nilai sama → PBB lebih tinggi di atas (juklak). Dipakai juga oleh sertifikat.
+  return hasil.sort(bandingkanRanking);
 }

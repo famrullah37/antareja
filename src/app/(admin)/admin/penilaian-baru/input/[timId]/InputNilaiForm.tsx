@@ -47,9 +47,24 @@ type Existing = {
 
 type Skor = { nilai: number; catatan: string };
 
+// Aturan lomba: peserta yang tidak melakukan perintah = nilai 0 (sah), beda dengan
+// sub-kategori yang belum diisi (kosong). Kalau master kategori tidak memuat 0,
+// baris ini ditambahkan supaya juri tetap bisa memberi 0 — sama dengan
+// PREDIKAT_TIDAK_DILAKUKAN di lib/kelengkapanNilai.ts (diterima server).
+const BARIS_NOL: NilaiDiskrit = {
+  id: "tidak-dilakukan",
+  kategori: "",
+  predikat: "TIDAK_DILAKUKAN",
+  warna: "#6b7280",
+  nilai: [0],
+  urutan: 9999,
+};
+
 function predikatDari(nilai: number, masters: NilaiDiskrit[], kategori: string) {
-  return masters.find(
-    (m) => m.kategori.toLowerCase() === kategori.toLowerCase() && (m.nilai as number[]).includes(nilai)
+  return (
+    masters.find(
+      (m) => m.kategori.toLowerCase() === kategori.toLowerCase() && (m.nilai as number[]).includes(nilai)
+    ) ?? (nilai === 0 ? BARIS_NOL : undefined)
   );
 }
 
@@ -118,6 +133,18 @@ export default function InputNilaiForm({
       toast.error("Belum ada nilai yang diubah");
       return;
     }
+    // Kosong ≠ 0: sub-kategori yang belum diisi tetap dihitung 0 di total, jadi
+    // juri diingatkan dulu. Simpan sebagian tetap boleh (juri bisa menyimpan bertahap).
+    const masihKosong = subSaya.filter((s) => nilaiTampil(s.id) === undefined);
+    if (
+      masihKosong.length > 0 &&
+      !confirm(
+        `Masih ada ${masihKosong.length} sub-kategori BELUM DINILAI:\n` +
+          masihKosong.map((s) => `• ${s.nama}`).join("\n") +
+          `\n\nKosong berbeda dengan 0. Jika peserta tidak melakukan perintah, pilih nilai 0 (Tidak dilakukan).\n\nSimpan dulu nilai yang sudah diisi?`
+      )
+    )
+      return;
     setLoading(true);
     const toastId = toast.loading("Menyimpan nilai...");
     // Juri yang dipilih hanya dipakai server untuk Sie Lomba/Admin; akun juri selalu dirinya sendiri.
@@ -241,9 +268,12 @@ export default function InputNilaiForm({
 
       {/* Kartu per sub-kategori — tombol besar untuk layar sentuh */}
       {Object.entries(grouped).map(([kategori, subs]) => {
-        const masters = nilaiMasters
+        const mastersKategori = nilaiMasters
           .filter((m) => m.kategori.toLowerCase() === kategori.toLowerCase())
           .sort((a, b) => a.urutan - b.urutan);
+        const masters = mastersKategori.some((m) => (m.nilai as number[]).includes(0))
+          ? mastersKategori
+          : [...mastersKategori, BARIS_NOL];
         return (
           <section key={kategori} className="flex flex-col gap-3">
             <h2 className="font-bold text-lg">Kategori {kategori}</h2>
@@ -255,8 +285,12 @@ export default function InputNilaiForm({
                 return (
                   <div
                     key={sub.id}
-                    className={`bg-white rounded-xl border-2 p-4 flex flex-col gap-3 ${
-                      berubah ? "border-primary-300" : "border-neutral-200"
+                    className={`rounded-xl border-2 p-4 flex flex-col gap-3 ${
+                      berubah
+                        ? "bg-white border-primary-300"
+                        : dipilih === undefined
+                          ? "bg-amber-50 border-amber-300"
+                          : "bg-white border-neutral-200"
                     }`}
                   >
                     <div className="flex items-start justify-between gap-3">
@@ -268,12 +302,16 @@ export default function InputNilaiForm({
                           {sub.kode} · maks {sub.maxNilai}
                         </div>
                       </div>
-                      {dipilih !== undefined && (
+                      {dipilih !== undefined ? (
                         <span
                           className="px-3 py-1 rounded-full text-white text-sm font-bold whitespace-nowrap"
                           style={{ backgroundColor: pred?.warna ?? "#888" }}
                         >
                           {dipilih} · {(pred?.predikat ?? "").replace(/_/g, " ")}
+                        </span>
+                      ) : (
+                        <span className="px-3 py-1 rounded-full bg-amber-100 text-amber-800 text-sm font-semibold whitespace-nowrap">
+                          Belum dinilai
                         </span>
                       )}
                     </div>
@@ -429,7 +467,10 @@ export default function InputNilaiForm({
             Terisi{" "}
             <b className={terisi === subSaya.length ? "text-green-600" : "text-black"}>
               {terisi}/{subSaya.length}
-            </b>{" "}
+            </b>
+            {terisi < subSaya.length && (
+              <span className="text-amber-700 font-semibold"> · {subSaya.length - terisi} belum dinilai</span>
+            )}{" "}
             · Total <b className="text-black text-lg">{total}</b>
           </div>
           <button
