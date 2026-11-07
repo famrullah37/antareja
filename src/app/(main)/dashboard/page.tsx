@@ -21,6 +21,7 @@ import PelunasanSection from "./components/PelunasanSection";
 import MenuDashboard from "./components/MenuDashboard";
 import TiketWajibSection from "./components/TiketWajibSection";
 import FotoTimSection from "./components/FotoTimSection";
+import VoucherSection from "./components/VoucherSection";
 import { findTikets } from "@/queries/tiket.query";
 import { statusPerJenis } from "@/lib/tiketWajib";
 import { siapkanPelunasan } from "@/lib/pelunasan";
@@ -52,7 +53,7 @@ export default async function TimDashboard() {
     findTransaksiTikets({ userId: session.user!.id }),
     hasilPenilaianUntukTim(tim.id),
     findSertifikatByTim(tim.id),
-    biayaPendaftaran(tim.jenjang, tim.pembayaran?.isDP ?? false),
+    biayaPendaftaran(tim.jenjang, tim.pembayaran?.isDP ?? false, tim.pembayaran?.potongan ?? 0),
     getKonfigUmum(),
     findTikets({ khususTim: true }),
   ]);
@@ -122,6 +123,7 @@ export default async function TimDashboard() {
       <FotoTimSection timId={tim.id} />
       <NilaiAkhirSection penilaianBaru={penilaianBaru as any} />
       <SertifikatSection sertifikat={sertifikat as any} />
+      <VoucherSection timId={tim.id} />
       <TiketSayaSection transaksis={transaksiTikets as any} />
     </div>
   );

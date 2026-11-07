@@ -143,6 +143,9 @@ export type KuitansiData = {
   jenjang: string;
   isDP: boolean;
   hargaDasar: number;
+  // Voucher pendaftaran (Pembayaran.potongan) — tampil sebagai baris tersendiri;
+  // hargaDasar sudah berupa nominal SETELAH potongan.
+  voucher?: { kode: string; potongan: number } | null;
   tanggal: Date;
   bendaharaNama?: string | null;
   bendaharaTtdUrl?: string | null;
@@ -196,6 +199,9 @@ export function buildKuitansiPdf(data: KuitansiData): Promise<Buffer> {
       ["Nama Tim", data.namaTim],
       ["Jenjang", data.jenjang],
       ["Jenis Pembayaran", data.isDP ? "DP 50% (sementara)" : "Lunas"],
+      ...(data.voucher
+        ? [["Potongan Voucher", `${data.voucher.kode} — Rp${data.voucher.potongan.toLocaleString("id-ID")}`] as [string, string]]
+        : []),
     ],
     total: data.hargaDasar,
     tanggal: data.tanggal,

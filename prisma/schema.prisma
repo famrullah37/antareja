@@ -160,7 +160,57 @@ model Pembayaran {
   pelunasanBank     String?
   pelunasanNamaRek  String?
   pelunasanAt       DateTime?
+  // Voucher yang dipakai saat mendaftar. potongan = rupiah yang dipotong dari
+  // biaya LUNAS (snapshot saat daftar, tidak ikut berubah kalau voucher/biaya
+  // diubah belakangan). DP tetap normal; potongan mengurangi sisa pelunasan —
+  // lihat biayaPendaftaran di actions/pembayaran.ts.
+  voucherId         String?
+  voucher           Voucher?  @relation(fields: [voucherId], references: [id], onDelete: Restrict)
+  potongan          Int       @default(0)
   tim             Tim       @relation(fields: [tim_id], references: [id], onDelete: Cascade)
+
+  @@index([voucherId])
+}
+
+// Voucher potongan biaya pendaftaran tim (/admin/voucher). Satu tabel untuk dua pemakaian:
+//  - kode umum dibuat admin (mis. EARLYBIRD), boleh dibatasi jenjang/kuota;
+//  - voucher pribadi untuk kegiatan berikutnya, dibuat massal dari tim yang
+//    terdaftar sekarang: sumberTimId = tim penerima (teks biasa, BUKAN relasi,
+//    supaya voucher tetap ada saat data tim/user direset), asalSekolah dikunci
+//    ke sekolah tim itu, kuota 1. Dibuat nonaktif dulu, diaktifkan saat
+//    pendaftaran kegiatan berikutnya dibuka.
+// persen=false → nilai dalam rupiah; persen=true → nilai 1-100 (%), opsional
+// dibatasi maksPotongan (rupiah). kuota null = tanpa batas pemakaian.
+model Voucher {
+  id           String       @id @default(uuid())
+  kode         String       @unique
+  keterangan   String?
+  persen       Boolean      @default(false)
+  nilai        Int
+  maksPotongan Int?
+  jenjang      Jenjang?
+  asalSekolah  String?
+  kuota        Int?
+  aktif        Boolean      @default(true)
+  sumberTimId  String?
+  // Data Tim & User DIRESET setelah tiap kegiatan, jadi semua yang perlu
+  // bertahan sampai kegiatan berikutnya disimpan di voucher itu sendiri:
+  //  - jumlahDipakai: penghitung pemakaian (dicek terhadap kuota) — bukan
+  //    hitungan Pembayaran, yang ikut terhapus saat reset sehingga voucher
+  //    sekali-pakai bisa terpakai lagi;
+  //  - penerima*: snapshot tim penerima voucher pribadi (nama tim — sekolah,
+  //    email akun, no. official) supaya panitia tetap tahu pemiliknya;
+  //  - emailTerkirimAt: kode sudah dikirim ke email penerima (wajib sebelum
+  //    reset, karena dashboard tim ikut hilang).
+  jumlahDipakai   Int       @default(0)
+  penerimaNama    String?
+  penerimaEmail   String?
+  penerimaTelp    String?
+  emailTerkirimAt DateTime?
+  createdAt    DateTime     @default(now())
+  pembayaran   Pembayaran[]
+
+  @@index([sumberTimId])
 }
 
 // ─── Juri ────────────────────────────────────────────────────────────────────

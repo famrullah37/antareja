@@ -18,10 +18,12 @@ export default function PembayaranForm({
   data,
   id,
   biayaDasar,
+  voucher,
 }: {
   data?: TimWithPembayaran;
   id?: string;
   biayaDasar: number;
+  voucher?: { kode: string; potongan: number } | null;
 }) {
   // Nominal yang seharusnya masuk = total transfer yang dicadangkan saat daftar
   // (biaya saat itu + kode unik). Tim lama tanpa total: pakai biaya jenjang saat ini.
@@ -137,6 +139,13 @@ Tetap konfirmasi (mis. dibayar tunai / sudah dicek di mutasi)?`;
               </span>
             )}
           </P>
+          {voucher && (
+            <P className="font-bold text-black">
+              <span className="font-normal">Voucher: </span>
+              <span className="font-mono">{voucher.kode}</span>
+              <span className="font-normal"> — potongan {formatRupiah(voucher.potongan)} dari biaya lunas</span>
+            </P>
+          )}
           <P className="font-bold text-black">
             <span className="font-normal">Nama Rekening Pengirim: </span>
             {data?.pembayaran?.nama_rek}

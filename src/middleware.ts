@@ -6,7 +6,7 @@ import { NextRequest, NextResponse } from "next/server";
 const JURI_ROUTES = ["/admin/penilaian-baru/input"];
 // Petugas tiket hanya POS (bukan manajemen tiket, verifikasi pembayaran, atau scanner).
 const TIKET_ROUTES = ["/admin/tiket/pos"];
-const BENDAHARA_ROUTES = ["/admin/kas", "/admin/kuitansi","/admin/pembayaran", "/admin/voting", "/admin/merchandise", "/admin/tiket", "/admin/makanan", "/admin/galeri/transaksi", "/admin/galeri/bagi-hasil"];
+const BENDAHARA_ROUTES = ["/admin/kas", "/admin/kuitansi","/admin/pembayaran", "/admin/voucher", "/admin/voting", "/admin/merchandise", "/admin/tiket", "/admin/makanan", "/admin/galeri/transaksi", "/admin/galeri/bagi-hasil"];
 const FOTOGRAFER_ROUTES = ["/admin/galeri"];
 const SIE_HUMAS_ROUTES = ["/admin/sponsor", "/admin/berita"];
 const SIE_LOMBA_ROUTES = [

@@ -66,8 +66,24 @@ export default function FormComponent({
 }) {
   const [tipeValue, setTipeValue] = useState<"TRUE" | "FALSE" | null>(null);
   const [selectedJenjang, setSelectedJenjang] = useState<string | null>(null);
-  const [reserved, setReserved] = useState<{ kodeUnik: string; hargaDasar: number; totalBayar: number } | null>(null);
+  const [reserved, setReserved] = useState<{
+    kodeUnik: string;
+    hargaDasar: number;
+    totalBayar: number;
+    potongan: number;
+    voucherKode: string | null;
+    otomatis: boolean;
+  } | null>(null);
   const [loadingReserve, setLoadingReserve] = useState(false);
+  // Kode yang diketik vs kode yang sudah diterapkan (ikut dikirim ke
+  // reserveKodePendaftaran). Objek baru tiap klik "Pakai" supaya efek di bawah
+  // selalu jalan ulang walau kodenya sama.
+  const [voucherInput, setVoucherInput] = useState("");
+  const [kodeDipakai, setKodeDipakai] = useState<{ kode: string } | null>(null);
+  // Asal sekolah yang sudah "selesai diketik" (diambil saat kolomnya ditinggalkan,
+  // bukan tiap ketikan — tiap perubahan mencadangkan kode unik baru). Tanpa kode,
+  // voucher yang dikunci ke sekolah ini dipakai otomatis.
+  const [asalSekolah, setAsalSekolah] = useState("");
   const router = useRouter();
 
   const jenjangOptions = ALL_JENJANG.filter((j) => konfigUmum[j.aktifKey]).map((j) => ({
@@ -85,11 +101,24 @@ export default function FormComponent({
     }
     let cancelled = false;
     setLoadingReserve(true);
-    reserveKodePendaftaran(selectedJenjang as any, tipeValue === "TRUE").then((result) => {
+    reserveKodePendaftaran(selectedJenjang as any, tipeValue === "TRUE", {
+      kode: kodeDipakai?.kode ?? "",
+      asalSekolah,
+    }).then((result) => {
       if (cancelled) return;
       setLoadingReserve(false);
       if (result.success) {
-        setReserved({ kodeUnik: result.kodeUnik!, hargaDasar: result.hargaDasar!, totalBayar: result.totalBayar! });
+        setReserved({
+          kodeUnik: result.kodeUnik!,
+          hargaDasar: result.hargaDasar!,
+          totalBayar: result.totalBayar!,
+          potongan: result.potongan ?? 0,
+          voucherKode: result.voucherKode ?? null,
+          otomatis: !!result.voucherOtomatis,
+        });
+        if (result.voucherGagal) toast.error(result.voucherGagal);
+        else if (result.voucherOtomatis) toast.success("Sekolah Anda mendapat voucher potongan pendaftaran!");
+        else if (result.voucherKode) toast.success(`Voucher ${result.voucherKode} dipakai`);
       } else {
         toast.error(result.message ?? "Gagal menyiapkan kode pembayaran");
         setReserved(null);
@@ -98,7 +127,28 @@ export default function FormComponent({
     return () => {
       cancelled = true;
     };
-  }, [selectedJenjang, tipeValue]);
+  }, [selectedJenjang, tipeValue, kodeDipakai, asalSekolah]);
+
+  function ambilAsalSekolah() {
+    const nilai = ((document.getElementById("sekolah") as HTMLInputElement | null)?.value ?? "").trim();
+    if (nilai !== asalSekolah) setAsalSekolah(nilai);
+  }
+
+  function pakaiVoucher() {
+    const kode = voucherInput.trim();
+    if (!kode) return;
+    if (!selectedJenjang || !tipeValue) {
+      toast.error("Pilih jenjang & tipe pembayaran dulu");
+      return;
+    }
+    ambilAsalSekolah();
+    setKodeDipakai({ kode });
+  }
+
+  function hapusVoucher() {
+    setVoucherInput("");
+    setKodeDipakai(null);
+  }
 
   async function submitForm(data: FormData) {
     const toastId = toast.loading("Membuat tim....");
@@ -109,7 +159,10 @@ export default function FormComponent({
       router.refresh();
     } else {
       toast.error(result.message, { id: toastId });
-      if (result.message?.includes("pilih ulang jenjang")) setReserved(null);
+      if (result.message?.includes("pilih ulang jenjang")) {
+        setReserved(null);
+        setKodeDipakai(null);
+      }
     }
   }
 
@@ -158,16 +211,19 @@ export default function FormComponent({
           label="No.Telp Official"
           required
         />
-        <TextField
-          id="sekolah"
-          name="asal"
-          placeholder="Masukkan nama Sekolah"
-          type="text"
-          className="w-full"
-          label="Asal Sekolah"
-          list="daftar-sekolah"
-          required
-        />
+        {/* onBlur React ikut menggelembung dari input di dalamnya. */}
+        <div onBlur={ambilAsalSekolah}>
+          <TextField
+            id="sekolah"
+            name="asal"
+            placeholder="Masukkan nama Sekolah"
+            type="text"
+            className="w-full"
+            label="Asal Sekolah"
+            list="daftar-sekolah"
+            required
+          />
+        </div>
         {/* Autocomplete dari nama sekolah yang sudah pernah dipakai tim lain —
             supaya PIC berbeda dari sekolah yang sama tidak mengetik nama yang
             beda-beda. Tetap teks bebas, sekolah baru tetap bisa mengetik nama sendiri. */}
@@ -220,7 +276,62 @@ export default function FormComponent({
             classNames={selectClassNames}
           />
         </div>
+        <div className="flex flex-col gap-2">
+          <label htmlFor="kode-voucher" className="text-[16px]">
+            Kode Voucher{" "}
+            <span className="text-gray-400">(opsional — voucher untuk sekolah Anda terpasang otomatis)</span>
+          </label>
+          <div className="flex gap-2">
+            <input
+              id="kode-voucher"
+              type="text"
+              value={voucherInput}
+              onChange={(e) => setVoucherInput(e.target.value.toUpperCase())}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  pakaiVoucher();
+                }
+              }}
+              placeholder="Punya kode voucher?"
+              maxLength={40}
+              className="flex-1 min-w-0 bg-[#FAFAFA] border focus:outline-none border-[#E4E6EA] rounded-[14px] text-black py-[18px] px-[20px] text-[16px] font-mono uppercase focus:bg-[#F1F6F9] transition-all duration-500 placeholder:text-[#C8C8C8] placeholder:font-sans placeholder:normal-case"
+            />
+            {reserved?.voucherKode && !reserved.otomatis ? (
+              <button
+                type="button"
+                onClick={hapusVoucher}
+                className="shrink-0 px-5 rounded-[14px] border border-neutral-300 hover:bg-neutral-100 transition-colors"
+              >
+                Hapus
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={pakaiVoucher}
+                disabled={!voucherInput.trim() || loadingReserve}
+                className="shrink-0 px-5 rounded-[14px] bg-primary-500 text-white hover:bg-opacity-85 disabled:opacity-50 transition-all"
+              >
+                Pakai
+              </button>
+            )}
+          </div>
+          {reserved?.voucherKode && (
+            <P className="text-sm text-green-700">
+              {reserved.otomatis ? (
+                <>Sekolah Anda mendapat voucher dari kegiatan sebelumnya, otomatis dipakai</>
+              ) : (
+                <>
+                  Voucher <span className="font-mono font-bold">{reserved.voucherKode}</span> dipakai
+                </>
+              )}{" "}
+              — potongan {formatRupiah(reserved.potongan)} dari biaya lunas.
+              {tipeValue === "TRUE" && " Potongan mengurangi sisa pelunasan setelah DP."}
+            </P>
+          )}
+        </div>
         <input type="hidden" name="kodeUnik" value={reserved?.kodeUnik ?? ""} />
+        <input type="hidden" name="kodeVoucher" value={reserved?.voucherKode ?? ""} />
         <div>
           <div>
             <H3>Pembayaran</H3>
@@ -235,7 +346,8 @@ export default function FormComponent({
                 </P>
                 <p className="text-black font-extrabold text-2xl mt-1">{formatRupiah(reserved.totalBayar)}</p>
                 <P className="text-xs text-gray-400 mt-1">
-                  {formatRupiah(reserved.hargaDasar)} biaya pendaftaran + kode unik {reserved.kodeUnik}
+                  {formatRupiah(reserved.hargaDasar)} biaya pendaftaran
+                  {reserved.potongan > 0 && " (sudah termasuk potongan voucher)"} + kode unik {reserved.kodeUnik}
                 </P>
                 <P className="text-xs text-gray-400">
                   Nominal harus persis (termasuk 3 digit kode unik) supaya pembayaran gampang dicocokkan bendahara.

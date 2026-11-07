@@ -37,7 +37,11 @@ async function assignNoUrutIfNeeded(timId: string) {
 // Biaya pendaftaran per jenjang & tipe pembayaran diambil dari KonfigUmum (bisa
 // diubah admin lewat /admin/pengaturan) — jangan hardcode di sini, supaya kas
 // selalu mencatat nominal yang sesungguhnya berlaku, termasuk untuk jenjang SD.
-export async function biayaPendaftaran(jenjang: Jenjang, isDP: boolean) {
+//
+// potongan = Pembayaran.potongan (voucher), selalu dipotong dari biaya LUNAS:
+// DP tetap nominal normal (kecuali biaya setelah potongan lebih kecil dari DP),
+// jadi potongan otomatis mengurangi sisa pelunasan. Tim tanpa voucher = 0.
+export async function biayaPendaftaran(jenjang: Jenjang, isDP: boolean, potongan = 0) {
   const konfig = await getKonfigUmum();
   const table: Record<Jenjang, { full: number; dp: number }> = {
     SD: { full: konfig.biayaSD, dp: konfig.biayaSDDP },
@@ -45,7 +49,13 @@ export async function biayaPendaftaran(jenjang: Jenjang, isDP: boolean) {
     SMA: { full: konfig.biayaSMA, dp: konfig.biayaSMADP },
     PURNA: { full: konfig.biayaPurna, dp: konfig.biayaPurnaDP },
   };
-  return isDP ? table[jenjang].dp : table[jenjang].full;
+  const lunas = Math.max(table[jenjang].full - potongan, 0);
+  return isDP ? Math.min(table[jenjang].dp, lunas) : lunas;
+}
+
+// Data voucher untuk baris "Potongan Voucher" di kuitansi.
+function voucherKuitansi(p: { potongan: number; voucher: { kode: string } | null }) {
+  return p.potongan > 0 ? { kode: p.voucher?.kode ?? "-", potongan: p.potongan } : null;
 }
 
 // Tim yang terdaftar sebelum fitur kode unik ada punya pembayaran.kodeUnik/
@@ -93,7 +103,7 @@ function ringkasGalat(e: unknown) {
 async function generateDanKirimKuitansi(timId: string, hargaDasar: number) {
   const tim = await prisma.tim.findUnique({
     where: { id: timId },
-    include: { pembayaran: true, user: true },
+    include: { pembayaran: { include: { voucher: { select: { kode: true } } } }, user: true },
   });
   if (!tim?.pembayaran) return { success: false, message: "Data pembayaran tidak ditemukan" };
 
@@ -115,6 +125,7 @@ async function generateDanKirimKuitansi(timId: string, hargaDasar: number) {
     jenjang: tim.jenjang,
     isDP: tim.pembayaran.isDP,
     hargaDasar,
+    voucher: voucherKuitansi(tim.pembayaran),
     tanggal: terbit.tanggal,
     bendaharaNama: konfig.bendaharaNama,
     bendaharaTtdUrl: konfig.bendaharaTtdUrl,
@@ -187,7 +198,7 @@ export async function downloadKuitansiPdf() {
 
   const tim = await prisma.tim.findFirst({
     where: { userId: session.user.id },
-    include: { pembayaran: true },
+    include: { pembayaran: { include: { voucher: { select: { kode: true } } } } },
   });
   if (!tim) return { success: false, message: "Tim tidak ditemukan" };
   if (!tim.confirmed || !tim.pembayaran) {
@@ -196,7 +207,7 @@ export async function downloadKuitansiPdf() {
 
   try {
     const [hargaDasar, konfig] = await Promise.all([
-      biayaPendaftaran(tim.jenjang, tim.pembayaran.isDP),
+      biayaPendaftaran(tim.jenjang, tim.pembayaran.isDP, tim.pembayaran.potongan),
       getKonfigUmum(),
     ]);
     const terbit = await ensureNomorKuitansi(tim.id);
@@ -208,6 +219,7 @@ export async function downloadKuitansiPdf() {
       jenjang: tim.jenjang,
       isDP: tim.pembayaran.isDP,
       hargaDasar,
+      voucher: voucherKuitansi(tim.pembayaran),
       tanggal: terbit.tanggal,
       bendaharaNama: konfig.bendaharaNama,
       bendaharaTtdUrl: konfig.bendaharaTtdUrl,
@@ -228,7 +240,7 @@ export async function generateKuitansiManual(timId: string) {
     await requireAdmin();
     const tim = await prisma.tim.findUnique({ where: { id: timId }, include: { pembayaran: true } });
     if (!tim?.confirmed) return { success: false, message: "Pembayaran tim ini belum dikonfirmasi" };
-    const jumlah = await biayaPendaftaran(tim.jenjang, tim.pembayaran?.isDP ?? false);
+    const jumlah = await biayaPendaftaran(tim.jenjang, tim.pembayaran?.isDP ?? false, tim.pembayaran?.potongan ?? 0);
     const result = await generateDanKirimKuitansi(timId, jumlah);
     if (result.success) {
       revalidatePath("/", "layout");
@@ -273,13 +285,12 @@ async function setStatusPembayaran(timId: string, confirmed: boolean, isDP: bool
 
   await assignNoUrutIfNeeded(timId);
 
-  const jumlah = await biayaPendaftaran(tim.jenjang, isDP);
-
   // Kas HARUS mencatat nominal yang benar-benar ditransfer (hargaDasar +
   // kode unik), bukan cuma hargaDasar — sama pola dengan Tiket/Foto/Voting.
   // Kuitansi tetap pakai `jumlah` polos (tanpa kode unik), lihat komentar di
   // generateDanKirimKuitansi.
   const pembayaran = await prisma.pembayaran.findUnique({ where: { tim_id: timId } });
+  const jumlah = await biayaPendaftaran(tim.jenjang, isDP, pembayaran?.potongan ?? 0);
   const kodeUnikAngka = pembayaran?.kodeUnik ? parseInt(pembayaran.kodeUnik) : 0;
   const totalBayar = jumlah + kodeUnikAngka;
   // isDP bisa berubah saat konfirmasi (beda dari saat pendaftaran) — jaga
@@ -418,7 +429,7 @@ export async function konfirmasiPelunasan(timId: string) {
     // setStatusPembayaran sudah mengirim kuitansi kalau tim belum pernah punya
     // kuitansi sama sekali — jangan kirim dua kali.
     const otomatis = await setStatusPembayaran(timId, true, false);
-    const kuitansi = otomatis ?? (await generateDanKirimKuitansi(timId, await biayaPendaftaran(tim.jenjang, false)));
+    const kuitansi = otomatis ?? (await generateDanKirimKuitansi(timId, await biayaPendaftaran(tim.jenjang, false, tim.pembayaran.potongan)));
     revalidatePath("/", "layout");
     revalidatePath("/admin/kas");
     if (!kuitansi.success) {

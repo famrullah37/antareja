@@ -8,8 +8,12 @@ export type InfoPelunasan = {
   total: number; // yang harus ditransfer = sisa + kode unik
 };
 
-export async function sisaPelunasan(jenjang: Jenjang) {
-  const [lunas, dp] = await Promise.all([biayaPendaftaran(jenjang, false), biayaPendaftaran(jenjang, true)]);
+// potongan voucher mengurangi biaya lunas, DP tetap — jadi sisa ikut berkurang.
+export async function sisaPelunasan(jenjang: Jenjang, potongan = 0) {
+  const [lunas, dp] = await Promise.all([
+    biayaPendaftaran(jenjang, false, potongan),
+    biayaPendaftaran(jenjang, true, potongan),
+  ]);
   return Math.max(lunas - dp, 0);
 }
 
@@ -26,7 +30,7 @@ export async function siapkanPelunasan(timId: string): Promise<InfoPelunasan | n
     return { sisa: p.pelunasanTotal - parseInt(p.pelunasanKodeUnik, 10), kodeUnik: p.pelunasanKodeUnik, total: p.pelunasanTotal };
   }
 
-  const sisa = await sisaPelunasan(tim.jenjang);
+  const sisa = await sisaPelunasan(tim.jenjang, p.potongan);
   for (let i = 0; i < 20; i++) {
     const updated = await prisma.konfigUmum.update({
       where: { id: "singleton" },
