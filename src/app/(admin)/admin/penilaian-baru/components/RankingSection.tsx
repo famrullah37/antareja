@@ -82,7 +82,7 @@ export default function RankingSection({
   kategoris: KategoriLomba[];
   // Per timId: jumlah nilai juri yang belum diisi (kosong ≠ 0) — lib/kelengkapanNilai.ts.
   kelengkapan: Record<string, Kelengkapan>;
-  timBelumDinilai: { timId: string; label: string }[];
+  timBelumDinilai: { timId: string; jenjang: string; label: string }[];
 }) {
   const belumLengkap = penilaians.filter((p) => (kelengkapan[p.timId]?.kosong ?? 0) > 0);
 
@@ -90,7 +90,7 @@ export default function RankingSection({
   async function handlePublishJenjang(jenjang: string, publish: boolean, daftar: (PenilaianBaruItem & { nilaiPBB: number })[]) {
     if (publish) {
       const kosong = daftar.filter((p) => (kelengkapan[p.timId]?.kosong ?? 0) > 0);
-      const belumDinilai = timBelumDinilai.filter((t) => t.label.startsWith(`${jenjang}-`));
+      const belumDinilai = timBelumDinilai.filter((t) => t.jenjang === jenjang);
       const adaSeri = daftar.some((_, i) => statusSeri(daftar, i).seri);
       const peringatan = [
         kosong.length ? `• ${kosong.length} tim nilainya masih ada yang KOSONG` : "",

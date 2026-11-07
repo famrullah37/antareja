@@ -4,6 +4,7 @@ import { findTims } from "@/queries/tim.query";
 import { findSertifikats } from "@/queries/sertifikat.query";
 import { findKonfigJuaras, getRankingPerJenjang } from "@/queries/penghargaan.query";
 import SertifikatForm from "./components/SertifikatForm";
+import { statusSeri } from "@/lib/rankingNilai";
 
 const JENJANG_LIST = ["SD", "SMP", "SMA", "PURNA"] as const;
 
@@ -25,7 +26,9 @@ export default async function SertifikatPage() {
 
     ranking.forEach((r, idx) => {
       const label = konfigsInJenjang[idx]?.namaJuara ?? `Peringkat ${idx + 1} ${jenjang}`;
-      juaraLabelMap[r.timId] = label;
+      // Nilai akhir & PBB sama dengan tetangga → urutan belum pasti; jangan cetak
+      // sertifikat juara sebelum panitia memutuskan.
+      juaraLabelMap[r.timId] = statusSeri(ranking, idx).seri ? `${label} (SERI — tunggu keputusan panitia)` : label;
     });
   }
 

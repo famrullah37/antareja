@@ -33,6 +33,7 @@ export default function RankingJuaraSection({
     jenjang: string;
     ranking: RankingItem[];
     juaraUmum: RankingItem | null;
+    juaraUmumSeri: boolean;
     kategoriUmum: string[] | null;
     belumLengkap: string[]; // tim dengan nilai juri kosong (kosong ≠ 0)
   }[];
@@ -41,7 +42,7 @@ export default function RankingJuaraSection({
   return (
     <div className="flex flex-col gap-8">
       <h2 className="text-xl font-semibold">Ranking Otomatis</h2>
-      {rankingData.map(({ jenjang, ranking, juaraUmum, kategoriUmum, belumLengkap }) => {
+      {rankingData.map(({ jenjang, ranking, juaraUmum, juaraUmumSeri, kategoriUmum, belumLengkap }) => {
         if (ranking.length === 0) return null;
 
         const peringkatKonfigs = konfigs
@@ -65,6 +66,12 @@ export default function RankingJuaraSection({
               )}
               .
             </p>
+            {juaraUmumSeri && (
+              <div className="bg-red-50 border border-red-300 text-red-800 rounded-lg px-3 py-2 text-xs mb-2">
+                <b>⚠ Juara Umum {jenjang} SERI</b> — peringkat 1 dan 2 menurut kategori Juara Umum punya nilai dan
+                nilai PBB yang sama. Lencana Juara Umum di tabel hanya sementara, putuskan sesuai juklak.
+              </div>
+            )}
             {belumLengkap.length > 0 && (
               <div className="bg-amber-50 border border-amber-300 text-amber-900 rounded-lg px-3 py-2 text-xs mb-2">
                 <b>⚠ Juara jenjang {jenjang} BELUM FINAL</b> — {belumLengkap.length} tim masih punya nilai kosong

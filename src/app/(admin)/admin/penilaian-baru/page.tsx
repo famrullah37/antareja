@@ -58,6 +58,7 @@ export default async function PenilaianBaruPage() {
         )}
         timBelumDinilai={timBelumDinilai.map((k) => ({
           timId: k.timId,
+          jenjang: k.jenjang,
           label: `${k.jenjang}-${String(k.noUrut ?? "?").padStart(2, "0")} ${k.namaTim} — ${k.asalSekolah}`,
         }))}
       />

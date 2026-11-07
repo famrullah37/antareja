@@ -4,15 +4,18 @@ import { getServerSession } from "@/lib/next-auth";
 import { revalidatePath } from "next/cache";
 import {
   createPelanggaran,
-  createPelanggaranTim,
   createSubKategoriMaster,
   deletePelanggaran,
   deleteSubKategoriMaster,
+  NilaiSudahDipublish,
   recalcPenilaianBaru,
+  ubahPenilaianTerkunci,
   upsertJuriKategori,
   upsertNilaiDiskritMaster,
   upsertPenilaianBaru,
 } from "@/queries/penilaianBaru.query";
+
+const PESAN_SUDAH_PUBLISH = "Nilai tim ini sudah dipublish, hubungi admin untuk membuka kembali";
 import prisma from "@/lib/prisma";
 import { catatLog } from "@/lib/activityLog";
 import { findOrLinkJuriByUser } from "@/queries/juri.query";
@@ -207,9 +210,10 @@ export async function inputNilaiJuri(
 
   try {
     const penilaian = await upsertPenilaianBaru(timId);
-    await prisma.$transaction(
-      valid.map((v) =>
-        prisma.nilaiJuri.upsert({
+    // Simpan nilai + hitung total dalam satu transaksi terkunci (lihat ubahPenilaianTerkunci).
+    await ubahPenilaianTerkunci(penilaian.id, async (tx) => {
+      for (const v of valid) {
+        await tx.nilaiJuri.upsert({
           where: {
             penilaianId_juriId_subKategoriId: {
               penilaianId: penilaian.id,
@@ -219,10 +223,9 @@ export async function inputNilaiJuri(
           },
           create: { penilaianId: penilaian.id, juriId: juri.id, subKategoriId: v.subKategoriId, nilaiDipilih: v.nilai, predikat: v.predikat, catatan: v.catatan },
           update: { nilaiDipilih: v.nilai, predikat: v.predikat, catatan: v.catatan },
-        })
-      )
-    );
-    await recalcPenilaianBaru(penilaian.id);
+        });
+      }
+    });
     await catatLog(
       "INPUT_NILAI",
       `${juri.nama}${oleh ? ` (dimasukkan oleh ${oleh})` : ""}: ${valid.length} sub-kategori (tim ${timId.slice(0, 8)})`
@@ -230,8 +233,9 @@ export async function inputNilaiJuri(
     revalidatePath("/admin/penilaian-baru", "layout");
     return { success: true };
   } catch (e) {
+    if (e instanceof NilaiSudahDipublish) return { success: false, message: PESAN_SUDAH_PUBLISH };
     console.error("inputNilaiJuri error:", e);
-    return { success: false, message: "Gagal menyimpan nilai" };
+    return { success: false, message: "Gagal menyimpan nilai, coba simpan lagi" };
   }
 }
 
@@ -346,12 +350,21 @@ export async function inputPelanggaranTim(timId: string, pelanggaranId: string, 
 
   try {
     const penilaian = await upsertPenilaianBaru(timId);
-    await createPelanggaranTim(penilaian.id, pelanggaran.id, jumlah, pelanggaran.poinPengurangan);
-    await recalcPenilaianBaru(penilaian.id);
+    await ubahPenilaianTerkunci(penilaian.id, (tx) =>
+      tx.pelanggaranTim.create({
+        data: {
+          penilaianId: penilaian.id,
+          pelanggaranId: pelanggaran.id,
+          jumlahKejadian: jumlah,
+          totalPengurang: jumlah * Math.abs(pelanggaran.poinPengurangan),
+        },
+      })
+    );
     await catatLog("INPUT_PELANGGARAN", `${pelaku}: [${pelanggaran.kode}] × ${jumlah} (tim ${timId.slice(0, 8)})`);
     revalidatePath("/admin/penilaian-baru", "layout");
     return { success: true };
   } catch (e) {
+    if (e instanceof NilaiSudahDipublish) return { success: false, message: PESAN_SUDAH_PUBLISH };
     console.error("inputPelanggaranTim error:", e);
     return { success: false, message: "Gagal menambah pelanggaran" };
   }
@@ -377,8 +390,7 @@ export async function hapusPelanggaranTim(pelanggaranTimId: string) {
     return { success: false, message: "Nilai tim ini sudah dipublish, hubungi admin untuk membuka kembali" };
 
   try {
-    await prisma.pelanggaranTim.delete({ where: { id: pt.id } });
-    await recalcPenilaianBaru(pt.penilaian.id);
+    await ubahPenilaianTerkunci(pt.penilaian.id, (tx) => tx.pelanggaranTim.delete({ where: { id: pt.id } }));
     await catatLog(
       "HAPUS_PELANGGARAN",
       `[${pt.pelanggaran.kode}] × ${pt.jumlahKejadian} (tim ${pt.penilaian.timId.slice(0, 8)})`
@@ -386,6 +398,7 @@ export async function hapusPelanggaranTim(pelanggaranTimId: string) {
     revalidatePath("/admin/penilaian-baru", "layout");
     return { success: true };
   } catch (e) {
+    if (e instanceof NilaiSudahDipublish) return { success: false, message: PESAN_SUDAH_PUBLISH };
     console.error("hapusPelanggaranTim error:", e);
     return { success: false, message: "Gagal menghapus pelanggaran" };
   }
@@ -417,13 +430,15 @@ export async function hitungUlangSemuaNilai() {
   await requireAdmin();
   try {
     const semua = await prisma.penilaianBaru.findMany({
-      select: { id: true, nilaiAkhir: true, tim: { select: { nama_tim: true, jenjang: true } } },
+      select: { id: true, nilaiAkhir: true, published: true, tim: { select: { nama_tim: true, jenjang: true } } },
     });
     const berubah: string[] = [];
     for (const p of semua) {
       const baru = await recalcPenilaianBaru(p.id);
       if (baru && baru.nilaiAkhir !== p.nilaiAkhir)
-        berubah.push(`${p.tim.jenjang} ${p.tim.nama_tim}: ${p.nilaiAkhir} → ${baru.nilaiAkhir}`);
+        berubah.push(
+          `${p.tim.jenjang} ${p.tim.nama_tim}: ${p.nilaiAkhir} → ${baru.nilaiAkhir}${p.published ? " (SUDAH DIPUBLISH — tim sempat melihat nilai lama)" : ""}`
+        );
     }
     await catatLog(
       "HITUNG_ULANG_NILAI",

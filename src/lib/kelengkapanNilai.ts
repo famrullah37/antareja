@@ -31,22 +31,30 @@ export async function hitungKelengkapanNilai(): Promise<Record<string, Kelengkap
     prisma.nilaiJuri.findMany({ select: { juriId: true, subKategoriId: true, penilaian: { select: { timId: true } } } }),
   ]);
 
-  // Pasangan (juri, sub-kategori) yang wajib diisi untuk setiap tim.
-  const wajib = penugasan.flatMap((jk) =>
-    subs
-      .filter((s) => s.kategori.toLowerCase() === jk.kategori.toLowerCase())
-      .map((s) => ({ juriId: jk.juriId, juri: jk.juri.nama, subId: s.id }))
-  );
+  // Pasangan (juri, sub-kategori) yang wajib diisi untuk setiap tim. Dikunci per
+  // juriId|subId: penugasan "PBB" dan "pbb" untuk juri yang sama (unik-nya peka huruf
+  // besar/kecil, pencocokannya tidak) tidak boleh terhitung dua kali.
+  const pasangan = new Map<string, { juriId: string; juri: string; subId: string }>();
+  for (const jk of penugasan) {
+    for (const s of subs) {
+      if (s.kategori.toLowerCase() !== jk.kategori.toLowerCase()) continue;
+      pasangan.set(`${jk.juriId}|${s.id}`, { juriId: jk.juriId, juri: jk.juri.nama, subId: s.id });
+    }
+  }
+  const wajib = Array.from(pasangan.values());
   const terisi = new Set(nilai.map((n) => `${n.penilaian.timId}|${n.juriId}|${n.subKategoriId}`));
 
   const hasil: Record<string, KelengkapanTim> = {};
   for (const t of tims) {
-    const kosongPerJuri = new Map<string, number>();
+    // Per juriId (bukan nama) — dua juri bernama sama tidak boleh tergabung.
+    const kosongPerJuri = new Map<string, { juri: string; kosong: number }>();
     let kosong = 0;
     for (const w of wajib) {
       if (terisi.has(`${t.id}|${w.juriId}|${w.subId}`)) continue;
       kosong++;
-      kosongPerJuri.set(w.juri, (kosongPerJuri.get(w.juri) ?? 0) + 1);
+      const k = kosongPerJuri.get(w.juriId) ?? { juri: w.juri, kosong: 0 };
+      k.kosong++;
+      kosongPerJuri.set(w.juriId, k);
     }
     hasil[t.id] = {
       timId: t.id,
@@ -57,7 +65,7 @@ export async function hitungKelengkapanNilai(): Promise<Record<string, Kelengkap
       diharapkan: wajib.length,
       terisi: wajib.length - kosong,
       kosong,
-      perJuri: Array.from(kosongPerJuri, ([juri, n]) => ({ juri, kosong: n })),
+      perJuri: Array.from(kosongPerJuri.values()),
     };
   }
   return hasil;
