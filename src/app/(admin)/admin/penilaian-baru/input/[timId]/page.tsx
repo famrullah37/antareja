@@ -89,6 +89,20 @@ export default async function InputNilaiPage({
     );
   }
 
+  if (isJuri && juriAktif && juriKategoris.length === 0) {
+    return (
+      <div className="max-w-4xl mx-auto py-6">
+        <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 rounded-xl p-5 text-sm">
+          Akun juri ini belum ditugaskan ke kategori mana pun, jadi belum bisa menilai. Minta Sie Lomba menugaskan
+          kategori di Konfigurasi Penilaian.{" "}
+          <Link href="/admin/penilaian-baru/input" className="underline font-semibold">
+            Kembali
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   const [penilaian, presensi] = await Promise.all([
     findPenilaianBaru({ timId: timParam.id }),
     // Registrasi ulang di DP: hanya jumlah (tanpa nama anggota) — tampil juga ke juri.
@@ -102,11 +116,13 @@ export default async function InputNilaiPage({
 
   // Props komponen klien ikut terkirim ke browser (terbaca di page source), jadi
   // hanya kirim yang dibutuhkan: tanpa nama/sekolah tim, tanpa nilai juri lain.
+  // Juri hanya menilai kategorinya sendiri: total tim (gabungan semua juri & kategori)
+  // tidak dikirim ke akun juri — props ini terbaca di page source.
   const existing = penilaian && {
     id: penilaian.id,
-    nilaiKotor: penilaian.nilaiKotor,
+    nilaiKotor: isJuri ? null : penilaian.nilaiKotor,
     totalPengurang: penilaian.totalPengurang,
-    nilaiAkhir: penilaian.nilaiAkhir,
+    nilaiAkhir: isJuri ? null : penilaian.nilaiAkhir,
     published: penilaian.published,
     nilaiJuri: penilaian.nilaiJuri
       .filter((n) => n.juriId === juriAktif?.id)

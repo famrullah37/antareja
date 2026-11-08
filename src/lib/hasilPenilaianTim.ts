@@ -20,7 +20,7 @@ export async function hasilPenilaianUntukTim(timId: string) {
           nilaiDipilih: true,
           predikat: true,
           catatan: true,
-          juri: { select: { nama: true } },
+          juri: { select: { id: true, nama: true } },
           subKategori: { select: { kode: true, nama: true, kategori: true, maxNilai: true, urutan: true } },
         },
       },

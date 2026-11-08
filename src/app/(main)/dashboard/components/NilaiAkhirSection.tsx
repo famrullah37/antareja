@@ -9,7 +9,7 @@ type NilaiJuriItem = {
   nilaiDipilih: number;
   predikat: string;
   catatan: string | null;
-  juri: { nama: string };
+  juri: { id?: string; nama: string };
   subKategori: SubKategori;
 };
 type PelanggaranItem = {
@@ -40,11 +40,26 @@ const PREDIKAT_COLOR: Record<string, { bg: string; text: string }> = {
   SANGAT_KURANG: { bg: "bg-red-200",    text: "text-red-800"    },
 };
 
+// Satu kategori = matriks: baris sub-kategori, kolom tiap juri yang menilai
+// kategori ini, lalu jumlah. Subtotal per juri di baris bawah. Sel kosong = juri
+// itu tidak memberi nilai di sub-kategori tersebut.
 function KategoriCard({ kategori, items }: { kategori: string; items: NilaiJuriItem[] }) {
   const [open, setOpen] = useState(true);
+  const kunciJuri = (n: NilaiJuriItem) => n.juri.id ?? n.juri.nama;
+
+  const juris = Array.from(new Map(items.map((n) => [kunciJuri(n), n.juri.nama])).entries()).map(([id, nama]) => ({
+    id,
+    nama,
+  }));
+  const subs = Array.from(new Map(items.map((n) => [n.subKategori.kode, n.subKategori])).values());
+  const sel = new Map(items.map((n) => [`${n.subKategori.kode}|${kunciJuri(n)}`, n]));
+
   const total = items.reduce((s, n) => s + n.nilaiDipilih, 0);
-  const maxTotal = items.reduce((s, n) => s + n.subKategori.maxNilai, 0);
+  // Maks = maks sub-kategori × jumlah juri yang menilai kategori ini.
+  const maxTotal = subs.reduce((s, x) => s + x.maxNilai, 0) * juris.length;
   const persen = maxTotal > 0 ? Math.round((total / maxTotal) * 100) : 0;
+  const subtotalJuri = (id: string) =>
+    items.filter((n) => kunciJuri(n) === id).reduce((s, n) => s + n.nilaiDipilih, 0);
 
   return (
     <div className="bg-white rounded-xl border border-neutral-200 overflow-hidden">
@@ -52,72 +67,108 @@ function KategoriCard({ kategori, items }: { kategori: string; items: NilaiJuriI
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="w-full flex items-center justify-between px-5 py-3 bg-neutral-50 border-b border-neutral-100 hover:bg-neutral-100 transition-colors text-left"
+        aria-expanded={open}
+        className="w-full flex items-center justify-between gap-3 px-4 sm:px-5 py-3 bg-neutral-50 border-b border-neutral-100 hover:bg-neutral-100 transition-colors text-left"
       >
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 min-w-0">
           <span className={`text-sm transition-transform duration-200 ${open ? "rotate-90" : ""}`}>▶</span>
-          <span className="font-semibold text-sm">{kategori}</span>
+          <div className="min-w-0">
+            <div className="font-semibold text-sm">{kategori}</div>
+            <div className="text-xs text-gray-400">
+              {subs.length} sub-kategori · {juris.length} juri
+            </div>
+          </div>
         </div>
         <div className="flex items-center gap-3">
           {maxTotal > 0 && (
             <div className="hidden sm:flex items-center gap-2">
               <div className="w-24 h-1.5 bg-neutral-200 rounded-full">
-                <div
-                  className="h-1.5 rounded-full bg-primary-500 transition-all"
-                  style={{ width: `${persen}%` }}
-                />
+                <div className="h-1.5 rounded-full bg-primary-500 transition-all" style={{ width: `${persen}%` }} />
               </div>
               <span className="text-xs text-gray-400">{persen}%</span>
             </div>
           )}
-          <span className="font-bold text-base tabular-nums">
+          <span className="font-bold text-base tabular-nums whitespace-nowrap">
             {total}
             {maxTotal > 0 && <span className="text-xs text-gray-400 font-normal"> / {maxTotal}</span>}
           </span>
         </div>
       </button>
 
-      {/* Detail tabel */}
       {open && (
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full text-sm border-collapse">
             <thead>
-              <tr className="text-xs text-gray-400 border-b border-neutral-100">
-                <th className="px-5 py-2 text-left">Sub-Kategori</th>
-                <th className="px-5 py-2 text-left">Juri</th>
-                <th className="px-5 py-2 text-center">Nilai</th>
-                <th className="px-5 py-2 text-left">Predikat</th>
-                <th className="px-5 py-2 text-left">Catatan</th>
+              <tr className="text-xs text-gray-500 border-b border-neutral-100 bg-white">
+                <th className="sticky left-0 z-10 bg-white px-4 sm:px-5 py-2 text-left font-medium min-w-[120px] sm:min-w-[180px]">
+                  Sub-Kategori
+                </th>
+                {juris.map((j) => (
+                  <th key={j.id} className="px-2 sm:px-3 py-2 text-center font-medium min-w-[96px]">
+                    {j.nama}
+                  </th>
+                ))}
+                {juris.length > 1 && <th className="px-3 py-2 text-center font-medium">Jumlah</th>}
               </tr>
             </thead>
-            <tbody className="divide-y divide-neutral-50">
-              {items.map((nj, i) => {
-                const clr = PREDIKAT_COLOR[nj.predikat] ?? { bg: "bg-neutral-100", text: "text-neutral-600" };
+            <tbody className="divide-y divide-neutral-100">
+              {subs.map((sk) => {
+                const jumlah = juris.reduce((s, j) => s + (sel.get(`${sk.kode}|${j.id}`)?.nilaiDipilih ?? 0), 0);
                 return (
-                  <tr key={i} className="hover:bg-neutral-50 transition-colors">
-                    <td className="px-5 py-3">
-                      <div className="font-medium text-neutral-800">{nj.subKategori.nama}</div>
-                      <div className="text-xs text-gray-400 font-mono">{nj.subKategori.kode}</div>
+                  <tr key={sk.kode} className="align-top">
+                    <td className="sticky left-0 z-10 bg-white px-4 sm:px-5 py-3">
+                      <div className="font-medium text-neutral-800">{sk.nama}</div>
+                      <div className="text-xs text-gray-400 font-mono">
+                        {sk.kode} · maks {sk.maxNilai}
+                      </div>
                     </td>
-                    <td className="px-5 py-3 text-gray-500 text-xs">{nj.juri.nama}</td>
-                    <td className="px-5 py-3 text-center">
-                      <span className="font-bold text-base">{nj.nilaiDipilih}</span>
-                      {nj.subKategori.maxNilai > 0 && (
-                        <span className="text-xs text-gray-400"> /{nj.subKategori.maxNilai}</span>
-                      )}
-                    </td>
-                    <td className="px-5 py-3">
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${clr.bg} ${clr.text}`}>
-                        {nj.predikat.replace(/_/g, " ")}
-                      </span>
-                    </td>
-                    <td className="px-5 py-3 text-xs text-gray-400 max-w-[180px]">
-                      {nj.catatan ?? <span className="italic">—</span>}
-                    </td>
+                    {juris.map((j) => {
+                      const nj = sel.get(`${sk.kode}|${j.id}`);
+                      if (!nj)
+                        return (
+                          <td key={j.id} className="px-3 py-3 text-center text-gray-300">
+                            —
+                          </td>
+                        );
+                      const clr = PREDIKAT_COLOR[nj.predikat] ?? { bg: "bg-neutral-100", text: "text-neutral-600" };
+                      return (
+                        <td key={j.id} className="px-2 sm:px-3 py-3 text-center">
+                          <div className="font-bold text-base tabular-nums">{nj.nilaiDipilih}</div>
+                          <span
+                            className={`inline-block mt-0.5 px-2 py-0.5 rounded-full text-[10px] font-semibold whitespace-nowrap ${clr.bg} ${clr.text}`}
+                          >
+                            {nj.predikat.replace(/_/g, " ")}
+                          </span>
+                          {nj.catatan && (
+                            <div className="mt-1 text-[11px] leading-snug text-gray-500 text-left italic">
+                              “{nj.catatan}”
+                            </div>
+                          )}
+                        </td>
+                      );
+                    })}
+                    {juris.length > 1 && (
+                      <td className="px-3 py-3 text-center font-bold tabular-nums text-neutral-700">{jumlah}</td>
+                    )}
                   </tr>
                 );
               })}
             </tbody>
+            <tfoot>
+              <tr className="border-t-2 border-neutral-200 bg-neutral-50 font-semibold">
+                <td className="sticky left-0 z-10 bg-neutral-50 px-4 sm:px-5 py-2 text-xs text-gray-600">
+                  Subtotal juri
+                </td>
+                {juris.map((j) => (
+                  <td key={j.id} className="px-3 py-2 text-center tabular-nums">
+                    {subtotalJuri(j.id)}
+                  </td>
+                ))}
+                {juris.length > 1 && (
+                  <td className="px-3 py-2 text-center tabular-nums text-primary-600">{total}</td>
+                )}
+              </tr>
+            </tfoot>
           </table>
         </div>
       )}
@@ -153,10 +204,13 @@ export default function NilaiAkhirSection({ penilaianBaru }: { penilaianBaru: Pe
     );
   }
 
+  // Dikelompokkan tanpa membedakan huruf besar/kecil ("PBB" = "pbb"); urutan
+  // mengikuti urutan sub-kategori di master (data sudah diurutkan di server).
+  const namaKategori = new Map<string, string>();
   const byKategori = penilaianBaru.nilaiJuri.reduce<Record<string, NilaiJuriItem[]>>((acc, nj) => {
-    const kat = nj.subKategori.kategori;
-    if (!acc[kat]) acc[kat] = [];
-    acc[kat].push(nj);
+    const kunci = nj.subKategori.kategori.trim().toUpperCase();
+    if (!namaKategori.has(kunci)) namaKategori.set(kunci, nj.subKategori.kategori);
+    (acc[namaKategori.get(kunci)!] ??= []).push(nj);
     return acc;
   }, {});
 
@@ -225,7 +279,9 @@ export default function NilaiAkhirSection({ penilaianBaru }: { penilaianBaru: Pe
       {/* Detail per kategori */}
       {hasDetail ? (
         <div className="flex flex-col gap-3">
-          <p className="text-sm text-gray-500 font-medium">Detail per Kategori</p>
+          <p className="text-sm text-gray-500 font-medium">
+            Detail per Kategori — nilai tiap sub-kategori dari masing-masing juri
+          </p>
           {Object.entries(byKategori).map(([kat, items]) => (
             <KategoriCard key={kat} kategori={kat} items={items} />
           ))}

@@ -82,7 +82,9 @@ export default async function InputNilaiIndexPage({
 
   const jenjangList = JENJANG_ORDER.filter((j) => (tims as any[]).some((t) => t.jenjang === j));
 
-  const filtered = (tims as any[])
+  // Juri tanpa kategori / akun belum terhubung tidak diberi daftar tim.
+  const juriBisaMenilai = !isJuri || (!!juriLogin && kategoriJuri.length > 0);
+  const filtered = (juriBisaMenilai ? (tims as any[]) : [])
     .filter((t) => {
       if (searchParams?.jenjang && t.jenjang !== searchParams.jenjang) return false;
       if (!isJuri && searchParams?.sekolah && !t.asal_sekolah.toLowerCase().includes(searchParams.sekolah.toLowerCase()))
@@ -131,6 +133,18 @@ export default async function InputNilaiIndexPage({
           </div>
         )}
       </div>
+
+      {isJuri && juriLogin && kategoriJuri.length === 0 && (
+        <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 rounded-xl p-5 text-sm">
+          Akun juri ini belum ditugaskan ke kategori mana pun, jadi belum bisa menilai. Minta Sie Lomba menugaskan
+          kategori di Konfigurasi Penilaian.
+        </div>
+      )}
+      {isJuri && !juriLogin && (
+        <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 rounded-xl p-5 text-sm">
+          Akun ini belum terhubung ke data Juri. Minta admin memastikan email akun sama dengan email di menu Juri.
+        </div>
+      )}
 
       <InputNilaiFilter
         jenjangList={jenjangList}

@@ -27,9 +27,10 @@ type Pelanggaran = { id: string; kode: string; nama: string; poinPengurangan: nu
 type Tim = { id: string };
 type Existing = {
   id: string;
-  nilaiKotor: number;
+  // null untuk akun juri — total tim gabungan semua juri tidak ditampilkan ke juri.
+  nilaiKotor: number | null;
   totalPengurang: number;
-  nilaiAkhir: number;
+  nilaiAkhir: number | null;
   published: boolean;
   nilaiJuri: {
     subKategoriId: string;
@@ -280,7 +281,7 @@ export default function InputNilaiForm({
                 : "Belum ditugaskan ke kategori"}
           </div>
         </div>
-        {existing && (
+        {existing && existing.nilaiAkhir !== null && existing.nilaiKotor !== null ? (
           <div className="flex gap-6 ml-auto">
             <div className="text-center">
               <div className="text-2xl font-bold">{existing.nilaiKotor}</div>
@@ -295,6 +296,14 @@ export default function InputNilaiForm({
               <div className="text-xs text-gray-400">Nilai Akhir</div>
             </div>
           </div>
+        ) : (
+          // Akun juri: hanya jumlah nilai yang ia berikan di kategorinya sendiri.
+          juriAktif && (
+            <div className="ml-auto text-center text-primary-600">
+              <div className="text-2xl font-bold">{total}</div>
+              <div className="text-xs text-gray-400">Nilai Anda ({kategoriJuri.join(", ") || "-"})</div>
+            </div>
+          )
         )}
       </div>
 
@@ -306,7 +315,7 @@ export default function InputNilaiForm({
 
       {/* Tab kategori — hanya bila juri memegang lebih dari satu kategori. */}
       {progresKategori.length > 1 && (
-        <div className="sticky top-0 z-20 -mx-1 flex flex-wrap gap-2 bg-neutral-50/95 px-1 py-2 backdrop-blur">
+        <div className="sticky -top-4 z-20 -mx-1 flex gap-2 overflow-x-auto whitespace-nowrap bg-slate-100/95 px-1 pb-2 pt-3 backdrop-blur sm:flex-wrap">
           {[{ kategori: "SEMUA", terisi, total: subSaya.length }, ...progresKategori].map((p) => {
             const aktif = tabAktif === p.kategori;
             const lengkap = p.total > 0 && p.terisi === p.total;
@@ -315,7 +324,7 @@ export default function InputNilaiForm({
                 key={p.kategori}
                 type="button"
                 onClick={() => setTab(p.kategori)}
-                className={`h-11 rounded-lg border-2 px-4 text-sm font-semibold ${
+                className={`h-11 shrink-0 rounded-lg border-2 px-4 text-sm font-semibold ${
                   aktif ? "border-primary-500 bg-primary-500 text-white" : "border-neutral-300 bg-white"
                 }`}
               >
@@ -403,7 +412,7 @@ export default function InputNilaiForm({
                     <div className="flex flex-col gap-2">
                       {masters.map((m) => (
                         <div key={m.id} className="flex flex-wrap items-center gap-2">
-                          <span className="w-28 shrink-0 text-xs font-semibold" style={{ color: m.warna }}>
+                          <span className="w-full sm:w-28 shrink-0 text-xs font-semibold" style={{ color: m.warna }}>
                             {m.predikat.replace(/_/g, " ")}
                           </span>
                           {(m.nilai as number[]).map((n) => {
@@ -457,7 +466,7 @@ export default function InputNilaiForm({
                         <button
                           type="button"
                           onClick={() => setCatatanTerbuka((p) => ({ ...p, [sub.id]: true }))}
-                          className="self-start text-sm text-primary-500 font-medium py-1"
+                          className="self-start text-sm text-primary-500 font-medium py-2 pr-3"
                         >
                           + Catatan
                         </button>
@@ -548,8 +557,8 @@ export default function InputNilaiForm({
 
       {/* Bar simpan — selalu terlihat saat menggulir di tablet */}
       {!terkunci && subSaya.length > 0 && (
-        <div className="fixed bottom-0 left-0 right-0 lg:left-80 z-30 bg-white/95 backdrop-blur border-t border-neutral-200 px-4 sm:px-8 py-3 flex items-center gap-4">
-          <div className="text-sm text-gray-600">
+        <div className="fixed bottom-0 left-0 right-0 lg:left-80 z-30 bg-white/95 backdrop-blur border-t border-neutral-200 px-3 sm:px-8 py-2 sm:py-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] flex items-center gap-3 sm:gap-4">
+          <div className="min-w-0 text-xs sm:text-sm text-gray-600">
             Terisi{" "}
             <b className={terisi === subSaya.length ? "text-green-600" : "text-black"}>
               {terisi}/{subSaya.length}
@@ -568,7 +577,7 @@ export default function InputNilaiForm({
             type="button"
             onClick={handleSubmit}
             disabled={loading || !adaPerubahan}
-            className="ml-auto bg-primary-500 text-white px-8 h-12 rounded-xl font-semibold hover:bg-primary-600 transition-colors disabled:opacity-50"
+            className="ml-auto shrink-0 bg-primary-500 text-white px-5 sm:px-8 h-12 rounded-xl font-semibold hover:bg-primary-600 transition-colors disabled:opacity-50"
           >
             {loading ? "Menyimpan..." : adaPerubahan ? "Simpan Nilai" : "Tersimpan"}
           </button>

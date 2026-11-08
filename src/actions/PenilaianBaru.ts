@@ -237,7 +237,10 @@ async function juriPenilai(juriIdDipilih?: string) {
 
   if (role === "JURI") {
     const juri = await findOrLinkJuriByUser(session!.user!.id);
-    return juri ? { juri, oleh: null } : { error: "Akun tidak terhubung ke data Juri" };
+    if (!juri) return { error: "Akun tidak terhubung ke data Juri" };
+    // Juri hanya menilai kategori yang ditugaskan; tanpa penugasan = belum boleh menilai.
+    if (juri.juriKategori.length === 0) return { error: "Akun juri ini belum ditugaskan ke kategori mana pun" };
+    return { juri, oleh: null };
   }
   if (!juriIdDipilih || typeof juriIdDipilih !== "string") return { error: "Pilih juri yang nilainya akan dimasukkan" };
   const juri = await prisma.juri.findUnique({ where: { id: juriIdDipilih }, include: { juriKategori: true } });
@@ -440,6 +443,7 @@ export async function inputPelanggaranTim(timId: string, pelanggaranId: string, 
   if (role === "JURI") {
     const juri = await findOrLinkJuriByUser(session!.user!.id);
     if (!juri) return { success: false, message: "Akun tidak terhubung ke data Juri" };
+    if (juri.juriKategori.length === 0) return { success: false, message: "Akun juri ini belum ditugaskan ke kategori mana pun" };
     pelaku = juri.nama;
   }
 
