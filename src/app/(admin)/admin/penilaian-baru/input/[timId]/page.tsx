@@ -89,7 +89,15 @@ export default async function InputNilaiPage({
     );
   }
 
-  const penilaian = await findPenilaianBaru({ timId: timParam.id });
+  const [penilaian, presensi] = await Promise.all([
+    findPenilaianBaru({ timId: timParam.id }),
+    // Registrasi ulang di DP: hanya jumlah (tanpa nama anggota) — tampil juga ke juri.
+    prisma.presensiDP.findUnique({
+      where: { timId: timParam.id },
+      select: { anggota: { select: { tidakHadir: true } } },
+    }),
+  ]);
+  const anggotaTidakHadir = presensi?.anggota.filter((a) => a.tidakHadir).length ?? 0;
   const suaraSaya = penilaian?.masukanSuara.find((m) => m.juriId === juriAktif?.id);
 
   // Props komponen klien ikut terkirim ke browser (terbaca di page source), jadi
@@ -129,6 +137,17 @@ export default async function InputNilaiPage({
         <p className="text-gray-500">
           {isJuri ? `Jenjang ${tim.jenjang}` : `${tim.asal_sekolah} — ${tim.jenjang}`}
         </p>
+        <div className="mt-2 flex flex-wrap gap-2 text-xs font-semibold">
+          {!presensi ? (
+            <span className="rounded-full bg-neutral-100 px-2.5 py-1 text-neutral-600">Tim belum registrasi di DP</span>
+          ) : anggotaTidakHadir > 0 ? (
+            <span className="rounded-full bg-orange-100 px-2.5 py-1 text-orange-800">
+              Tim hadir · {anggotaTidakHadir} anggota tidak hadir
+            </span>
+          ) : (
+            <span className="rounded-full bg-green-100 px-2.5 py-1 text-green-800">Tim hadir di DP</span>
+          )}
+        </div>
       </div>
       {juriAktif && (
         <MasukanSuaraJuri

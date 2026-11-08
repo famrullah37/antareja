@@ -7,6 +7,7 @@
 //   tim tidak dinilai. Ditandai lewat tombol di halaman tim, tidak pernah otomatis.
 // - ANGGOTA tidak hadir → PresensiAnggota.tidakHadir: tim tetap hadir & ikut lomba,
 //   hanya anggota itu tercatat absen (kondisi "Hadir, kurang anggota").
+// Urutan di DP: (1) registrasi kehadiran tim → (2) cek kehadiran tiap anggota.
 
 export const noUrutLabel = (jenjang: string, noUrut: number | null) =>
   noUrut != null ? `${jenjang}-${String(noUrut).padStart(2, "0")}` : jenjang;
@@ -48,8 +49,8 @@ export function ringkasPresensi(tipe: string, statusPerPosisi: Map<string, Statu
 export type KondisiTim = "BELUM_HADIR" | "BELUM_LENGKAP" | "KURANG_ANGGOTA" | "SESUAI" | "GUGUR";
 
 export const KONDISI_TIM: Record<KondisiTim, { label: string; cls: string }> = {
-  BELUM_HADIR: { label: "Belum hadir", cls: "bg-neutral-100 text-neutral-600 border-neutral-300" },
-  BELUM_LENGKAP: { label: "Belum selesai dicek", cls: "bg-yellow-100 text-yellow-800 border-yellow-300" },
+  BELUM_HADIR: { label: "Belum registrasi", cls: "bg-neutral-100 text-neutral-600 border-neutral-300" },
+  BELUM_LENGKAP: { label: "Tim hadir, anggota belum selesai dicek", cls: "bg-yellow-100 text-yellow-800 border-yellow-300" },
   // Semua anggota sudah dicek, tapi ada yang tidak hadir / slot kosong — tim tetap lomba.
   KURANG_ANGGOTA: { label: "Hadir, kurang anggota", cls: "bg-orange-100 text-orange-800 border-orange-300" },
   SESUAI: { label: "Sesuai", cls: "bg-green-100 text-green-800 border-green-300" },

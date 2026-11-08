@@ -14,14 +14,14 @@ export default function KategoriLombaSection({
     const toastId = toast.loading("Menyimpan...");
     const result = await saveKategoriLomba(data);
     if (result.success) toast.success("Kategori ditambahkan!", { id: toastId });
-    else toast.error("Gagal (sudah ada?)", { id: toastId });
+    else toast.error(result.message ?? "Gagal", { id: toastId });
   }
 
   async function handleDelete(id: string) {
     const toastId = toast.loading("Menghapus...");
     const result = await removeKategoriLomba(id);
     if (result.success) toast.success("Dihapus", { id: toastId });
-    else toast.error("Gagal", { id: toastId });
+    else toast.error(result.message ?? "Gagal", { id: toastId });
   }
 
   return (

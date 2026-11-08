@@ -67,13 +67,14 @@ export default function JuriTable({ data }: { data: Juri[] }) {
         <button
           onClick={async (e) => {
             e.stopPropagation();
+            if (!confirm(`Hapus juri ${row.nama}?`)) return;
             const toastId = toast.loading("Menghapus...");
             const result = await deleteJuriForm(row.id);
             if (result.success) {
               toast.success("Juri dihapus", { id: toastId });
               router.refresh();
             } else {
-              toast.error("Gagal menghapus", { id: toastId });
+              toast.error(result.message ?? "Gagal menghapus", { id: toastId });
             }
           }}
           className="px-3 py-1 text-sm bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-all"

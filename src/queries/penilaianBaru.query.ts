@@ -264,3 +264,12 @@ export async function createPelanggaranTim(
 export async function deletePelanggaranTim(id: string) {
   return prisma.pelanggaranTim.delete({ where: { id } });
 }
+
+// Juri sudah memberi nilai di kategori ini? Dipakai untuk menolak perubahan
+// penugasan: nilainya tetap ikut total tim, tapi tidak lagi terlihat di form &
+// peringatan "nilai kosong" (nilai yatim) — total tim bisa menggelembung diam-diam.
+export async function jumlahNilaiJuriDiKategori(juriId: string, kategori: string) {
+  return prisma.nilaiJuri.count({
+    where: { juriId, subKategori: { kategori: { equals: kategori, mode: "insensitive" } } },
+  });
+}

@@ -4,6 +4,7 @@ import { getServerSession } from "@/lib/next-auth";
 import { revalidatePath } from "next/cache";
 import {
   createPelanggaran,
+  jumlahNilaiJuriDiKategori,
   createSubKategoriMaster,
   deletePelanggaran,
   deleteSubKategoriMaster,
@@ -29,25 +30,61 @@ async function requireAdmin() {
   if (!["ADMIN", "SIE_LOMBA"].includes(session?.user?.role ?? "")) throw new Error("Forbidden");
 }
 
+// Angka bulat dalam rentang — master penilaian dulu menerima NaN/negatif apa adanya.
+function angka(v: FormDataEntryValue | null, min: number, max: number) {
+  const n = Number(String(v ?? "").trim());
+  return Number.isInteger(n) && n >= min && n <= max ? n : null;
+}
+const teks = (v: FormDataEntryValue | null, maks = 100) => String(v ?? "").trim().slice(0, maks);
+
+// Kategori harus ada di master Kategori Lomba (ejaan resmi dari master) — kalau teks
+// bebas, beda huruf/ejaan membuat sub-kategori tidak pernah muncul di form juri.
+async function kategoriResmi(nama: string) {
+  if (!nama) return null;
+  const k = await prisma.kategoriLomba.findFirst({ where: { nama: { equals: nama.trim(), mode: "insensitive" } } });
+  return k?.nama ?? null;
+}
+
 export async function saveMasterNilaiDiskrit(data: FormData) {
   await requireAdmin();
-  const kategori = data.get("kategori") as string;
-  const predikat = data.get("predikat") as string;
-  const warna = data.get("warna") as string;
-  const nilaiRaw = data.get("nilai") as string;
-  const urutan = parseInt(data.get("urutan") as string);
+  const kategori = await kategoriResmi(teks(data.get("kategori")));
+  const predikat = teks(data.get("predikat")).toUpperCase().replace(/\s+/g, "_");
+  const warna = teks(data.get("warna"), 20);
+  const urutan = angka(data.get("urutan"), 0, 999);
+  const nilai = Array.from(
+    new Set(String(data.get("nilai") ?? "").split(",").map((s) => Number(s.trim())))
+  ).filter((n) => Number.isInteger(n) && n >= 0 && n <= 1000);
+  if (!kategori) return { success: false, message: "Pilih kategori lomba yang terdaftar" };
+  if (!predikat) return { success: false, message: "Predikat wajib diisi" };
+  if (!/^#[0-9a-fA-F]{3,8}$/.test(warna)) return { success: false, message: "Warna tidak valid" };
+  if (urutan === null) return { success: false, message: "Urutan harus angka 0–999" };
+  if (nilai.length === 0 || nilai.length > 30)
+    return { success: false, message: "Isi 1–30 nilai (angka bulat 0–1000, pisahkan dengan koma)" };
+  // Satu angka hanya boleh punya satu predikat per kategori — kalau tidak, predikat
+  // yang tersimpan untuk nilai itu jadi acak. Data lama bisa beda huruf kategorinya.
+  const sekategori = await prisma.nilaiDiskritMaster.findMany({
+    where: { kategori: { equals: kategori, mode: "insensitive" } },
+  });
+  const ini = sekategori.find((m) => m.predikat === predikat);
+  const bentrok = nilai.filter((n) => sekategori.some((m) => m.id !== ini?.id && (m.nilai as number[]).includes(n)));
+  if (bentrok.length)
+    return { success: false, message: `Nilai ${bentrok.join(", ")} sudah dipakai predikat lain di kategori ${kategori}` };
   try {
-    const nilai = nilaiRaw.split(",").map((s) => parseInt(s.trim())).filter((n) => !isNaN(n));
-    await upsertNilaiDiskritMaster(kategori, predikat, { kategori, predikat, warna, nilai, urutan });
+    if (ini) await prisma.nilaiDiskritMaster.update({ where: { id: ini.id }, data: { nilai, warna, urutan } });
+    else await upsertNilaiDiskritMaster(kategori, predikat, { kategori, predikat, warna, nilai, urutan });
+    await catatLog("SIMPAN_MASTER_NILAI", `${kategori} ${predikat}: ${nilai.join(",")}`);
     revalidatePath("/admin/penilaian-baru");
     return { success: true };
-  } catch { return { success: false }; }
+  } catch { return { success: false, message: "Gagal menyimpan master nilai" }; }
 }
 
 export async function deleteMasterNilaiDiskrit(id: string) {
   await requireAdmin();
   try {
+    const m = await prisma.nilaiDiskritMaster.findUnique({ where: { id } });
+    if (m?.dikunci) return { success: false, message: "Master nilai ini dikunci" };
     await prisma.nilaiDiskritMaster.delete({ where: { id } });
+    if (m) await catatLog("HAPUS_MASTER_NILAI", `${m.kategori} ${m.predikat}`);
     revalidatePath("/admin/penilaian-baru");
     return { success: true };
   } catch { return { success: false }; }
@@ -55,63 +92,108 @@ export async function deleteMasterNilaiDiskrit(id: string) {
 
 export async function saveSubKategori(data: FormData) {
   await requireAdmin();
-  const kode = data.get("kode") as string;
-  const nama = data.get("nama") as string;
-  const kategori = data.get("kategori") as string;
-  const maxNilai = parseInt(data.get("maxNilai") as string);
-  const urutan = parseInt(data.get("urutan") as string);
+  const kode = teks(data.get("kode"), 30).toUpperCase();
+  const nama = teks(data.get("nama"), 150);
+  const kategori = await kategoriResmi(teks(data.get("kategori")));
+  const maxNilai = angka(data.get("maxNilai"), 1, 1000);
+  const urutan = angka(data.get("urutan"), 0, 999);
+  if (!kode || !nama) return { success: false, message: "Kode & nama wajib diisi" };
+  if (!kategori) return { success: false, message: "Pilih kategori lomba yang terdaftar" };
+  if (maxNilai === null) return { success: false, message: "Nilai maks harus angka 1–1000" };
+  if (urutan === null) return { success: false, message: "Urutan harus angka 0–999" };
   try {
     await createSubKategoriMaster({ kode, nama, kategori, maxNilai, urutan });
+    await catatLog("TAMBAH_SUB_KATEGORI", `${kategori}: [${kode}] ${nama} (maks ${maxNilai})`);
     revalidatePath("/admin/penilaian-baru");
     return { success: true };
-  } catch { return { success: false }; }
+  } catch (e: any) {
+    if (e?.code === "P2002") return { success: false, message: "Kode sub-kategori sudah ada" };
+    return { success: false, message: "Gagal menyimpan sub-kategori" };
+  }
 }
 
+// Sub-kategori yang sudah dinilai tidak boleh dihapus — nilainya ikut total tim.
 export async function removeSubKategori(id: string) {
   await requireAdmin();
+  const dipakai = await prisma.nilaiJuri.count({ where: { subKategoriId: id } });
+  if (dipakai > 0)
+    return { success: false, message: `Sub-kategori ini sudah dinilai (${dipakai} nilai) — tidak bisa dihapus` };
   try {
-    await deleteSubKategoriMaster(id);
+    const sub = await deleteSubKategoriMaster(id);
+    await catatLog("HAPUS_SUB_KATEGORI", `${sub.kategori}: [${sub.kode}] ${sub.nama}`);
     revalidatePath("/admin/penilaian-baru");
     return { success: true };
-  } catch { return { success: false }; }
+  } catch { return { success: false, message: "Gagal menghapus sub-kategori" }; }
 }
 
 export async function savePelanggaran(data: FormData) {
   await requireAdmin();
-  const kode = data.get("kode") as string;
-  const nama = data.get("nama") as string;
-  const kategori = data.get("kategori") as string;
-  const poinPengurangan = parseInt(data.get("poin") as string);
+  const kode = teks(data.get("kode"), 30).toUpperCase();
+  const nama = teks(data.get("nama"), 150);
+  const kategori = teks(data.get("kategori"), 50);
+  // Disimpan positif; pengurangan selalu memakai nilai mutlaknya.
+  const poin = angka(String(data.get("poin") ?? "").replace("-", ""), 1, 1000);
+  if (!kode || !nama) return { success: false, message: "Kode & nama pelanggaran wajib diisi" };
+  if (poin === null) return { success: false, message: "Poin pengurangan harus angka 1–1000" };
   try {
-    await createPelanggaran({ kode, nama, kategori, poinPengurangan });
+    await createPelanggaran({ kode, nama, kategori, poinPengurangan: poin });
+    await catatLog("TAMBAH_MASTER_PELANGGARAN", `[${kode}] ${nama} (−${poin})`);
     revalidatePath("/admin/penilaian-baru");
     return { success: true };
-  } catch { return { success: false }; }
+  } catch (e: any) {
+    if (e?.code === "P2002") return { success: false, message: "Kode pelanggaran sudah ada" };
+    return { success: false, message: "Gagal menyimpan pelanggaran" };
+  }
 }
 
 export async function removePelanggaran(id: string) {
   await requireAdmin();
+  const dipakai = await prisma.pelanggaranTim.count({ where: { pelanggaranId: id } });
+  if (dipakai > 0)
+    return { success: false, message: `Pelanggaran ini sudah dicatat di ${dipakai} tim — hapus catatannya di tim dulu` };
   try {
-    await deletePelanggaran(id);
+    const p = await deletePelanggaran(id);
+    await catatLog("HAPUS_MASTER_PELANGGARAN", `[${p.kode}] ${p.nama}`);
     revalidatePath("/admin/penilaian-baru");
     return { success: true };
-  } catch { return { success: false }; }
+  } catch { return { success: false, message: "Gagal menghapus pelanggaran" }; }
 }
+
 
 export async function tugaskanJuriKategori(juriId: string, kategori: string) {
   await requireAdmin();
+  const resmi = await kategoriResmi(String(kategori ?? ""));
+  if (!resmi) return { success: false, message: "Pilih kategori lomba yang terdaftar" };
+  const juri = typeof juriId === "string" && juriId ? await prisma.juri.findUnique({ where: { id: juriId } }) : null;
+  if (!juri) return { success: false, message: "Pilih juri" };
+  const sudah = await prisma.juriKategori.count({
+    where: { juriId: juri.id, kategori: { equals: resmi, mode: "insensitive" } },
+  });
+  if (sudah) return { success: false, message: "Juri ini sudah ditugaskan di kategori tersebut" };
   try {
-    await upsertJuriKategori(juriId, kategori);
+    await upsertJuriKategori(juri.id, resmi);
+    await catatLog("TUGASKAN_JURI", `${juri.nama} → ${resmi}`);
     revalidatePath("/admin/penilaian-baru");
     return { success: true };
-  } catch { return { success: false }; }
+  } catch { return { success: false, message: "Gagal menugaskan juri" }; }
 }
 
 // Ganti kategori sebuah penugasan. Nilai yang sudah diinput juri tidak ikut
 // berubah/hilang — penugasan hanya menentukan kategori mana yang bisa dia isi.
-export async function ubahJuriKategori(id: string, kategori: string) {
+export async function ubahJuriKategori(id: string, kategoriInput: string) {
   await requireAdmin();
-  if (!kategori) return { success: false, message: "Pilih kategori" };
+  const kategori = await kategoriResmi(String(kategoriInput ?? ""));
+  if (!kategori) return { success: false, message: "Pilih kategori lomba yang terdaftar" };
+  const lama = await prisma.juriKategori.findUnique({ where: { id }, include: { juri: { select: { nama: true } } } });
+  if (!lama) return { success: false, message: "Penugasan tidak ditemukan" };
+  if (lama.kategori.toLowerCase() !== kategori.toLowerCase()) {
+    const n = await jumlahNilaiJuriDiKategori(lama.juriId, lama.kategori);
+    if (n > 0)
+      return {
+        success: false,
+        message: `${lama.juri.nama} sudah memberi ${n} nilai di kategori ${lama.kategori} — penugasan tidak bisa dipindah. Tambahkan penugasan baru saja.`,
+      };
+  }
   try {
     const jk = await prisma.juriKategori.update({ where: { id }, data: { kategori }, include: { juri: true } });
     await catatLog("UBAH_PENUGASAN_JURI", `${jk.juri.nama} → ${kategori}`);
@@ -125,6 +207,14 @@ export async function ubahJuriKategori(id: string, kategori: string) {
 
 export async function hapusJuriKategori(id: string) {
   await requireAdmin();
+  const lama = await prisma.juriKategori.findUnique({ where: { id }, include: { juri: { select: { nama: true } } } });
+  if (!lama) return { success: true };
+  const n = await jumlahNilaiJuriDiKategori(lama.juriId, lama.kategori);
+  if (n > 0)
+    return {
+      success: false,
+      message: `${lama.juri.nama} sudah memberi ${n} nilai di kategori ${lama.kategori} — penugasan tidak bisa dihapus (nilainya ikut total tim)`,
+    };
   try {
     const jk = await prisma.juriKategori.delete({ where: { id }, include: { juri: true } });
     await catatLog("HAPUS_PENUGASAN_JURI", `${jk.juri.nama} — ${jk.kategori}`);
@@ -149,7 +239,7 @@ async function juriPenilai(juriIdDipilih?: string) {
     const juri = await findOrLinkJuriByUser(session!.user!.id);
     return juri ? { juri, oleh: null } : { error: "Akun tidak terhubung ke data Juri" };
   }
-  if (!juriIdDipilih) return { error: "Pilih juri yang nilainya akan dimasukkan" };
+  if (!juriIdDipilih || typeof juriIdDipilih !== "string") return { error: "Pilih juri yang nilainya akan dimasukkan" };
   const juri = await prisma.juri.findUnique({ where: { id: juriIdDipilih }, include: { juriKategori: true } });
   return juri ? { juri, oleh: session!.user!.nama } : { error: "Juri tidak ditemukan" };
 }
@@ -177,8 +267,16 @@ export async function inputNilaiJuri(
   const penilai = await juriPenilai(juriIdDipilih);
   if (!penilai.juri) return { success: false, message: penilai.error };
   const { juri, oleh } = penilai;
-  if (!Array.isArray(scores) || scores.length === 0 || scores.length > 200)
+  // Argumen server action bisa dikirim siapa saja — periksa bentuknya sebelum ke database.
+  if (
+    !Array.isArray(scores) ||
+    scores.length === 0 ||
+    scores.length > 200 ||
+    scores.some((s) => !s || typeof s.subKategoriId !== "string" || (s.catatan != null && typeof s.catatan !== "string"))
+  )
     return { success: false, message: "Data nilai tidak valid" };
+  if (new Set(scores.map((s) => s.subKategoriId)).size !== scores.length)
+    return { success: false, message: "Data nilai ganda" };
 
   const tolak = await cekTimBisaDinilai(timId);
   if (tolak) return { success: false, message: tolak };
@@ -208,6 +306,9 @@ export async function inputNilaiJuri(
     const predikat = master?.predikat ?? (nilai === 0 ? PREDIKAT_TIDAK_DILAKUKAN : null);
     if (!Number.isInteger(nilai) || !predikat)
       return { success: false, message: `Nilai ${s.nilai} tidak valid untuk ${sub.nama}` };
+    // Master nilai diskrit berlaku per KATEGORI; sub-kategori bisa punya maks lebih kecil.
+    if (nilai < 0 || nilai > sub.maxNilai)
+      return { success: false, message: `Nilai ${nilai} melebihi maks ${sub.maxNilai} untuk ${sub.nama}` };
     const catatan = (s.catatan ?? "").toString().trim().slice(0, MAKS_CATATAN) || null;
     valid.push({ subKategoriId: sub.id, nilai, predikat, catatan });
   }
@@ -342,6 +443,7 @@ export async function inputPelanggaranTim(timId: string, pelanggaranId: string, 
     pelaku = juri.nama;
   }
 
+  if (typeof pelanggaranId !== "string" || !pelanggaranId) return { success: false, message: "Pilih jenis pelanggaran" };
   const jumlah = Number(jumlahKejadian);
   if (!Number.isInteger(jumlah) || jumlah < 1 || jumlah > MAKS_KEJADIAN)
     return { success: false, message: `Jumlah kejadian harus 1–${MAKS_KEJADIAN}` };
@@ -384,6 +486,8 @@ export async function hapusPelanggaranTim(pelanggaranTimId: string) {
     const juri = await findOrLinkJuriByUser(session!.user!.id);
     if (!juri) return { success: false, message: "Akun tidak terhubung ke data Juri" };
   }
+  if (typeof pelanggaranTimId !== "string" || !pelanggaranTimId)
+    return { success: false, message: "Pelanggaran tidak ditemukan" };
 
   const pt = await prisma.pelanggaranTim.findUnique({
     where: { id: pelanggaranTimId },
@@ -412,21 +516,39 @@ export async function hapusPelanggaranTim(pelanggaranTimId: string) {
 
 export async function saveKategoriLomba(data: FormData) {
   await requireAdmin();
-  const nama = (data.get("nama") as string).trim().toUpperCase();
+  const nama = teks(data.get("nama"), 50).replace(/\s+/g, " ").toUpperCase();
+  if (!nama) return { success: false, message: "Nama kategori wajib diisi" };
   try {
     await prisma.kategoriLomba.upsert({ where: { nama }, create: { nama }, update: {} });
+    await catatLog("TAMBAH_KATEGORI_LOMBA", nama);
     revalidatePath("/admin/penilaian-baru");
     return { success: true };
-  } catch { return { success: false }; }
+  } catch { return { success: false, message: "Gagal menyimpan kategori" }; }
 }
 
+// Kategori yang masih punya sub-kategori / penugasan juri tidak boleh dihapus —
+// dulu terhapus begitu saja, meninggalkan sub-kategori & nilai tanpa kategori induk.
 export async function removeKategoriLomba(id: string) {
   await requireAdmin();
+  const kat = await prisma.kategoriLomba.findUnique({ where: { id } });
+  if (!kat) return { success: true };
+  const ci = { equals: kat.nama, mode: "insensitive" as const };
+  const [nSub, nJuri, nMaster] = await Promise.all([
+    prisma.subKategoriMaster.count({ where: { kategori: ci } }),
+    prisma.juriKategori.count({ where: { kategori: ci } }),
+    prisma.nilaiDiskritMaster.count({ where: { kategori: ci } }),
+  ]);
+  if (nSub || nJuri || nMaster)
+    return {
+      success: false,
+      message: `Kategori ${kat.nama} masih dipakai (${nSub} sub-kategori, ${nJuri} penugasan juri, ${nMaster} master nilai) — hapus itu dulu`,
+    };
   try {
     await prisma.kategoriLomba.delete({ where: { id } });
+    await catatLog("HAPUS_KATEGORI_LOMBA", kat.nama);
     revalidatePath("/admin/penilaian-baru");
     return { success: true };
-  } catch { return { success: false }; }
+  } catch { return { success: false, message: "Gagal menghapus kategori" }; }
 }
 
 // Pengaman sebelum juara diumumkan: hitung ulang total SEMUA tim dari nilai juri
@@ -488,11 +610,17 @@ export async function publishNilaiBaru(penilaianId: string, publish: boolean) {
       const p = await prisma.penilaianBaru.findUnique({ where: { id: penilaianId }, select: { tim: { select: TIM_SELECT_IKUT } } });
       if (!p || !p.tim.confirmed || p.tim.gugurAt) return { success: false, message: "Tim tidak ikut lomba (batal konfirmasi / mundur / tidak hadir)" };
     }
-    await prisma.penilaianBaru.update({
-      where: { id: penilaianId },
-      data: { published: publish, publishedAt: publish ? new Date() : null, status: publish ? "FINAL" : "DRAFT" },
+    const p = await prisma.penilaianBaru.update({
+      where: { id: String(penilaianId) },
+      data: { published: !!publish, publishedAt: publish ? new Date() : null, status: publish ? "FINAL" : "DRAFT" },
+      select: { nilaiAkhir: true, tim: { select: { jenjang: true, noUrut: true, nama_tim: true } } },
     });
+    // Jejak audit: kapan & oleh siapa nilai dibuka ke tim / ditarik kembali.
+    await catatLog(
+      publish ? "PUBLISH_NILAI" : "SEMBUNYIKAN_NILAI",
+      `${p.tim.nama_tim} (${p.tim.jenjang}-${String(p.tim.noUrut ?? "?").padStart(2, "0")}) nilai akhir ${p.nilaiAkhir}`
+    );
     revalidatePath("/", "layout");
     return { success: true };
-  } catch { return { success: false }; }
+  } catch { return { success: false, message: "Gagal" }; }
 }

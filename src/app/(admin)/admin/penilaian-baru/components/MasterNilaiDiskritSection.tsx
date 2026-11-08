@@ -31,14 +31,14 @@ export default function MasterNilaiDiskritSection({
     const toastId = toast.loading("Menyimpan...");
     const result = await saveMasterNilaiDiskrit(data);
     if (result.success) toast.success("Disimpan!", { id: toastId });
-    else toast.error("Gagal", { id: toastId });
+    else toast.error(result.message ?? "Gagal", { id: toastId });
   }
 
   async function handleDelete(id: string) {
     const toastId = toast.loading("Menghapus...");
     const result = await deleteMasterNilaiDiskrit(id);
     if (result.success) toast.success("Dihapus", { id: toastId });
-    else toast.error("Gagal", { id: toastId });
+    else toast.error(result.message ?? "Gagal", { id: toastId });
   }
 
   return (

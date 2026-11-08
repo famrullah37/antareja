@@ -1,6 +1,6 @@
 "use client";
 
-import { centangSemuaSesuai, resetPresensiDP, setStatusAnggota } from "@/actions/PresensiDP";
+import { centangSemuaSesuai, registrasiTim, resetPresensiDP, setStatusAnggota } from "@/actions/PresensiDP";
 import { KONDISI_TIM, kondisiTim, noUrutLabel, ringkasPresensi, type StatusAnggota } from "@/lib/presensiDp";
 import cn from "@/lib/clsx";
 import Image from "next/image";
@@ -140,8 +140,9 @@ export default function PresensiTim({ tim, presensi, slot, gugur, nilaiDipublish
   );
   const tGugur = !!gugur.gugurAt;
   const kondisi = kondisiTim(!!presensi, ringkas, tGugur);
-  // Tim mundur / tidak hadir tidak dicentang (server juga menolak).
-  const bisaCentang = tim.confirmed && !tGugur;
+  // Anggota baru bisa dicek setelah TIM registrasi hadir; tim mundur / tidak hadir
+  // tidak dicek sama sekali (server juga menolak).
+  const bisaCentang = tim.confirmed && !tGugur && !!presensi;
   // "Centang semua sesuai" hanya mengisi anggota yang BELUM dicek (yang ditandai tidak hadir tidak berubah).
   const belum = slot.filter((s) => s.anggota && !s.anggota.status).length;
 
@@ -193,10 +194,21 @@ export default function PresensiTim({ tim, presensi, slot, gugur, nilaiDipublish
             <div className="text-sm text-yellow-700">Pembayaran tim belum terkonfirmasi</div>
           ) : (
             <>
-              {presensi && (
+              {presensi ? (
                 <div className="text-sm text-gray-500 text-right">
-                  Hadir {jamWIB(presensi.hadirAt)} WIB · {presensi.olehNama}
+                  Tim registrasi {jamWIB(presensi.hadirAt)} WIB · {presensi.olehNama}
                 </div>
+              ) : (
+                !tGugur && (
+                  <button
+                    type="button"
+                    disabled={loading}
+                    onClick={() => jalankan(() => registrasiTim(tim.id), `${tim.nama_tim} tercatat hadir`)}
+                    className={cn(btnCls, "bg-primary-500 text-white hover:bg-primary-600 h-11 px-5")}
+                  >
+                    ✓ Tim hadir (registrasi)
+                  </button>
+                )
               )}
               <div className="flex flex-wrap justify-end gap-2">
                 {belum > 0 && bisaCentang && (
@@ -214,12 +226,12 @@ export default function PresensiTim({ tim, presensi, slot, gugur, nilaiDipublish
                     type="button"
                     disabled={loading}
                     onClick={() => {
-                      if (confirm(`Reset presensi ${tim.nama_tim}? Semua centang tim ini dihapus.`))
-                        jalankan(() => resetPresensiDP(tim.id), "Presensi direset");
+                      if (confirm(`Batalkan registrasi ${tim.nama_tim}? Registrasi tim dan semua status anggotanya dihapus.`))
+                        jalankan(() => resetPresensiDP(tim.id), "Registrasi dibatalkan");
                     }}
                     className={cn(btnCls, "border border-neutral-300 text-gray-600 hover:bg-neutral-50")}
                   >
-                    Reset
+                    Batalkan registrasi
                   </button>
                 )}
               </div>
@@ -227,6 +239,21 @@ export default function PresensiTim({ tim, presensi, slot, gugur, nilaiDipublish
           )}
         </div>
       </div>
+
+      {/* Langkah 1: registrasi tim. Langkah 2: cek anggota (di bawah). */}
+      {!presensi && !tGugur && tim.confirmed && (
+        <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
+          <b>Langkah 1 — registrasi kehadiran tim.</b> Tekan &quot;Tim hadir (registrasi)&quot; saat tim melapor datang.
+          Bila tim tidak datang, gunakan &quot;Tandai mundur / tidak hadir&quot;. Kehadiran tiap anggota baru bisa dicek
+          setelah tim registrasi.
+        </div>
+      )}
+      {presensi && !tGugur && (
+        <div className="text-sm text-gray-600">
+          <b>Langkah 2 — kehadiran anggota:</b> tandai tiap Danton & pasukan &quot;Sesuai&quot; atau &quot;Tidak hadir&quot;.
+          Anggota tidak hadir tidak membuat tim gugur.
+        </div>
+      )}
 
       <StatusGugurTim
         timId={tim.id}

@@ -192,7 +192,7 @@ export default async function InputNilaiIndexPage({
                           {/* Pengingat saja — tim tetap bisa dinilai. */}
                           {!sudahHadir.has(tim.id) && (
                             <span className="whitespace-nowrap rounded-full bg-neutral-100 px-2 py-0.5 text-xs font-semibold text-neutral-600">
-                              Belum presensi
+                              Belum registrasi
                             </span>
                           )}
                         </div>

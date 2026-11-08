@@ -60,7 +60,7 @@ export default async function PenilaianBaruPage() {
         kelengkapan={Object.fromEntries(
           Object.values(kelengkapan).map((k) => [
             k.timId,
-            { kosong: k.kosong, diharapkan: k.diharapkan, detail: ringkasKosong(k) },
+            { kosong: k.kosong, diharapkan: k.diharapkan, detail: ringkasKosong(k), yatim: k.yatim },
           ])
         )}
         timBelumDinilai={timBelumDinilai.map((k) => ({

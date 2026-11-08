@@ -19,6 +19,9 @@ export type KelengkapanTim = {
   terisi: number;
   kosong: number;
   perJuri: { juri: string; kosong: number }[];
+  // Nilai tersimpan dari juri yang TIDAK (lagi) ditugaskan di kategori itu, atau di
+  // sub-kategori nonaktif — tetap ikut total tim tapi tak terlihat di form juri.
+  yatim: number;
 };
 
 export async function hitungKelengkapanNilai(): Promise<Record<string, KelengkapanTim>> {
@@ -45,6 +48,11 @@ export async function hitungKelengkapanNilai(): Promise<Record<string, Kelengkap
   }
   const wajib = Array.from(pasangan.values());
   const terisi = new Set(nilai.map((n) => `${n.penilaian.timId}|${n.juriId}|${n.subKategoriId}`));
+  const yatimPerTim = new Map<string, number>();
+  for (const n of nilai) {
+    if (pasangan.has(`${n.juriId}|${n.subKategoriId}`)) continue;
+    yatimPerTim.set(n.penilaian.timId, (yatimPerTim.get(n.penilaian.timId) ?? 0) + 1);
+  }
 
   const hasil: Record<string, KelengkapanTim> = {};
   for (const t of tims) {
@@ -68,6 +76,7 @@ export async function hitungKelengkapanNilai(): Promise<Record<string, Kelengkap
       terisi: wajib.length - kosong,
       kosong,
       perJuri: Array.from(kosongPerJuri.values()),
+      yatim: yatimPerTim.get(t.id) ?? 0,
     };
   }
   return hasil;

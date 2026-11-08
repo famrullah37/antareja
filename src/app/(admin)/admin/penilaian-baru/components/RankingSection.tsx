@@ -70,7 +70,7 @@ type KategoriLomba = { id: string; nama: string };
 
 const JENJANG_ORDER = ["SD", "SMP", "SMA", "PURNA"];
 
-type Kelengkapan = { kosong: number; diharapkan: number; detail: string };
+type Kelengkapan = { kosong: number; diharapkan: number; detail: string; yatim: number };
 
 export default function RankingSection({
   penilaians,
@@ -90,6 +90,7 @@ export default function RankingSection({
   // Cegah klik ganda tombol publish / sembunyikan.
   const [sibuk, setSibuk] = useState(false);
   const belumLengkap = penilaians.filter((p) => (kelengkapan[p.timId]?.kosong ?? 0) > 0);
+  const adaYatim = penilaians.filter((p) => (kelengkapan[p.timId]?.yatim ?? 0) > 0);
 
   // Publish/sembunyikan semua tim satu jenjang sekaligus (momen pengumuman).
   async function handlePublishJenjang(jenjang: string, publish: boolean, daftar: (PenilaianBaruItem & { nilaiPBB: number })[]) {
@@ -192,6 +193,23 @@ export default function RankingSection({
     </div>
   );
 
+  // Nilai dari penugasan juri yang sudah dihapus/dipindah — tetap masuk total.
+  const infoYatim = adaYatim.length > 0 && (
+    <div className="bg-red-50 border border-red-300 text-red-900 rounded-xl p-4 text-sm mb-4">
+      <p className="font-semibold">
+        ⚠ Ada nilai dari juri yang tidak lagi ditugaskan di kategorinya ({adaYatim.length} tim) — nilai itu TETAP
+        masuk total. Kembalikan penugasan juri tersebut, atau minta admin teknis menghapus nilainya.
+      </p>
+      <ul className="list-disc ml-5">
+        {adaYatim.map((p) => (
+          <li key={p.id}>
+            {p.tim.jenjang} · {p.tim.nama_tim} — {kelengkapan[p.timId].yatim} nilai
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+
   const infoGugur = timGugur.length > 0 && (
     <div className="bg-red-50 border border-red-200 text-red-900 rounded-xl p-4 text-sm mb-4">
       <p className="font-semibold">
@@ -213,6 +231,7 @@ export default function RankingSection({
       <section>
         <h2 className="text-xl font-semibold mb-3">Rekap Nilai</h2>
         {peringatan}
+        {infoYatim}
         {infoGugur}
         <p className="text-gray-400 text-sm">Belum ada data penilaian.</p>
       </section>
@@ -226,6 +245,7 @@ export default function RankingSection({
         <TombolHitungUlang />
       </div>
       {peringatan}
+      {infoYatim}
       {infoGugur}
       {JENJANG_ORDER.map((jenjang) => {
         // Nilai sama → PBB lebih tinggi di atas (juklak), lihat lib/rankingNilai.ts.

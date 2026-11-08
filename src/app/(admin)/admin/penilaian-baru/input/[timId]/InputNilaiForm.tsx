@@ -4,6 +4,7 @@ import { hapusPelanggaranTim, inputNilaiJuri, inputPelanggaranTim } from "@/acti
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
+import { usePeringatanKeluar } from "@/lib/usePeringatanKeluar";
 
 type SubKategori = {
   id: string;
@@ -147,6 +148,8 @@ export default function InputNilaiForm({
   const tabAktif = tab !== "SEMUA" && grouped[tab] ? tab : "SEMUA";
   const groupedTampil = Object.entries(grouped).filter(([k]) => tabAktif === "SEMUA" || k === tabAktif);
   const adaPerubahan = Object.keys(scores).length > 0;
+  // Juri sering langsung pindah ke tim berikutnya — jangan sampai nilai belum tersimpan hilang.
+  usePeringatanKeluar(adaPerubahan, "Nilai belum disimpan. Tinggalkan halaman ini dan buang perubahan?");
 
   async function handleSubmit() {
     const entries = Object.entries(scores).map(([subKategoriId, v]) => ({

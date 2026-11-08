@@ -33,9 +33,9 @@ export default async function PresensiDPPage() {
       <div className="flex flex-col gap-1">
         <H1>Presensi Daerah Persiapan</H1>
         <p className="text-sm text-gray-500">
-          {hadir} dari {baris.length} tim terkonfirmasi sudah hadir di DP · {sesuai} tim sesuai lengkap
+          {hadir} dari {baris.length} tim terkonfirmasi sudah registrasi hadir di DP · {sesuai} tim sesuai lengkap
           {gugur > 0 && ` · ${gugur} tim mundur / tidak hadir`}. Buka tim
-          yang datang, lalu tandai tiap Danton & pasukan: &quot;Sesuai&quot; (hadir & cocok dengan foto/data) atau
+          yang datang: (1) catat registrasi kehadiran tim, lalu (2) tandai tiap Danton & pasukan: &quot;Sesuai&quot; (hadir & cocok dengan foto/data) atau
           &quot;Tidak hadir&quot; (anggota itu absen — tim tetap ikut lomba). Tim yang
           tidak datang / tidak registrasi ulang ditandai lewat tombol &quot;Tandai mundur / tidak hadir&quot; di halaman tim
           — tidak pernah otomatis.
