@@ -39,9 +39,11 @@ export async function upsertKonfigVoting(data: {
   });
 }
 
+// Tim yang mundur SEBELUM voting dibuka & tanpa vote tidak ikut (gugurTanpaVote);
+// tim tidak hadir / mundur saat voting berjalan tetap tampil (lib/gugurTim.ts).
 export async function findTimsForVoting() {
   return prisma.tim.findMany({
-    where: { confirmed: true },
+    where: { confirmed: true, gugurTanpaVote: false },
     select: {
       id: true,
       nama_tim: true,
@@ -59,7 +61,7 @@ export async function findTimsForVoting() {
 // "DANTON". Tim yang belum isi Danton tidak akan punya entri di map ini.
 export async function findDantonMap(): Promise<Record<string, string>> {
   const dantons = await prisma.anggota.findMany({
-    where: { posisi: "DANTON", Tim: { confirmed: true } },
+    where: { posisi: "DANTON", Tim: { confirmed: true, gugurTanpaVote: false } },
     select: { timId: true, nama: true },
   });
   return Object.fromEntries(dantons.map((d) => [d.timId, d.nama]));

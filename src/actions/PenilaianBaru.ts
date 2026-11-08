@@ -22,6 +22,7 @@ import { findOrLinkJuriByUser } from "@/queries/juri.query";
 import { deleteUploadFile, saveUploadFile } from "@/lib/localUpload";
 import { PREDIKAT_TIDAK_DILAKUKAN } from "@/lib/kelengkapanNilai";
 import { Jenjang } from "@prisma/client";
+import { labelGugur, TIM_IKUT_LOMBA } from "@/lib/gugurTim";
 
 async function requireAdmin() {
   const session = await getServerSession();
@@ -153,17 +154,20 @@ async function juriPenilai(juriIdDipilih?: string) {
   return juri ? { juri, oleh: session!.user!.nama } : { error: "Juri tidak ditemukan" };
 }
 
-// Tim harus terkonfirmasi & nilainya belum dipublish (FINAL) — setelah publish,
-// nilai tidak boleh berubah diam-diam dari sisi juri.
+// Tim harus terkonfirmasi, tidak mundur/tidak hadir (lib/gugurTim.ts), & nilainya
+// belum dipublish (FINAL) — setelah publish, nilai tidak boleh berubah diam-diam.
 async function cekTimBisaDinilai(timId: string) {
-  const tim = await prisma.tim.findUnique({ where: { id: timId }, select: { confirmed: true } });
+  if (typeof timId !== "string" || !timId) return "Tim tidak ditemukan";
+  const tim = await prisma.tim.findUnique({ where: { id: timId }, select: { confirmed: true, gugurAt: true, gugurJenis: true } });
   if (!tim || !tim.confirmed) return "Tim tidak ditemukan";
+  if (tim.gugurAt) return `Tim ini ditandai "${labelGugur(tim.gugurJenis)}" — tidak dinilai`;
   const penilaian = await prisma.penilaianBaru.findUnique({ where: { timId }, select: { published: true } });
   if (penilaian?.published) return "Nilai tim ini sudah dipublish, hubungi admin untuk membuka kembali";
   return null;
 }
 
 const MAKS_CATATAN = 500;
+const TIM_SELECT_IKUT = { confirmed: true, gugurAt: true } as const;
 
 export async function inputNilaiJuri(
   timId: string,
@@ -386,6 +390,8 @@ export async function hapusPelanggaranTim(pelanggaranTimId: string) {
     include: { penilaian: { select: { id: true, published: true, timId: true } }, pelanggaran: true },
   });
   if (!pt) return { success: false, message: "Pelanggaran tidak ditemukan" };
+  const tolak = await cekTimBisaDinilai(pt.penilaian.timId);
+  if (tolak) return { success: false, message: tolak };
   if (pt.penilaian.published)
     return { success: false, message: "Nilai tim ini sudah dipublish, hubungi admin untuk membuka kembali" };
 
@@ -462,7 +468,8 @@ export async function publishNilaiJenjang(jenjang: string, publish: boolean) {
   if (!JENJANG_VALID.includes(jenjang as Jenjang)) return { success: false, count: 0 };
   try {
     const r = await prisma.penilaianBaru.updateMany({
-      where: { tim: { jenjang: jenjang as Jenjang }, published: !publish },
+      // Publish hanya tim yang ikut lomba; sembunyikan berlaku untuk semua.
+      where: { tim: publish ? { jenjang: jenjang as Jenjang, ...TIM_IKUT_LOMBA } : { jenjang: jenjang as Jenjang }, published: !publish },
       data: { published: publish, publishedAt: publish ? new Date() : null, status: publish ? "FINAL" : "DRAFT" },
     });
     await catatLog(publish ? "PUBLISH_NILAI_JENJANG" : "SEMBUNYIKAN_NILAI_JENJANG", `${jenjang}: ${r.count} tim`);
@@ -477,6 +484,10 @@ export async function publishNilaiJenjang(jenjang: string, publish: boolean) {
 export async function publishNilaiBaru(penilaianId: string, publish: boolean) {
   await requireAdmin();
   try {
+    if (publish) {
+      const p = await prisma.penilaianBaru.findUnique({ where: { id: penilaianId }, select: { tim: { select: TIM_SELECT_IKUT } } });
+      if (!p || !p.tim.confirmed || p.tim.gugurAt) return { success: false, message: "Tim tidak ikut lomba (batal konfirmasi / mundur / tidak hadir)" };
+    }
     await prisma.penilaianBaru.update({
       where: { id: penilaianId },
       data: { published: publish, publishedAt: publish ? new Date() : null, status: publish ? "FINAL" : "DRAFT" },

@@ -1,4 +1,5 @@
 import prisma from "@/lib/prisma";
+import { TIM_IKUT_LOMBA } from "@/lib/gugurTim";
 
 // Nilai 0 adalah nilai SAH (peserta tidak melakukan perintah — sesuai aturan lomba),
 // sedangkan sub-kategori yang belum diisi juri = KOSONG. Keduanya sama-sama
@@ -23,7 +24,8 @@ export type KelengkapanTim = {
 export async function hitungKelengkapanNilai(): Promise<Record<string, KelengkapanTim>> {
   const [tims, penugasan, subs, nilai] = await Promise.all([
     prisma.tim.findMany({
-      where: { confirmed: true },
+      // Tim mundur / tidak hadir tidak dinilai — tidak dihitung "kosong".
+      where: TIM_IKUT_LOMBA,
       select: { id: true, nama_tim: true, asal_sekolah: true, jenjang: true, noUrut: true },
     }),
     prisma.juriKategori.findMany({ select: { juriId: true, kategori: true, juri: { select: { nama: true } } } }),

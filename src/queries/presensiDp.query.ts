@@ -1,5 +1,5 @@
 import prisma from "@/lib/prisma";
-import { posisiPresensi } from "@/lib/presensiDp";
+import { posisiPresensi, statusAnggota } from "@/lib/presensiDp";
 
 // Daftar tim terkonfirmasi untuk halaman presensi DP + centang anggotanya.
 export async function findTimPresensiDP() {
@@ -13,8 +13,10 @@ export async function findTimPresensiDP() {
       jenjang: true,
       tipe_tim: true,
       noUrut: true,
+      gugurAt: true,
+      gugurJenis: true,
       presensiDP: { select: { hadirAt: true } },
-      anggotas: { select: { posisi: true, presensiDP: { select: { id: true } } } },
+      anggotas: { select: { posisi: true, presensiDP: { select: { tidakHadir: true } } } },
     },
   });
   return tims.map((t) => {
@@ -23,7 +25,7 @@ export async function findTimPresensiDP() {
       ...t,
       anggotas: t.anggotas
         .filter((a) => wajib.has(a.posisi))
-        .map((a) => ({ posisi: a.posisi as string, sesuai: !!a.presensiDP })),
+        .map((a) => ({ posisi: a.posisi as string, status: statusAnggota(a.presensiDP) })),
     };
   });
 }
@@ -41,6 +43,12 @@ export async function findPresensiDPTim(timId: string) {
       noUrut: true,
       confirmed: true,
       foto: true,
+      gugurAt: true,
+      gugurJenis: true,
+      gugurAlasan: true,
+      gugurOleh: true,
+      gugurTanpaVote: true,
+      penilaianBaru: { select: { published: true } },
       presensiDP: { select: { hadirAt: true, olehNama: true } },
       anggotas: {
         select: {
@@ -51,7 +59,7 @@ export async function findPresensiDPTim(timId: string) {
           nisn: true,
           kelas: true,
           tanggal_lahir: true,
-          presensiDP: { select: { olehNama: true } },
+          presensiDP: { select: { olehNama: true, tidakHadir: true } },
         },
       },
     },

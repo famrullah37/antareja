@@ -1,13 +1,14 @@
 "use client";
 
-import { centangSemuaSesuai, resetPresensiDP, setSesuaiAnggota } from "@/actions/PresensiDP";
-import { KONDISI_TIM, kondisiTim, noUrutLabel, ringkasPresensi } from "@/lib/presensiDp";
+import { centangSemuaSesuai, resetPresensiDP, setStatusAnggota } from "@/actions/PresensiDP";
+import { KONDISI_TIM, kondisiTim, noUrutLabel, ringkasPresensi, type StatusAnggota } from "@/lib/presensiDp";
 import cn from "@/lib/clsx";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next-nprogress-bar";
 import { useState } from "react";
 import { toast } from "sonner";
+import StatusGugurTim, { type DataGugur } from "../../../components/StatusGugurTim";
 
 type Anggota = {
   id: string;
@@ -16,7 +17,7 @@ type Anggota = {
   nisn: string | null;
   kelas: string | null;
   tanggalLahir: string | null;
-  sesuai: boolean;
+  status: StatusAnggota;
   olehNama: string | null;
 };
 
@@ -35,6 +36,8 @@ type Props = {
   };
   presensi: { hadirAt: string; olehNama: string } | null;
   slot: Slot[];
+  gugur: DataGugur;
+  nilaiDipublish: boolean;
 };
 
 const btnCls = "rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-60";
@@ -57,27 +60,36 @@ function KartuAnggota({ timId, bisa, posisi, a }: { timId: string; bisa: boolean
       </div>
     );
 
-  async function toggle() {
+  async function ubah(status: StatusAnggota) {
+    if (loading) return;
     setLoading(true);
-    const result = await setSesuaiAnggota(timId, a!.id, !a!.sesuai);
+    const result = await setStatusAnggota(timId, a!.id, status).catch(() => ({ success: false, message: "Koneksi terputus" }));
     setLoading(false);
     if (!result.success) toast.error(result.message ?? "Gagal");
     router.refresh();
   }
 
+  const sesuai = a.status === "SESUAI";
+  const absen = a.status === "TIDAK_HADIR";
+
   return (
-    <label
+    <div
       className={cn(
         "rounded-2xl border-2 bg-white overflow-hidden flex flex-col select-none",
-        bisa ? "cursor-pointer" : "opacity-70",
-        a.sesuai ? "border-green-500" : "border-neutral-200"
+        !bisa && "opacity-70",
+        sesuai ? "border-green-500" : absen ? "border-orange-400" : "border-neutral-200"
       )}
     >
-      <div className="relative w-full aspect-[3/4] bg-neutral-200">
+      <div className={cn("relative w-full aspect-[3/4] bg-neutral-200", absen && "grayscale")}>
         <Image src={a.foto} alt={`Foto ${a.nama}`} fill sizes="(max-width: 640px) 50vw, 240px" className="object-cover" unoptimized />
         <span className="absolute top-2 left-2 bg-black/70 text-white text-xs font-bold rounded px-2 py-0.5">
           {posisi}
         </span>
+        {absen && (
+          <span className="absolute bottom-2 left-2 right-2 rounded bg-orange-600 py-1 text-center text-xs font-bold text-white">
+            TIDAK HADIR
+          </span>
+        )}
       </div>
       <div className="p-3 flex flex-col gap-2 flex-1">
         <div>
@@ -87,37 +99,51 @@ function KartuAnggota({ timId, bisa, posisi, a }: { timId: string; bisa: boolean
             {a.tanggalLahir && <> · Lahir {formatTanggal(a.tanggalLahir)}</>}
           </div>
         </div>
-        <div
-          className={cn(
-            "mt-auto flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-semibold",
-            a.sesuai ? "bg-green-100 border-green-300 text-green-800" : "border-neutral-300 text-gray-600"
-          )}
-        >
-          <input
-            type="checkbox"
-            checked={a.sesuai}
+        {/* Anggota tidak hadir ≠ tim tidak hadir: tim tetap ikut lomba. Ketuk lagi untuk menghapus tanda. */}
+        <div className="mt-auto grid grid-cols-2 gap-1.5">
+          <button
+            type="button"
             disabled={!bisa || loading}
-            onChange={toggle}
-            className="w-5 h-5 accent-green-600"
-          />
-          Sesuai
+            onClick={() => ubah(sesuai ? null : "SESUAI")}
+            className={cn(
+              "rounded-lg border px-2 py-2 text-sm font-semibold disabled:opacity-60",
+              sesuai ? "bg-green-600 border-green-600 text-white" : "border-neutral-300 text-gray-700 hover:bg-green-50"
+            )}
+          >
+            ✓ Sesuai
+          </button>
+          <button
+            type="button"
+            disabled={!bisa || loading}
+            onClick={() => ubah(absen ? null : "TIDAK_HADIR")}
+            className={cn(
+              "rounded-lg border px-2 py-2 text-sm font-semibold disabled:opacity-60",
+              absen ? "bg-orange-500 border-orange-500 text-white" : "border-neutral-300 text-gray-700 hover:bg-orange-50"
+            )}
+          >
+            Tidak hadir
+          </button>
         </div>
-        {a.sesuai && a.olehNama && <div className="text-[11px] text-gray-400">dicentang {a.olehNama}</div>}
+        {a.status && a.olehNama && <div className="text-[11px] text-gray-400">ditandai {a.olehNama}</div>}
       </div>
-    </label>
+    </div>
   );
 }
 
-export default function PresensiTim({ tim, presensi, slot }: Props) {
+export default function PresensiTim({ tim, presensi, slot, gugur, nilaiDipublish }: Props) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
 
   const ringkas = ringkasPresensi(
     tim.tipe_tim,
-    new Map(slot.filter((s) => s.anggota).map((s) => [s.posisi, s.anggota!.sesuai]))
+    new Map(slot.filter((s) => s.anggota).map((s) => [s.posisi, s.anggota!.status]))
   );
-  const kondisi = kondisiTim(!!presensi, ringkas);
-  const belum = slot.filter((s) => s.anggota && !s.anggota.sesuai).length;
+  const tGugur = !!gugur.gugurAt;
+  const kondisi = kondisiTim(!!presensi, ringkas, tGugur);
+  // Tim mundur / tidak hadir tidak dicentang (server juga menolak).
+  const bisaCentang = tim.confirmed && !tGugur;
+  // "Centang semua sesuai" hanya mengisi anggota yang BELUM dicek (yang ditandai tidak hadir tidak berubah).
+  const belum = slot.filter((s) => s.anggota && !s.anggota.status).length;
 
   async function jalankan(aksi: () => Promise<{ success: boolean; message?: string }>, sukses: string) {
     setLoading(true);
@@ -153,6 +179,12 @@ export default function PresensiTim({ tim, presensi, slot }: Props) {
             <span className="text-sm font-semibold">
               {ringkas.sesuai}/{ringkas.total} sesuai
             </span>
+            {ringkas.tidakHadir > 0 && (
+              <span className="text-sm text-orange-700 font-semibold">· {ringkas.tidakHadir} anggota tidak hadir</span>
+            )}
+            {ringkas.belumDicek > 0 && presensi && (
+              <span className="text-sm text-gray-500">· {ringkas.belumDicek} belum dicek</span>
+            )}
             {ringkas.slotKosong > 0 && <span className="text-sm text-red-600">· {ringkas.slotKosong} slot kosong</span>}
           </div>
         </div>
@@ -167,14 +199,14 @@ export default function PresensiTim({ tim, presensi, slot }: Props) {
                 </div>
               )}
               <div className="flex flex-wrap justify-end gap-2">
-                {belum > 0 && (
+                {belum > 0 && bisaCentang && (
                   <button
                     type="button"
                     disabled={loading}
                     onClick={() => jalankan(() => centangSemuaSesuai(tim.id), "Semua anggota dicentang sesuai")}
                     className={cn(btnCls, "bg-green-600 text-white hover:bg-green-700")}
                   >
-                    Centang Semua Sesuai
+                    Sisanya Sesuai ({belum})
                   </button>
                 )}
                 {presensi && (
@@ -196,9 +228,18 @@ export default function PresensiTim({ tim, presensi, slot }: Props) {
         </div>
       </div>
 
+      <StatusGugurTim
+        timId={tim.id}
+        namaTim={tim.nama_tim}
+        confirmed={tim.confirmed}
+        data={gugur}
+        sudahPresensi={!!presensi}
+        nilaiDipublish={nilaiDipublish}
+      />
+
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
         {slot.map((s) => (
-          <KartuAnggota key={s.posisi} timId={tim.id} bisa={tim.confirmed} posisi={s.posisi} a={s.anggota} />
+          <KartuAnggota key={s.posisi} timId={tim.id} bisa={bisaCentang} posisi={s.posisi} a={s.anggota} />
         ))}
       </div>
     </div>

@@ -1,4 +1,5 @@
 import prisma from "@/lib/prisma";
+import { TIM_IKUT_LOMBA } from "@/lib/gugurTim";
 import { Prisma } from "@prisma/client";
 
 // ─── Nilai Diskrit Master ─────────────────────────────────────────────────────
@@ -81,11 +82,14 @@ export async function deleteJuriKategori(id: string) {
 
 // ─── PenilaianBaru ────────────────────────────────────────────────────────────
 
+// Hanya tim yang ikut lomba (terkonfirmasi & tidak mundur/tidak hadir): konfirmasi
+// bisa dibatalkan / tim bisa gugur setelah sempat dinilai, dan tim itu tidak boleh
+// ikut rekap, ranking, juara, maupun pengumuman.
 export async function findPenilaianBarus(
   where?: Prisma.PenilaianBaruWhereInput
 ) {
   return prisma.penilaianBaru.findMany({
-    where,
+    where: { AND: [where ?? {}, { tim: TIM_IKUT_LOMBA }] },
     include: {
       tim: true,
       nilaiJuri: { include: { juri: true, subKategori: true } },

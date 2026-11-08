@@ -15,6 +15,7 @@ type Baris = {
   hadirAt: string | null;
   ringkas: RingkasanPresensi;
   kondisi: KondisiTim;
+  labelGugur: string | null;
 };
 
 const inputCls =
@@ -80,11 +81,11 @@ export default function DaftarPresensi({ tims }: { tims: Baris[] }) {
             </div>
             {t.hadirAt && (
               <div className="text-sm text-gray-500">
-                {t.ringkas.sesuai}/{t.ringkas.total} sesuai · hadir {jamWIB(t.hadirAt)}
+                {t.ringkas.sesuai}/{t.ringkas.total} sesuai{t.ringkas.tidakHadir > 0 && ` · ${t.ringkas.tidakHadir} anggota tidak hadir`} · hadir {jamWIB(t.hadirAt)}
               </div>
             )}
             <span className={cn("text-xs border rounded-full px-2.5 py-1", KONDISI_TIM[t.kondisi].cls)}>
-              {KONDISI_TIM[t.kondisi].label}
+              {t.labelGugur ?? KONDISI_TIM[t.kondisi].label}
             </span>
           </Link>
         ))}

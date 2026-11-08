@@ -136,6 +136,11 @@ export async function getDynamicQrisVoting(amount: number) {
 
 // ─── Publik: Kirim Dukungan (Vote Berbayar) ──────────────────────────────────
 
+// Kode unik pembayaran vote: 100–300 (permintaan panitia), ditambahkan ke nominal transfer.
+const KODE_VOTE_MIN = 100;
+const KODE_VOTE_MAX = 300;
+const RENTANG_KODE_VOTE = KODE_VOTE_MAX - KODE_VOTE_MIN + 1;
+
 // Memesan nomor urut (kode unik) pembayaran secara atomik, dipanggil saat user
 // memilih tim — sebelum mengisi form & mengunggah bukti transfer QRIS.
 export async function reserveKodeVoting() {
@@ -146,11 +151,21 @@ export async function reserveKodeVoting() {
     if (!konfig) return { success: false, message: "Voting dukungan belum/tidak dibuka" };
     const status = await cekJendelaVoting(konfig);
     if (!status.open) return { success: false, message: status.message };
-    const updated = await prisma.konfigVoting.update({
-      where: { id: "singleton" },
-      data: { counterUrut: { increment: 1 } },
-    });
-    const kodeUnik = String(updated.counterUrut).padStart(3, "0");
+    // Kode unik berputar di 100–300 (KODE_VOTE_MIN..MAX) dari counter berurutan;
+    // kode yang masih dipakai transaksi PENDING dilewati supaya nominal transfer
+    // yang sedang menunggu verifikasi tidak kembar.
+    let kodeUnik: string | null = null;
+    for (let i = 0; i < RENTANG_KODE_VOTE && !kodeUnik; i++) {
+      const updated = await prisma.konfigVoting.update({
+        where: { id: "singleton" },
+        data: { counterUrut: { increment: 1 } },
+      });
+      const calon = String(KODE_VOTE_MIN + ((updated.counterUrut - 1) % RENTANG_KODE_VOTE));
+      const dipakai = await prisma.transaksiVoting.findFirst({ where: { kodeUnik: calon, status: "PENDING" }, select: { id: true } });
+      if (!dipakai) kodeUnik = calon;
+    }
+    if (!kodeUnik)
+      return { success: false, message: "Antrean pembayaran sedang penuh, coba lagi beberapa menit lagi" };
     return { success: true, kodeUnik, hargaSatuan: konfig.nominalVote, ...terbitkanTokenKode(kodeUnik) };
   } catch (e) {
     console.error("reserveKodeVoting error:", e);
@@ -205,12 +220,15 @@ export async function submitVote(data: FormData) {
   // Pastikan kodeUnik benar-benar pernah di-reserve (bukan dikarang klien) dan
   // belum dipakai transaksi lain — mencegah dua transaksi bertabrakan nominal
   // transfernya, yang akan membingungkan admin saat rekonsiliasi manual.
-  const konfigCheck = await prisma.konfigVoting.findUnique({ where: { id: "singleton" } });
-  if (!konfigCheck || parseInt(kodeUnik) < 1 || parseInt(kodeUnik) > konfigCheck.counterUrut) {
+  // Asal kode sudah dijamin token bertanda tangan (cekTokenKode di atas); di sini
+  // cukup rentang 100–300. Kode berputar, jadi yang dicek hanya transaksi PENDING
+  // (yang VERIFIED sudah selesai dicocokkan admin, kodenya boleh dipakai lagi).
+  const kodeAngka = parseInt(kodeUnik);
+  if (kodeAngka < KODE_VOTE_MIN || kodeAngka > KODE_VOTE_MAX) {
     return { success: false, message: "Kode pembayaran tidak valid, silakan ulangi dari pemilihan tim" };
   }
   const kodeDipakai = await prisma.transaksiVoting.findFirst({
-    where: { kodeUnik, status: { in: ["PENDING", "VERIFIED"] } },
+    where: { kodeUnik, status: "PENDING" },
   });
   if (kodeDipakai) {
     return { success: false, message: "Kode pembayaran sudah terpakai, silakan ulangi dari pemilihan tim untuk mendapat kode baru" };
@@ -223,7 +241,7 @@ export async function submitVote(data: FormData) {
     if (!status.open) return { success: false, message: status.message };
 
     const tim = await prisma.tim.findUnique({ where: { id: timId } });
-    if (!tim || !tim.confirmed) return { success: false, message: "Tim tidak ditemukan" };
+    if (!tim || !tim.confirmed || tim.gugurTanpaVote) return { success: false, message: "Tim tidak ditemukan" };
 
     let buktiUrl: string | undefined;
     if (buktiAda) {

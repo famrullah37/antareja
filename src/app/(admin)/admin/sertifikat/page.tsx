@@ -10,7 +10,8 @@ const JENJANG_LIST = ["SD", "SMP", "SMA", "PURNA"] as const;
 
 export default async function SertifikatPage() {
   const [tims, sertifikats, konfigs] = await Promise.all([
-    findTims(),
+    // Tim mundur / tidak hadir tidak mendapat sertifikat (lib/gugurTim.ts).
+    findTims({ gugurAt: null }),
     findSertifikats(),
     findKonfigJuaras({ jenisJuara: "PERINGKAT" }),
   ]);

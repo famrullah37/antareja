@@ -1,4 +1,5 @@
 import prisma from "@/lib/prisma";
+import { TIM_IKUT_LOMBA } from "@/lib/gugurTim";
 import { Jenjang, Prisma } from "@prisma/client";
 import { bandingkanRanking, nilaiPenentuSeri } from "@/lib/rankingNilai";
 
@@ -35,7 +36,8 @@ export async function deleteKonfigJuara(where: Prisma.KonfigJuaraWhereUniqueInpu
 // Dulu parameter ini diabaikan sehingga centang kategori tidak berpengaruh.
 export async function getRankingPerJenjang(jenjang: Jenjang, kategoriList: string[]) {
   const penilaians = await prisma.penilaianBaru.findMany({
-    where: { tim: { jenjang } },
+    // Tim batal konfirmasi / mundur / tidak hadir tidak ikut jadi juara (juga sertifikat).
+    where: { tim: { jenjang, ...TIM_IKUT_LOMBA } },
     include: {
       tim: true,
       nilaiJuri: { select: { nilaiDipilih: true, subKategori: { select: { kategori: true } } } },

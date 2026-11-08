@@ -16,9 +16,11 @@ import JuriKategoriSection from "./components/JuriKategoriSection";
 import KategoriLombaSection from "./components/KategoriLombaSection";
 import RankingSection from "./components/RankingSection";
 import { hitungKelengkapanNilai, ringkasKosong } from "@/lib/kelengkapanNilai";
+import { labelGugur } from "@/lib/gugurTim";
+import prisma from "@/lib/prisma";
 
 export default async function PenilaianBaruPage() {
-  const [nilaiMasters, subKategoris, pelanggarans, juris, juriKategoris, kategoriLombas, penilaians, kelengkapan] =
+  const [nilaiMasters, subKategoris, pelanggarans, juris, juriKategoris, kategoriLombas, penilaians, kelengkapan, timGugur] =
     await Promise.all([
       findNilaiDiskritMasters(),
       findSubKategoriMasters(),
@@ -28,6 +30,11 @@ export default async function PenilaianBaruPage() {
       findKategoriLombas(),
       findPenilaianBarus(),
       hitungKelengkapanNilai(),
+      prisma.tim.findMany({
+        where: { confirmed: true, gugurAt: { not: null } },
+        select: { id: true, nama_tim: true, asal_sekolah: true, jenjang: true, noUrut: true, gugurJenis: true },
+        orderBy: [{ jenjang: "asc" }, { noUrut: "asc" }],
+      }),
     ]);
   // Tim terkonfirmasi yang belum punya satu nilai pun — tidak muncul di tabel rekap.
   const adaPenilaian = new Set(penilaians.map((p) => p.timId));
@@ -60,6 +67,11 @@ export default async function PenilaianBaruPage() {
           timId: k.timId,
           jenjang: k.jenjang,
           label: `${k.jenjang}-${String(k.noUrut ?? "?").padStart(2, "0")} ${k.namaTim} — ${k.asalSekolah}`,
+        }))}
+        timGugur={timGugur.map((t) => ({
+          timId: t.id,
+          label: `${t.jenjang}-${String(t.noUrut ?? "?").padStart(2, "0")} ${t.nama_tim} — ${t.asal_sekolah}`,
+          status: labelGugur(t.gugurJenis),
         }))}
       />
     </div>

@@ -12,13 +12,15 @@ import {
 import { notFound, redirect } from "next/navigation";
 import InputNilaiForm from "./InputNilaiForm";
 import MasukanSuaraJuri from "./MasukanSuaraJuri";
+import Link from "next/link";
+import { labelGugur } from "@/lib/gugurTim";
 
 export default async function InputNilaiPage({
   params,
   searchParams,
 }: {
   params: { timId: string };
-  searchParams?: { juri?: string };
+  searchParams?: { juri?: string; kategori?: string };
 }) {
   const timParam = await findTimByNoUrutParam(params.timId);
   if (!timParam) return notFound();
@@ -67,6 +69,25 @@ export default async function InputNilaiPage({
     ]);
 
   if (!tim) return notFound();
+
+  // Tim mundur / tidak hadir tidak dinilai (server juga menolak, lib/gugurTim.ts).
+  if (!tim.confirmed || tim.gugurAt) {
+    return (
+      <div className="max-w-4xl mx-auto py-6 flex flex-col gap-4">
+        <h1 className="text-2xl font-bold">
+          {tim.noUrut != null ? `${tim.jenjang}-${String(tim.noUrut).padStart(2, "0")}` : "Belum ada No. Urut"}
+        </h1>
+        <div className="bg-red-50 border border-red-200 text-red-800 rounded-xl p-5 text-sm">
+          {tim.gugurAt
+            ? `Tim ini ditandai "${labelGugur(tim.gugurJenis)}" — tidak dinilai.`
+            : "Pembayaran tim ini belum terkonfirmasi — tidak dinilai."}{" "}
+          <Link href="/admin/penilaian-baru/input" className="underline font-semibold">
+            Kembali ke daftar tim
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   const penilaian = await findPenilaianBaru({ timId: timParam.id });
   const suaraSaya = penilaian?.masukanSuara.find((m) => m.juriId === juriAktif?.id);
@@ -133,6 +154,7 @@ export default async function InputNilaiPage({
         pelanggarans={pelanggarans}
         juriKategoris={juriKategoris}
         existing={existing}
+        kategoriAwal={searchParams?.kategori}
       />
     </div>
   );
