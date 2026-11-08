@@ -2,7 +2,7 @@ import { getToken } from "next-auth/jwt";
 import { NextRequest, NextResponse } from "next/server";
 
 // Juri hanya halaman input nilai — "/admin/penilaian-baru" (konfigurasi + ranking
-// semua tim) dan "/admin/penilaian" (sistem lama) memuat nama sekolah & nilai juri lain.
+// semua tim) memuat nama sekolah & nilai juri lain.
 const JURI_ROUTES = ["/admin/penilaian-baru/input"];
 // Petugas tiket hanya POS (bukan manajemen tiket, verifikasi pembayaran, atau scanner).
 const TIKET_ROUTES = ["/admin/tiket/pos"];
@@ -13,7 +13,6 @@ const SIE_LOMBA_ROUTES = [
   "/admin/tim",
   "/admin/presensi-dp",
   "/admin/juri",
-  "/admin/penilaian",
   "/admin/penilaian-baru",
   "/admin/penghargaan",
   "/admin/sertifikat",
@@ -61,6 +60,14 @@ export default async function middleware(req: NextRequest) {
       return NextResponse.redirect(new URL(STAFF_HOME[role] ?? "/admin", req.url));
     }
     return NextResponse.next();
+  }
+
+  // Sistem penilaian LAMA (single-admin, tabel Penilaian) sudah diganti
+  // /admin/penilaian-baru — dialihkan untuk semua role supaya pengguna tidak
+  // bingung ada dua menu penilaian. Kodenya dibersihkan setelah lomba.
+  if (pathname === "/admin/penilaian" || pathname.startsWith("/admin/penilaian/")) {
+    const tujuan = role === "ADMIN" || role === "SIE_LOMBA" ? "/admin/penilaian-baru" : STAFF_HOME[role] ?? "/";
+    return NextResponse.redirect(new URL(tujuan, req.url));
   }
 
   if (pathname.startsWith("/admin")) {
