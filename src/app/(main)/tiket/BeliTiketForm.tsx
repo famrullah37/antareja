@@ -40,7 +40,7 @@ export default function BeliTiketForm({
   pilihAwal: string | null;
 }) {
   // Tiket wajib hanya bisa dipilih akun tim, satu pesanan aktif per tim.
-  const terkunci = (t: Tiket) => t.khususTim && (!punyaTim || sudahDipesan.includes(t.id));
+  const terkunci = (t: Tiket) => t.sisa <= 0 || (t.khususTim && (!punyaTim || sudahDipesan.includes(t.id)));
   // ?pilih=<id> (dari dashboard tim): langsung terpilih kalau boleh dipilih.
   const awal = tikets.find((t) => t.id === pilihAwal && !terkunci(t)) ?? null;
   const [selected, setSelected] = useState<Tiket | null>(awal);
@@ -205,13 +205,13 @@ export default function BeliTiketForm({
                 Bundling: +{formatRupiah(t.bundleHarga)} dapat {t.bundleIsi}
               </div>
             ) : null}
-            <div className="text-xs text-gray-400 mt-1">
-              Sisa: {t.sisa} tiket
+            <div className={`text-xs mt-1 ${t.sisa <= 0 ? "font-semibold text-red-600" : "text-gray-400"}`}>
+              {t.sisa <= 0 ? "Tiket habis" : `Sisa: ${t.sisa} tiket`}
             </div>
             {t.khususTim && (
               <div className="text-xs text-gray-600 mt-1">Wajib {t.jumlahPerTim} tiket per tim</div>
             )}
-            {dikunci && (
+            {dikunci && t.sisa > 0 && (
               <div className="text-xs text-gray-600 mt-2">
                 {dipesan
                   ? "Tim kamu sudah memesan tiket ini — cek status di dashboard tim."

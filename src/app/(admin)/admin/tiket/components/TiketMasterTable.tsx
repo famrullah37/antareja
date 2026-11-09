@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { deleteTiketAdmin, setKhususTimTiket, updateBundlingTiket } from "@/actions/Tiket";
+import { deleteTiketAdmin, setKhususTimTiket, tambahKuotaTiket, updateBundlingTiket } from "@/actions/Tiket";
 import { Tiket } from "@prisma/client";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -23,6 +23,18 @@ export default function TiketMasterTable({ tikets }: { tikets: Tiket[] }) {
       toast.success("Bundling disimpan", { id: toastId });
       setEditBundling(null);
     } else toast.error("Gagal menyimpan bundling", { id: toastId });
+  }
+
+  const [editKuota, setEditKuota] = useState<string | null>(null);
+
+  async function handleTambahKuota(data: FormData, id: string) {
+    const tambahan = parseInt((data.get("tambahan") as string) || "0");
+    const toastId = toast.loading("Menambah kuota...");
+    const result = await tambahKuotaTiket(id, tambahan);
+    if (result.success) {
+      toast.success(`Kuota ditambah ${tambahan} tiket`, { id: toastId });
+      setEditKuota(null);
+    } else toast.error(result.message ?? "Gagal menambah kuota", { id: toastId });
   }
 
   const [editWajib, setEditWajib] = useState<string | null>(null);
@@ -72,8 +84,42 @@ export default function TiketMasterTable({ tikets }: { tikets: Tiket[] }) {
             <tr key={t.id} className="bg-white">
               <td className="px-4 py-3 font-medium">{t.jenis}</td>
               <td className="px-4 py-3">{formatRupiah(t.harga)}</td>
-              <td className="px-4 py-3">{t.kuota}</td>
-              <td className="px-4 py-3">{t.sisa}</td>
+              <td className="px-4 py-3">
+                {editKuota === t.id ? (
+                  <form action={(data) => handleTambahKuota(data, t.id)} className="flex flex-wrap items-center gap-2">
+                    <span className="text-xs text-neutral-500">{t.kuota} +</span>
+                    <input
+                      name="tambahan"
+                      type="number"
+                      min={1}
+                      max={10000}
+                      required
+                      autoFocus
+                      className="border border-neutral-200 rounded-lg px-2 py-1 text-xs w-20"
+                    />
+                    <button type="submit" className="text-green-600 hover:underline text-xs">
+                      Simpan
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditKuota(null)}
+                      className="text-neutral-500 hover:underline text-xs"
+                    >
+                      Batal
+                    </button>
+                  </form>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <span>{t.kuota}</span>
+                    <button onClick={() => setEditKuota(t.id)} className="text-blue-500 hover:underline text-xs">
+                      + Tambah
+                    </button>
+                  </div>
+                )}
+              </td>
+              <td className={`px-4 py-3 ${t.sisa <= 0 ? "font-semibold text-red-600" : ""}`}>
+                {t.sisa <= 0 ? "Habis" : t.sisa}
+              </td>
               <td className="px-4 py-3">
                 {editWajib === t.id ? (
                   <form action={(data) => handleSaveWajib(data, t.id)} className="flex flex-wrap items-center gap-2">

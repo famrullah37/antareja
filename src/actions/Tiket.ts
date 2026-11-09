@@ -81,6 +81,17 @@ async function pesananWajibAktif(
   return n > 0;
 }
 
+// Tiket yang sedang "ditahan" pesanan online PENDING. `sisa` baru dipotong saat
+// admin memverifikasi, jadi tanpa ini pesanan yang menunggu verifikasi tidak
+// dihitung dan tiket yang sebenarnya sudah habis tetap bisa dipesan.
+async function jumlahTertahan(db: Pick<typeof prisma, "transaksiTiket">, tiketId: string) {
+  const agg = await db.transaksiTiket.aggregate({
+    where: { tiketId, status: "PENDING" },
+    _sum: { jumlah: true },
+  });
+  return agg._sum.jumlah ?? 0;
+}
+
 // Jumlah tiket wajib per tim dari form admin (minimal 1).
 function parseJumlahPerTim(data: FormData) {
   const n = parseInt((data.get("jumlahPerTim") as string) || "1");
@@ -118,11 +129,42 @@ export async function updateTiketAdmin(data: FormData, id: string) {
   const jenis = data.get("jenis") as string;
   const harga = parseInt(data.get("harga") as string);
   const kuota = parseInt(data.get("kuota") as string);
+  if (!Number.isInteger(kuota) || kuota < 0) return { success: false, message: "Kuota tidak valid" };
   try {
-    await updateTiket({ id }, { jenis, harga, kuota, ...parseBundling(data) });
+    // Ubah kuota → sisa ikut bergeser sebesar selisihnya (dulu sisa tidak ikut
+    // berubah, jadi menurunkan kuota tidak membuat tiket habis).
+    await prisma.$transaction(async (tx) => {
+      const lama = await tx.tiket.findUnique({ where: { id }, select: { kuota: true, sisa: true } });
+      if (!lama) throw new Error("TIKET_TIDAK_DITEMUKAN");
+      const sisa = Math.max(0, lama.sisa + (kuota - lama.kuota));
+      await tx.tiket.update({ where: { id }, data: { jenis, harga, kuota, sisa, ...parseBundling(data) } });
+    });
+    revalidatePath("/tiket");
     revalidatePath("/admin/tiket");
     return { success: true };
   } catch { return { success: false }; }
+}
+
+// Tambah stok tiket (mis. saat sudah habis) — kuota & sisa naik bersamaan secara
+// atomik. Hanya penambahan; tidak bisa mengurangi supaya tiket yang sudah
+// terjual/terverifikasi tidak ikut "hilang".
+export async function tambahKuotaTiket(id: string, tambahan: number) {
+  await requireAdmin();
+  if (!Number.isInteger(tambahan) || tambahan < 1 || tambahan > 10000)
+    return { success: false, message: "Jumlah tambahan tidak valid (1–10.000)" };
+  try {
+    const tiket = await prisma.tiket.update({
+      where: { id },
+      data: { kuota: { increment: tambahan }, sisa: { increment: tambahan } },
+    });
+    await catatLog("TAMBAH_KUOTA_TIKET", `Tiket ${tiket.jenis}: +${tambahan} (kuota ${tiket.kuota}, sisa ${tiket.sisa})`);
+    revalidatePath("/admin/tiket");
+    revalidatePath("/admin/tiket/pos");
+    revalidatePath("/tiket");
+    return { success: true };
+  } catch {
+    return { success: false };
+  }
 }
 
 export async function updateBundlingTiket(data: FormData, id: string) {
@@ -301,7 +343,8 @@ export async function beliTiket(data: FormData) {
       return { success: false, message: "Tim kamu sudah memesan tiket wajib ini — cek di dashboard tim" };
     }
   }
-  if (tiketCek.sisa < jumlah) return { success: false, message: "Stok tiket tidak mencukupi" };
+  if (tiketCek.sisa - (await jumlahTertahan(prisma, tiketId)) < jumlah)
+    return { success: false, message: "Stok tiket tidak mencukupi" };
 
   // Upload bukti dulu sebelum transaksi DB
   let buktiUrl: string | undefined;
@@ -317,12 +360,15 @@ export async function beliTiket(data: FormData) {
   }
 
   try {
-    // Atomic: decrement sisa hanya jika cukup, lalu buat transaksi
+    // Atomic: kunci per tiket supaya dua pesanan bersamaan tidak sama-sama lolos
+    // cek stok, lalu stok tersedia = sisa − pesanan PENDING (sisa baru dipotong
+    // saat verifikasi).
     const dibuat = await prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT 1 FROM (SELECT pg_advisory_xact_lock(hashtext(${`tiket-stok:${tiketId}`}))) AS kunci`;
       const tiket = await tx.tiket.findUnique({ where: { id: tiketId } });
       if (!tiket) throw new Error("TIKET_TIDAK_DITEMUKAN");
       if (jumlah < 1) throw new Error("JUMLAH_INVALID");
-      if (tiket.sisa < jumlah) throw new Error("STOK_KURANG");
+      if (tiket.sisa - (await jumlahTertahan(tx, tiketId)) < jumlah) throw new Error("STOK_KURANG");
       if (!Number.isInteger(bundleJumlah) || bundleJumlah < 0 || bundleJumlah > jumlah)
         throw new Error("BUNDLE_INVALID");
       if (bundleJumlah > 0 && !punyaBundling(tiket)) throw new Error("BUNDLE_INVALID");
