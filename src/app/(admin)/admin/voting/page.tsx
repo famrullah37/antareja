@@ -4,6 +4,7 @@ import { findKonfigTiket } from "@/queries/tiket.query";
 import { H1 } from "@/app/components/global/Text";
 import KonfigVotingForm from "./components/KonfigVotingForm";
 import TransaksiVotingTable from "./components/TransaksiVotingTable";
+import CocokkanNominalVoting from "./components/CocokkanNominalVoting";
 
 export default async function AdminVotingPage() {
   const [konfig, transaksis, tims, konfigTiket] = await Promise.all([
@@ -44,6 +45,8 @@ export default async function AdminVotingPage() {
           </div>
         </div>
       </div>
+
+      <CocokkanNominalVoting />
 
       <div>
         <h2 className="text-xl font-semibold mb-3">Transaksi Dukungan</h2>

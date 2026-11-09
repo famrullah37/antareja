@@ -311,6 +311,110 @@ export async function verifikasiVoting(transaksiId: string) {
   }
 }
 
+// ─── Admin: Pencocokan Nominal (semi-otomatis) ───────────────────────────────
+//
+// Admin menyalin daftar nominal masuk dari riwayat QRIS di aplikasi merchant,
+// sistem mencocokkan ke transaksi PENDING yang nominalnya TEPAT sama. Sesuai
+// aturan panitia, hanya transaksi yang ada bukti yang boleh diverifikasi lewat
+// jalur ini; yang cocok tapi tanpa bukti ditampilkan terpisah untuk manual.
+
+// "Rp 10.123", "10123", "10.123,00" → 10123. Format Indonesia: titik = ribuan,
+// koma = desimal (sen dibuang).
+function parseNominal(token: string): number | null {
+  let t = token.replace(/rp\.?/gi, "").trim();
+  if (!t) return null;
+  t = t.replace(/,\d{1,2}$/, "");
+  const digit = t.replace(/\D/g, "");
+  if (!digit) return null;
+  const n = parseInt(digit, 10);
+  return Number.isSafeInteger(n) && n > 0 ? n : null;
+}
+
+export type HasilCocokVoting = {
+  cocok: {
+    nominal: number;
+    id: string;
+    nama: string;
+    tim: string;
+    kategori: string;
+    jumlahVote: number;
+    kodeUnik: string;
+    bukti: string;
+  }[];
+  tanpaBukti: { nominal: number; nama: string; tim: string; kodeUnik: string }[];
+  tidakCocok: number[];
+};
+
+export async function cocokkanNominalVoting(
+  teks: string
+): Promise<{ success: true; hasil: HasilCocokVoting } | { success: false; message: string }> {
+  await requireAdminOrBendahara();
+  // Satu nominal per baris (atau dipisah titik koma / tab). Koma TIDAK dipakai
+  // sebagai pemisah karena di format Indonesia koma adalah desimal.
+  const nominals = (teks || "")
+    .split(/[\n;\t]+/)
+    .map(parseNominal)
+    .filter((n): n is number => n !== null);
+  if (nominals.length === 0) return { success: false, message: "Tidak ada nominal yang terbaca" };
+  if (nominals.length > 1000) return { success: false, message: "Maksimal 1.000 nominal sekali cocok" };
+
+  const kandidat = await prisma.transaksiVoting.findMany({
+    where: { status: "PENDING", totalBayar: { in: Array.from(new Set(nominals)) } },
+    orderBy: { createdAt: "asc" },
+    include: { tim: { select: { nama_tim: true } } },
+  });
+
+  // Satu nominal masuk = satu transaksi. Kalau nominal yang sama muncul dua
+  // kali di riwayat, dua transaksi (tertua dulu) ikut dicocokkan.
+  const terpakai = new Set<string>();
+  const hasil: HasilCocokVoting = { cocok: [], tanpaBukti: [], tidakCocok: [] };
+  for (const nominal of nominals) {
+    const tr = kandidat.find((k) => k.totalBayar === nominal && !terpakai.has(k.id));
+    if (!tr) {
+      hasil.tidakCocok.push(nominal);
+      continue;
+    }
+    terpakai.add(tr.id);
+    if (tr.bukti) {
+      hasil.cocok.push({
+        nominal,
+        id: tr.id,
+        nama: tr.nama,
+        tim: tr.tim.nama_tim,
+        kategori: tr.kategori,
+        jumlahVote: tr.jumlahVote,
+        kodeUnik: tr.kodeUnik,
+        bukti: tr.bukti,
+      });
+    } else {
+      hasil.tanpaBukti.push({ nominal, nama: tr.nama, tim: tr.tim.nama_tim, kodeUnik: tr.kodeUnik });
+    }
+  }
+  return { success: true, hasil };
+}
+
+export async function verifikasiVotingMassal(ids: string[]) {
+  await requireAdminOrBendahara();
+  if (!Array.isArray(ids) || ids.length === 0) return { success: false, message: "Tidak ada transaksi dipilih" };
+  if (ids.length > 1000) return { success: false, message: "Maksimal 1.000 transaksi sekali verifikasi" };
+  // Cek ulang di server: hanya PENDING yang ada bukti (aturan panitia).
+  const layak = await prisma.transaksiVoting.findMany({
+    where: { id: { in: ids }, status: "PENDING", bukti: { not: null } },
+    select: { id: true },
+  });
+  let berhasil = 0;
+  for (const { id } of layak) {
+    try {
+      const r = await markVotingVerified(id);
+      if (r.success) berhasil++;
+    } catch (e) {
+      console.error("verifikasiVotingMassal error:", id, e);
+    }
+  }
+  revalidatePath("/admin/voting");
+  return { success: true, berhasil, gagal: ids.length - berhasil };
+}
+
 export async function rejectVoting(transaksiId: string) {
   await requireAdminOrBendahara();
   try {
