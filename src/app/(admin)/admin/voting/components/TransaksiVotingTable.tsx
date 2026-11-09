@@ -122,7 +122,9 @@ export default function TransaksiVotingTable({
                     Lihat
                   </a>
                 ) : (
-                  <span className="text-gray-300 text-xs">-</span>
+                  <span className="text-amber-600 text-xs" title="Tanpa bukti — tidak diproses otomatis">
+                    Tanpa bukti · manual
+                  </span>
                 )}
               </td>
               <td className="px-4 py-3">

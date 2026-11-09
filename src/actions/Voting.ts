@@ -136,9 +136,12 @@ export async function getDynamicQrisVoting(amount: number) {
 
 // ─── Publik: Kirim Dukungan (Vote Berbayar) ──────────────────────────────────
 
-// Kode unik pembayaran vote: 100–300 (permintaan panitia), ditambahkan ke nominal transfer.
-const KODE_VOTE_MIN = 100;
-const KODE_VOTE_MAX = 300;
+// Kode unik pembayaran vote: 0–499 (permintaan panitia), ditambahkan ke nominal transfer.
+// Transaksi diproses otomatis hanya bila ada bukti DAN nominal masuk tepat
+// sama dengan totalBayar (harga × jumlah + kode unik); selain itu diproses
+// manual oleh admin — lihat autoVerifikasiVotingByNominal.
+const KODE_VOTE_MIN = 0;
+const KODE_VOTE_MAX = 499;
 const RENTANG_KODE_VOTE = KODE_VOTE_MAX - KODE_VOTE_MIN + 1;
 
 // Memesan nomor urut (kode unik) pembayaran secara atomik, dipanggil saat user
@@ -151,7 +154,7 @@ export async function reserveKodeVoting() {
     if (!konfig) return { success: false, message: "Voting dukungan belum/tidak dibuka" };
     const status = await cekJendelaVoting(konfig);
     if (!status.open) return { success: false, message: status.message };
-    // Kode unik berputar di 100–300 (KODE_VOTE_MIN..MAX) dari counter berurutan;
+    // Kode unik berputar di 0–499 (KODE_VOTE_MIN..MAX) dari counter berurutan;
     // kode yang masih dipakai transaksi PENDING dilewati supaya nominal transfer
     // yang sedang menunggu verifikasi tidak kembar.
     let kodeUnik: string | null = null;
@@ -198,14 +201,18 @@ export async function submitVote(data: FormData) {
   }
   const kategori = kategoriRaw;
 
-  // Dukungan selalu dibayar via QRIS (lihat komentar KonfigVoting) — bukti
-  // jadi opsional karena nominal sudah unik lewat kodeUnik, admin cocokkan
-  // manual dari riwayat QRIS/mutasi rekening.
-  const buktiAda = bukti && bukti.size > 0;
-  if (buktiAda) {
-    const fileCheck = await validateUploadFile(bukti as File);
-    if (!fileCheck.valid) return { success: false, message: fileCheck.message };
+  // Bukti WAJIB (aturan panitia: yang diproses hanya yang ada bukti). Bayar
+  // selalu via QRIS, dan semua aplikasi pembayaran menyimpan riwayat transaksi,
+  // jadi pendukung selalu bisa screenshot dari sana.
+  const buktiAda = !!bukti && bukti.size > 0;
+  if (!buktiAda) {
+    return {
+      success: false,
+      message: "Bukti pembayaran wajib diunggah — bisa screenshot dari riwayat transaksi di aplikasi pembayaranmu",
+    };
   }
+  const fileCheck = await validateUploadFile(bukti as File);
+  if (!fileCheck.valid) return { success: false, message: fileCheck.message };
   if (!kodeUnik || !/^\d+$/.test(kodeUnik)) {
     return { success: false, message: "Kode pembayaran tidak valid, silakan ulangi dari pemilihan tim" };
   }
@@ -221,7 +228,7 @@ export async function submitVote(data: FormData) {
   // belum dipakai transaksi lain — mencegah dua transaksi bertabrakan nominal
   // transfernya, yang akan membingungkan admin saat rekonsiliasi manual.
   // Asal kode sudah dijamin token bertanda tangan (cekTokenKode di atas); di sini
-  // cukup rentang 100–300. Kode berputar, jadi yang dicek hanya transaksi PENDING
+  // cukup rentang 0–499. Kode berputar, jadi yang dicek hanya transaksi PENDING
   // (yang VERIFIED sudah selesai dicocokkan admin, kodenya boleh dipakai lagi).
   const kodeAngka = parseInt(kodeUnik);
   if (kodeAngka < KODE_VOTE_MIN || kodeAngka > KODE_VOTE_MAX) {
