@@ -141,7 +141,7 @@ function KartuSesi({ sesi }: { sesi: Sesi }) {
           <div>
             <div className="flex items-center gap-2">
               <h3 className="font-semibold text-lg">{sesi.nama}</h3>
-              {!sesi.aktif && <span className="text-xs bg-neutral-100 text-neutral-500 px-2 py-0.5 rounded-full">Nonaktif</span>}
+              {!sesi.aktif && <span className="text-xs bg-neutral-100 text-gray-500 px-2 py-0.5 rounded-full">Nonaktif</span>}
             </div>
             <p className="text-sm text-gray-500">Makan: {formatTanggalWib(sesi.waktu)}</p>
             <p className="text-xs text-gray-400">

@@ -90,7 +90,7 @@ export default function StatusTiketWajibTim({ baris }: { baris: BarisStatusTiket
           <tbody className="divide-y divide-neutral-100">
             {tampil.length === 0 ? (
               <tr className="bg-white">
-                <td colSpan={5} className="px-4 py-6 text-center text-neutral-400">
+                <td colSpan={5} className="px-4 py-6 text-center text-gray-400">
                   Tidak ada tim.
                 </td>
               </tr>
@@ -101,14 +101,14 @@ export default function StatusTiketWajibTim({ baris }: { baris: BarisStatusTiket
                   <tr key={b.timId} className="bg-white">
                     <td className="px-4 py-3">
                       <div className="font-medium">{b.namaTim}</div>
-                      <div className="text-xs text-neutral-500">{b.asalSekolah}</div>
+                      <div className="text-xs text-gray-500">{b.asalSekolah}</div>
                     </td>
                     <td className="px-4 py-3">{b.jenjang}</td>
                     <td className="px-4 py-3">
                       {b.confirmed ? (
                         <span className="text-xs text-green-700">Terverifikasi</span>
                       ) : (
-                        <span className="text-xs text-neutral-500">Belum terverifikasi</span>
+                        <span className="text-xs text-gray-500">Belum terverifikasi</span>
                       )}
                     </td>
                     <td className="px-4 py-3">

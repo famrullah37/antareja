@@ -71,7 +71,7 @@ export default async function AdminMakananPage() {
                     </div>
                   </div>
                   <table className="w-full text-sm">
-                    <thead className="text-neutral-500">
+                    <thead className="text-gray-500">
                       <tr>
                         <th className="px-4 py-2 text-left font-medium">Menu</th>
                         <th className="px-4 py-2 text-right font-medium">Lunas</th>

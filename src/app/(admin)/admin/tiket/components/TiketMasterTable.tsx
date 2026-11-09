@@ -87,7 +87,7 @@ export default function TiketMasterTable({ tikets }: { tikets: Tiket[] }) {
               <td className="px-4 py-3">
                 {editKuota === t.id ? (
                   <form action={(data) => handleTambahKuota(data, t.id)} className="flex flex-wrap items-center gap-2">
-                    <span className="text-xs text-neutral-500">{t.kuota} +</span>
+                    <span className="text-xs text-gray-500">{t.kuota} +</span>
                     <input
                       name="tambahan"
                       type="number"
@@ -103,7 +103,7 @@ export default function TiketMasterTable({ tikets }: { tikets: Tiket[] }) {
                     <button
                       type="button"
                       onClick={() => setEditKuota(null)}
-                      className="text-neutral-500 hover:underline text-xs"
+                      className="text-gray-500 hover:underline text-xs"
                     >
                       Batal
                     </button>
@@ -134,14 +134,14 @@ export default function TiketMasterTable({ tikets }: { tikets: Tiket[] }) {
                       defaultValue={t.jumlahPerTim}
                       className="border border-neutral-200 rounded-lg px-2 py-1 text-xs w-16"
                     />
-                    <span className="text-xs text-neutral-500">/tim</span>
+                    <span className="text-xs text-gray-500">/tim</span>
                     <button type="submit" className="text-green-600 hover:underline text-xs">
                       Simpan
                     </button>
                     <button
                       type="button"
                       onClick={() => setEditWajib(null)}
-                      className="text-neutral-500 hover:underline text-xs"
+                      className="text-gray-500 hover:underline text-xs"
                     >
                       Batal
                     </button>
@@ -188,7 +188,7 @@ export default function TiketMasterTable({ tikets }: { tikets: Tiket[] }) {
                     <button
                       type="button"
                       onClick={() => setEditBundling(null)}
-                      className="text-neutral-500 hover:underline text-xs"
+                      className="text-gray-500 hover:underline text-xs"
                     >
                       Batal
                     </button>

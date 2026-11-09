@@ -100,7 +100,7 @@ export default function Footer() {
           <div className="w-full h-[1px] bg-[#D9E1EE]"></div>
           <P className="text-sm text-neutral-600 mt-[10px]">
             Copyright&copy; Antareja 2026
-            <span className="ml-2 text-xs text-neutral-500">· {labelVersiPublik}</span>
+            <span className="ml-2 text-xs text-gray-500">· {labelVersiPublik}</span>
           </P>
         </div>
       </div>
