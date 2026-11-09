@@ -7,6 +7,7 @@ import {
   getKategoriList,
 } from "@/queries/voting.query";
 import { findKonfigTiket } from "@/queries/tiket.query";
+import { getKonfigUmum } from "@/queries/konfigUmum.query";
 import { cekJendelaVoting } from "@/actions/Voting";
 import VoteForm from "./VoteForm";
 import VotingCountdownBanner from "./VotingCountdownBanner";
@@ -78,13 +79,22 @@ export async function generateMetadata({ searchParams }: { searchParams: VoteSea
 }
 
 export default async function VotePage({ searchParams }: { searchParams: VoteSearchParams }) {
-  const [tims, konfigVoting, dantonMap, tallyMap, konfigTiket] = await Promise.all([
+  const [tims, konfigVoting, dantonMap, tallyMap, konfigTiket, konfigUmum] = await Promise.all([
     findTimsForVoting(),
     findKonfigVoting(),
     findDantonMap(),
     findVotingTallyMap(),
     findKonfigTiket(),
+    getKonfigUmum(),
   ]);
+  // Tab jenjang di /vote hanya untuk jenjang yang aktif (toggle "Jenjang Aktif"
+  // di Pengaturan). Tim di jenjang nonaktif tetap muncul di "Semua Jenjang".
+  const jenjangAktif = [
+    konfigUmum.sdAktif && "SD",
+    konfigUmum.smpAktif && "SMP",
+    konfigUmum.smaAktif && "SMA",
+    konfigUmum.purnaAktif && "PURNA",
+  ].filter((j): j is string => !!j);
   const kategoriList = getKategoriList(konfigVoting);
   // QRIS voting sengaja ikut punya Tiket/Galeri Foto Premium (satu sumber),
   // lihat komentar di schema.prisma model KonfigTiket.
@@ -126,6 +136,7 @@ export default async function VotePage({ searchParams }: { searchParams: VoteSea
             tallyMap={tallyMap}
             linkTimId={searchParams.tim ?? null}
             linkKategori={searchParams.kategori ?? null}
+            jenjangAktif={jenjangAktif}
           />
         </div>
       )}

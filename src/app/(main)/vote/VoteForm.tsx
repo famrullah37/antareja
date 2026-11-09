@@ -77,6 +77,7 @@ export default function VoteForm({
   tallyMap,
   linkTimId,
   linkKategori,
+  jenjangAktif,
 }: {
   tims: TimVote[];
   konfig: KonfigVoting;
@@ -88,6 +89,8 @@ export default function VoteForm({
   // pendukung menekan Pilih, supaya tiap klik link tidak menghabiskan kode.
   linkTimId?: string | null;
   linkKategori?: string | null;
+  // Jenjang yang aktif di Pengaturan — hanya ini yang dapat tab sendiri.
+  jenjangAktif: string[];
 }) {
   const router = useRouter();
   const [activeKategori, setActiveKategori] = useState<KategoriVoting>(
@@ -268,7 +271,7 @@ export default function VoteForm({
 
       {/* Tab Jenjang */}
       <div className="flex flex-wrap gap-2 -mt-4">
-        {JENJANG_TABS.map((j) => (
+        {JENJANG_TABS.filter((j) => j === "SEMUA" || jenjangAktif.includes(j)).map((j) => (
           <button
             key={j}
             type="button"
@@ -276,7 +279,7 @@ export default function VoteForm({
             className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
               activeJenjang === j
                 ? "bg-neutral-800 text-white"
-                : "bg-neutral-100 text-neutral-500 hover:bg-neutral-200"
+                : "bg-neutral-100 text-gray-500 hover:bg-neutral-200"
             }`}
           >
             {j === "SEMUA" ? "Semua Jenjang" : j}
