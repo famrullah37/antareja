@@ -6,6 +6,7 @@ import { addKasTransaksi } from "@/actions/Kas";
 import { useRouter } from "next-nprogress-bar";
 import * as XLSX from "xlsx";
 import { totalBayarTiket } from "@/lib/tiket";
+import type { PendapatanUsaha } from "@/queries/kas.query";
 
 type KasTransaksi = {
   id: string;
@@ -44,6 +45,7 @@ type KasData = {
   transaksiTikets: TransaksiTiket[];
   transaksiFotos: TransaksiFoto[];
   kasTransaksis: KasTransaksi[];
+  pendapatanUsaha: PendapatanUsaha[];
 };
 
 const STATUS_COLORS: Record<string, string> = {
@@ -123,8 +125,86 @@ export default function LaporanKasClient({ data }: { data: KasData }) {
       Metode: t.metodePembayaran,
     }));
 
+    const labelKategori = (k: string | null) => (k || "LAINNYA").replace(/_/g, " ");
+    const urut = [...data.kasTransaksis].sort(
+      (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+    );
+
+    // Format ribuan untuk kolom angka (indeks kolom), mulai baris ke-2.
+    function formatAngka(ws: XLSX.WorkSheet, jumlahBaris: number, kolom: number[]) {
+      for (let r = 1; r < jumlahBaris; r++) {
+        for (const c of kolom) {
+          const cell = ws[XLSX.utils.encode_cell({ r, c })];
+          if (cell && typeof cell.v === "number") cell.z = "#,##0";
+        }
+      }
+    }
+
+    // Buku kas: urut dari yang terlama, saldo berjalan, baris TOTAL di akhir.
+    // denganKategori = sheet gabungan (semua kategori) diberi kolom Kategori.
+    function bukuKas(list: KasTransaksi[], denganKategori: boolean) {
+      let saldo = 0;
+      let totalMasuk = 0;
+      let totalKeluar = 0;
+      const header = ["Tanggal", ...(denganKategori ? ["Kategori"] : []), "Keterangan", "Pemasukan", "Pengeluaran", "Saldo"];
+      const aoa: (string | number | null)[][] = [header];
+      for (const k of list) {
+        const masuk = k.tipe === "PEMASUKAN" ? k.jumlah : 0;
+        const keluar = k.tipe === "PENGELUARAN" ? k.jumlah : 0;
+        saldo += masuk - keluar;
+        totalMasuk += masuk;
+        totalKeluar += keluar;
+        aoa.push([
+          formatDate(k.createdAt),
+          ...(denganKategori ? [labelKategori(k.kategori)] : []),
+          k.keterangan,
+          masuk || null,
+          keluar || null,
+          saldo,
+        ]);
+      }
+      aoa.push(["", ...(denganKategori ? [""] : []), "TOTAL", totalMasuk, totalKeluar, saldo]);
+      const ws = XLSX.utils.aoa_to_sheet(aoa);
+      const o = denganKategori ? 1 : 0;
+      ws["!cols"] = [{ wch: 14 }, ...(denganKategori ? [{ wch: 20 }] : []), { wch: 60 }, { wch: 16 }, { wch: 16 }, { wch: 16 }];
+      formatAngka(ws, aoa.length, [2 + o, 3 + o, 4 + o]);
+      return { ws, totalMasuk, totalKeluar };
+    }
+
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), "Kas Manual");
+    XLSX.utils.book_append_sheet(wb, bukuKas(urut, true).ws, "Buku Kas");
+
+    // Kelompokkan per kategori → rekap + satu sheet rincian per kategori.
+    const perKategori = new Map<string, KasTransaksi[]>();
+    for (const k of urut) {
+      const key = labelKategori(k.kategori);
+      perKategori.set(key, [...(perKategori.get(key) ?? []), k]);
+    }
+    const kategoriUrut = Array.from(perKategori.keys()).sort((a, b) => a.localeCompare(b));
+    const sheetKategori = kategoriUrut.map((nama) => ({ nama, ...bukuKas(perKategori.get(nama)!, false) }));
+
+    const rekap: (string | number)[][] = [["Kategori", "Jumlah Transaksi", "Pemasukan", "Pengeluaran", "Selisih"]];
+    for (const s of sheetKategori)
+      rekap.push([s.nama, perKategori.get(s.nama)!.length, s.totalMasuk, s.totalKeluar, s.totalMasuk - s.totalKeluar]);
+    const tM = sheetKategori.reduce((t, s) => t + s.totalMasuk, 0);
+    const tK = sheetKategori.reduce((t, s) => t + s.totalKeluar, 0);
+    rekap.push(["TOTAL", urut.length, tM, tK, tM - tK]);
+    const wsRekap = XLSX.utils.aoa_to_sheet(rekap);
+    wsRekap["!cols"] = [{ wch: 24 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 16 }];
+    formatAngka(wsRekap, rekap.length, [2, 3, 4]);
+    XLSX.utils.book_append_sheet(wb, wsRekap, "Rekap Kategori");
+
+    // Nama sheet Excel: maks. 31 karakter, tanpa : \ / ? * [ ] dan harus unik.
+    const dipakai = new Set(["Buku Kas", "Rekap Kategori", "Rincian Kas", "Transaksi Tiket"]);
+    for (const s of sheetKategori) {
+      const dasar = s.nama.replace(/[:\\/?*[\]]/g, " ").slice(0, 28) || "LAINNYA";
+      let nama = dasar;
+      for (let i = 2; dipakai.has(nama); i++) nama = `${dasar.slice(0, 26)} ${i}`;
+      dipakai.add(nama);
+      XLSX.utils.book_append_sheet(wb, s.ws, nama);
+    }
+
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), "Rincian Kas");
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(tiketRows), "Transaksi Tiket");
     XLSX.writeFile(wb, `laporan-kas-${new Date().toISOString().slice(0, 10)}.xlsx`);
   }
@@ -159,6 +239,8 @@ export default function LaporanKasClient({ data }: { data: KasData }) {
         <SummaryCard label="Penjualan Produk (POS)" value={formatRupiah(data.totalPosProduk)} color="blue" />
         <SummaryCard label="Pemasukan Manual" value={formatRupiah(data.totalPemasukanManual)} color="orange" />
       </div>
+
+      <PendapatanBersihUsaha data={data.pendapatanUsaha} />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <SummaryCard label="Non-Tunai (Transfer/QRIS)" value={formatRupiah(data.totalOnline)} color="primary" />
@@ -466,6 +548,66 @@ export default function LaporanKasClient({ data }: { data: KasData }) {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+// Pendapatan bersih panitia dari usaha yang punya harga beli (merch, makanan,
+// POS): uang masuk − modal/vendor. Bukan pengganti Saldo Bersih kas — kalau
+// pembayaran ke vendor juga dicatat sebagai pengeluaran kas, jangan dikurangi dua kali.
+function PendapatanBersihUsaha({ data }: { data: PendapatanUsaha[] }) {
+  const total = data.reduce(
+    (t, u) => ({ masuk: t.masuk + u.masuk, modal: t.modal + u.modal, bersih: t.bersih + u.bersih, tanpa: t.tanpa + u.tanpaHargaBeli }),
+    { masuk: 0, modal: 0, bersih: 0, tanpa: 0 }
+  );
+  return (
+    <div className="bg-white rounded-xl border border-neutral-200 overflow-hidden">
+      <div className="px-5 py-3 bg-neutral-50 border-b border-neutral-100">
+        <h3 className="font-semibold">Pendapatan Bersih Panitia (Usaha)</h3>
+        <p className="text-xs text-gray-500">Uang masuk dikurangi harga beli/vendor. Hanya transaksi lunas yang tidak dibatalkan.</p>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead className="text-gray-500">
+            <tr>
+              <th className="px-5 py-2 text-left font-medium">Usaha</th>
+              <th className="px-5 py-2 text-right font-medium">Uang Masuk</th>
+              <th className="px-5 py-2 text-right font-medium">Bayar Vendor/Modal</th>
+              <th className="px-5 py-2 text-right font-medium">Pendapatan Bersih</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-neutral-100">
+            {data.map((u) => (
+              <tr key={u.nama}>
+                <td className="px-5 py-2">
+                  {u.nama}
+                  {u.tanpaHargaBeli > 0 && (
+                    <span className="block text-xs text-amber-600">{u.tanpaHargaBeli} barang/porsi tanpa harga beli</span>
+                  )}
+                </td>
+                <td className="px-5 py-2 text-right">{formatRupiah(u.masuk)}</td>
+                <td className="px-5 py-2 text-right text-orange-700">{formatRupiah(u.modal)}</td>
+                <td className={`px-5 py-2 text-right font-semibold ${u.bersih < 0 ? "text-red-600" : "text-green-700"}`}>
+                  {formatRupiah(u.bersih)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+          <tfoot className="bg-neutral-50 font-semibold">
+            <tr>
+              <td className="px-5 py-2">Total</td>
+              <td className="px-5 py-2 text-right">{formatRupiah(total.masuk)}</td>
+              <td className="px-5 py-2 text-right text-orange-700">{formatRupiah(total.modal)}</td>
+              <td className={`px-5 py-2 text-right ${total.bersih < 0 ? "text-red-600" : "text-green-700"}`}>{formatRupiah(total.bersih)}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+      {total.tanpa > 0 && (
+        <p className="px-5 py-2 text-xs bg-amber-50 text-amber-800 border-t border-amber-100">
+          Ada barang/porsi tanpa harga beli: biayanya belum terhitung, jadi pendapatan bersih terlihat lebih besar. Isi harga beli di menu masing-masing.
+        </p>
+      )}
     </div>
   );
 }
