@@ -3,6 +3,7 @@ import { totalBayarTiket } from "@/lib/tiket";
 import { hitungModalMerch, type ItemPesanan } from "@/lib/merchandise";
 import { hitungLabaMakanan, type ItemMakanan } from "@/lib/makanan";
 import { hitungLaba, type ItemPOS } from "@/lib/posProduk";
+import { hitungBagiHasilFoto } from "@/lib/bagiHasilFoto";
 
 export type PendapatanUsaha = {
   nama: string;
@@ -10,19 +11,23 @@ export type PendapatanUsaha = {
   modal: number; // harga beli × jumlah (snapshot saat transaksi)
   bersih: number; // masuk − modal
   tanpaHargaBeli: number; // jumlah barang/porsi yang harga belinya kosong
+  // Penjelasan kolom biaya bila bukan harga beli (mis. bagi hasil fotografer).
+  keteranganBiaya?: string;
 };
 
-// Pendapatan bersih panitia per unit usaha yang punya harga beli. Modal dari
-// snapshot harga beli; barang tanpa harga beli dihitung modal 0 (ditandai).
-async function getPendapatanUsaha(): Promise<PendapatanUsaha[]> {
+// Pendapatan bersih panitia per unit usaha. Modal dari snapshot harga beli;
+// barang tanpa harga beli dihitung modal 0 (ditandai). Galeri Foto: biaya =
+// bagian fotografer (bagi hasil), sisanya + kode unik = panitia.
+export async function getPendapatanUsaha(): Promise<PendapatanUsaha[]> {
   const lunas = { status: { in: ["VERIFIED", "DIAMBIL"] } };
-  const [merch, makanan, pos] = await Promise.all([
+  const [merch, makanan, pos, foto] = await Promise.all([
     prisma.pesananMerch.findMany({
       where: { status: { in: ["VERIFIED", "DIAMBIL", "DIKIRIM"] } },
       select: { items: true, totalBayar: true, ongkir: true },
     }),
     prisma.pesananMakanan.findMany({ where: lunas, select: { items: true, totalBayar: true } }),
     prisma.transaksiPOS.findMany({ where: { status: "SELESAI" }, select: { items: true, total: true } }),
+    hitungBagiHasilFoto(),
   ]);
   const baris = (nama: string, masuk: number, modal: number, tanpaHargaBeli: number) => ({
     nama, masuk, modal, bersih: masuk - modal, tanpaHargaBeli,
@@ -50,6 +55,10 @@ async function getPendapatanUsaha(): Promise<PendapatanUsaha[]> {
     baris("Merchandise (PO)", mMasuk, mModal, mTanpa),
     baris("Pemesanan Makanan", kMasuk, kModal, kTanpa),
     baris("POS Produk", pMasuk, pModal, pTanpa),
+    {
+      ...baris("Galeri Foto", foto.totalKas, foto.totalFotografer, 0),
+      keteranganBiaya: `bagi hasil fotografer ${foto.persenFotografer}%`,
+    },
   ];
 }
 

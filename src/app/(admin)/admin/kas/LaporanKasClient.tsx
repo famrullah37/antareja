@@ -572,7 +572,7 @@ function PendapatanBersihUsaha({ data }: { data: PendapatanUsaha[] }) {
     <div className="bg-white rounded-xl border border-neutral-200 overflow-hidden">
       <div className="px-5 py-3 bg-neutral-50 border-b border-neutral-100">
         <h3 className="font-semibold">Pendapatan Bersih Panitia (Usaha)</h3>
-        <p className="text-xs text-gray-500">Uang masuk dikurangi harga beli/vendor. Hanya transaksi lunas yang tidak dibatalkan.</p>
+        <p className="text-xs text-gray-500">Uang masuk dikurangi biaya (harga beli/vendor, atau bagi hasil fotografer untuk foto). Hanya transaksi lunas yang tidak dibatalkan.</p>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
@@ -580,7 +580,7 @@ function PendapatanBersihUsaha({ data }: { data: PendapatanUsaha[] }) {
             <tr>
               <th className="px-5 py-2 text-left font-medium">Usaha</th>
               <th className="px-5 py-2 text-right font-medium">Uang Masuk</th>
-              <th className="px-5 py-2 text-right font-medium">Bayar Vendor/Modal</th>
+              <th className="px-5 py-2 text-right font-medium">Biaya (Vendor/Modal/Fotografer)</th>
               <th className="px-5 py-2 text-right font-medium">Pendapatan Bersih</th>
             </tr>
           </thead>
@@ -589,6 +589,7 @@ function PendapatanBersihUsaha({ data }: { data: PendapatanUsaha[] }) {
               <tr key={u.nama}>
                 <td className="px-5 py-2">
                   {u.nama}
+                  {u.keteranganBiaya && <span className="block text-xs text-gray-500">Biaya = {u.keteranganBiaya}</span>}
                   {u.tanpaHargaBeli > 0 && (
                     <span className="block text-xs text-amber-600">{u.tanpaHargaBeli} barang/porsi tanpa harga beli</span>
                   )}
