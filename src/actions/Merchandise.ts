@@ -11,7 +11,7 @@ import { cekDataPemesan } from "@/lib/validasi";
 import { parseWibDatetimeLocal } from "@/lib/datetime";
 import { daftarUkuran, labelItems, poTerbuka, type ItemPesanan } from "@/lib/merchandise";
 import { findKonfigMerch, incrementCounterUrutMerch } from "@/queries/merchandise.query";
-import { compressPhoto, imageUploader, validateUploadFile } from "./fileUploader";
+import { compressPhoto, imageUploader, validateUploadFile, bufferBukti } from "./fileUploader";
 import { notifPembayaranMasuk } from "@/lib/emailPembayaran";
 import { cekTokenKode, terbitkanTokenKode } from "@/lib/kodeUnikToken";
 import {
@@ -300,8 +300,9 @@ export async function pesanMerchandise(data: FormData) {
   if (salahData) return { success: false, message: salahData };
   if (metodePembayaran !== "TRANSFER" && metodePembayaran !== "QRIS")
     return { success: false, message: "Metode pembayaran hanya QRIS atau Transfer" };
-  if (metodePembayaran === "TRANSFER" && (!bukti || bukti.size === 0))
-    return { success: false, message: "Bukti pembayaran wajib diunggah" };
+  // Bukti WAJIB untuk Transfer maupun QRIS (aturan panitia).
+  if (!bukti || bukti.size === 0)
+    return { success: false, message: "Bukti pembayaran wajib diunggah — untuk QRIS, screenshot bukti berhasil dari aplikasi pembayaran" };
   if (!kodeUnik || !/^\d{3}$/.test(kodeUnik))
     return { success: false, message: "Kode pembayaran tidak valid, silakan muat ulang halaman" };
   if (metodePembayaran === "QRIS") {
@@ -346,7 +347,7 @@ export async function pesanMerchandise(data: FormData) {
   if (bukti && bukti.size > 0) {
     const cek = await validateUploadFile(bukti);
     if (!cek.valid) return { success: false, message: cek.message };
-    const upload = await imageUploader(Buffer.from(await bukti.arrayBuffer()));
+    const upload = await imageUploader(await bufferBukti(bukti));
     if (upload.error) return { success: false, message: upload.message };
     buktiUrl = upload.data?.url;
   }
@@ -705,7 +706,7 @@ export async function bayarMerchReady(data: FormData) {
 
   const cek = await validateUploadFile(bukti);
   if (!cek.valid) return { success: false, message: cek.message };
-  const upload = await imageUploader(Buffer.from(await bukti.arrayBuffer()));
+  const upload = await imageUploader(await bufferBukti(bukti));
   if (upload.error) return { success: false, message: upload.message };
 
   try {

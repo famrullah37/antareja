@@ -34,7 +34,7 @@ import {
   updateTransaksiTiket,
   upsertKonfigTiket,
 } from "@/queries/tiket.query";
-import { imageUploader, validateUploadFile } from "./fileUploader";
+import { imageUploader, validateUploadFile, bufferBukti } from "./fileUploader";
 import prisma from "@/lib/prisma";
 import { escapeHtml } from "@/lib/escapeHtml";
 import { formatJamWib } from "@/lib/ujiCoba";
@@ -308,11 +308,10 @@ export async function beliTiket(data: FormData) {
   const salahData = cekDataPemesan({ nama, email, noHp });
   if (salahData) return { success: false, message: salahData };
 
-  // Bukti wajib untuk transfer manual (admin tidak punya cara lain
-  // memverifikasi) — untuk QRIS opsional karena nominal sudah unik lewat
-  // kodeUnik, admin cocokkan manual dari riwayat QRIS/mutasi rekening.
-  if (metodePembayaran !== "QRIS" && (!bukti || bukti.size === 0)) {
-    return { success: false, message: "Bukti pembayaran wajib diunggah" };
+  // Bukti WAJIB untuk Transfer maupun QRIS (aturan panitia: verifikasi
+  // berdasarkan bukti, bukan hanya mencocokkan nominal).
+  if (!bukti || bukti.size === 0) {
+    return { success: false, message: "Bukti pembayaran wajib diunggah — untuk QRIS, screenshot bukti berhasil dari aplikasi pembayaran" };
   }
   if (!kodeUnik || !/^\d{3}$/.test(kodeUnik)) {
     return { success: false, message: "Kode pembayaran tidak valid, silakan pilih ulang jumlah tiket" };
@@ -351,7 +350,7 @@ export async function beliTiket(data: FormData) {
   if (bukti && bukti.size > 0) {
     const fileCheck = await validateUploadFile(bukti);
     if (!fileCheck.valid) return { success: false, message: fileCheck.message };
-    const upload = await imageUploader(Buffer.from(await bukti.arrayBuffer()));
+    const upload = await imageUploader(await bufferBukti(bukti));
     if (upload.error) {
       console.error("Upload bukti gagal:", upload.message);
       return { success: false, message: upload.message };
@@ -420,7 +419,8 @@ export async function beliTiket(data: FormData) {
       detail: `${dibuat.jumlah}× ${dibuat.tiket.jenis}${dibuat.bundleJumlah ? ` (+${dibuat.bundleJumlah} bundling)` : ""}`,
     });
     const linkPesanan = linkPesananTiket(dibuat.id);
-    await kirimEmailPesananDiterima({
+    // Tidak ditunggu: SMTP 2–5 detik tidak perlu menahan pembeli.
+    void kirimEmailPesananDiterima({
       to: dibuat.email,
       nama: dibuat.nama,
       produk: "Tiket",
@@ -460,7 +460,7 @@ export async function uploadBuktiTiket(data: FormData) {
   if (!tr || tr.jenisJual !== "ONLINE") return { success: false, message: "Pesanan tidak ditemukan" };
   if (tr.status !== "PENDING") return { success: false, message: "Pesanan ini sudah diproses panitia" };
 
-  const upload = await imageUploader(Buffer.from(await bukti!.arrayBuffer()));
+  const upload = await imageUploader(await bufferBukti(bukti!));
   if (upload.error || !upload.data?.url) {
     console.error("Upload bukti menyusul gagal:", upload.message);
     return { success: false, message: upload.message ?? "Gagal mengunggah bukti" };

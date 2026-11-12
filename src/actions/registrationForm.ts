@@ -1,7 +1,7 @@
 "use server";
 import { batasiAksi } from "@/lib/rateLimit";
 import { Jenjang, Tipe } from "@prisma/client";
-import { imageUploader, validateUploadFile } from "./fileUploader";
+import { imageUploader, validateUploadFile, bufferBukti } from "./fileUploader";
 import { revalidatePath } from "next/cache";
 import { getServerSession } from "@/lib/next-auth";
 import prisma from "@/lib/prisma";
@@ -106,7 +106,7 @@ export default async function submitFormRegistrasi(data: FormData) {
     return { success: false, message: "Akun Anda sudah memiliki tim terdaftar." };
 
   // Upload bukti dulu sebelum masuk transaksi DB
-  const tryUploadImage = await imageUploader(Buffer.from(await bukti.arrayBuffer()));
+  const tryUploadImage = await imageUploader(await bufferBukti(bukti));
   if (tryUploadImage.error)
     return { success: false, message: "Gagal upload bukti pembayaran" };
 

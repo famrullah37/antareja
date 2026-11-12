@@ -94,6 +94,8 @@ export default function GaleriClient({
     setKodeTerbit(r);
   }
 
+  const [mengirim, setMengirim] = useState(false);
+
   async function buatKodeBaru() {
     setReservingKode(true);
     setKodeUnik(null);
@@ -162,9 +164,12 @@ export default function GaleriClient({
   }, [metode, totalBayar]);
 
   async function handleCheckout(data: FormData) {
+    // Klik ganda dulu membuat 2 transaksi → 2 email & kuitansi, kas dobel.
+    if (mengirim) return;
+    setMengirim(true);
     data.set("fotoList", JSON.stringify(Array.from(cart)));
     const toastId = toast.loading("Memproses...");
-    const result = await beliFoto(data);
+    const result = await beliFoto(data).finally(() => setMengirim(false));
     if (result.success) {
       toast.success("Pembelian diterima!", { id: toastId, duration: 4000 });
       setTransaksiId(result.transaksiId ?? null);
@@ -561,26 +566,26 @@ export default function GaleriClient({
                 {/* Bukti */}
                 <div className="flex flex-col gap-1">
                   <label className="text-sm font-medium">
-                    Bukti Transfer {metode === "TRANSFER" && <span className="text-red-500">*</span>}
+                    Bukti Pembayaran <span className="text-red-500">*</span>
                     {metode === "QRIS" && (
-                      <span className="text-xs text-gray-400 font-normal ml-1">— opsional, admin cek dari riwayat QRIS</span>
-                    )}
+                  <span className="text-xs text-gray-500 font-normal ml-1">— screenshot bukti berhasil dari aplikasi pembayaran</span>
+                )}
                   </label>
                   <input
                     name="bukti"
                     type="file"
                     accept="image/*"
-                    required={metode === "TRANSFER"}
+                    required
                     className="border border-neutral-200 py-2 px-3 rounded-xl file:bg-primary-500 file:text-white file:rounded-md file:border-none file:py-1 file:px-3 text-sm"
                   />
                 </div>
 
                 <button
                   type="submit"
-                  disabled={reservingKode || !kodeUnik}
+                  disabled={reservingKode || !kodeUnik || mengirim}
                   className="bg-primary-500 text-white rounded-xl py-3 font-bold hover:bg-primary-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Kirim Pembelian{kodeUnik ? ` — ${formatRupiah(totalBayar)}` : ""}
+                  {mengirim ? "Mengirim..." : `Kirim Pembelian${kodeUnik ? ` — ${formatRupiah(totalBayar)}` : ""}`}
                 </button>
               </form>
             </div>

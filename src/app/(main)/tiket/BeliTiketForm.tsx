@@ -436,16 +436,16 @@ export default function BeliTiketForm({
 
             <div className="flex flex-col gap-1">
               <label className="text-sm font-medium">
-                Bukti Pembayaran {metode === "TRANSFER" && <span className="text-red-500">*</span>}
+                Bukti Pembayaran <span className="text-red-500">*</span>
                 {metode === "QRIS" && (
-                  <span className="text-xs text-gray-400 font-normal ml-1">— opsional, admin cek dari riwayat QRIS</span>
+                  <span className="text-xs text-gray-500 font-normal ml-1">— screenshot bukti berhasil dari aplikasi pembayaran</span>
                 )}
               </label>
               <input
                 name="bukti"
                 type="file"
                 accept="image/*"
-                required={metode === "TRANSFER"}
+                required
                 className="border border-gray-200 py-3 px-3 rounded-xl file:bg-primary-500 file:text-white file:rounded-md file:border-none file:py-1 hover:cursor-pointer"
               />
             </div>

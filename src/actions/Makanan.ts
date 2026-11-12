@@ -8,7 +8,7 @@ import { batasiAksi } from "@/lib/rateLimit";
 import { parseWibDatetimeLocal } from "@/lib/datetime";
 import { labelItemsMakanan, MAKS_PORSI_PER_MENU, sesiTerbuka, type ItemMakanan } from "@/lib/makanan";
 import { getKonfigUmum, upsertKonfigUmum } from "@/queries/konfigUmum.query";
-import { imageUploader, validateUploadFile } from "./fileUploader";
+import { imageUploader, validateUploadFile, bufferBukti } from "./fileUploader";
 import { notifPembayaranMasuk } from "@/lib/emailPembayaran";
 import { cekTokenKode, terbitkanTokenKode } from "@/lib/kodeUnikToken";
 
@@ -309,13 +309,14 @@ export async function pesanMakanan(data: FormData): Promise<Hasil> {
   const subtotal = items.reduce((s, i) => s + i.harga * i.jumlah, 0);
   const totalBayar = subtotal + parseInt(kodeUnik, 10);
 
-  // Bayar lewat QRIS dinamis (nominal = subtotal + kode unik), jadi bendahara
-  // mencocokkan nominal di riwayat QRIS — screenshot bukti hanya opsional.
+  // Bayar lewat QRIS dinamis (nominal = subtotal + kode unik). Bukti WAJIB
+  // (aturan panitia) — bendahara memverifikasi dari bukti + riwayat QRIS.
+  if (!bukti || bukti.size === 0) return { success: false, message: "Bukti pembayaran wajib diunggah — untuk QRIS, screenshot bukti berhasil dari aplikasi pembayaran" };
   let buktiUrl: string | null = null;
   if (bukti && bukti.size > 0) {
     const cek = await validateUploadFile(bukti);
     if (!cek.valid) return { success: false, message: cek.message };
-    const upload = await imageUploader(Buffer.from(await bukti.arrayBuffer()));
+    const upload = await imageUploader(await bufferBukti(bukti));
     if (upload.error) return { success: false, message: upload.message };
     buktiUrl = upload.data!.url;
   }

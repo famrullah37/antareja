@@ -5,7 +5,7 @@ import prisma from "@/lib/prisma";
 import { getServerSession } from "@/lib/next-auth";
 import { batasiAksi } from "@/lib/rateLimit";
 import { notifPembayaranMasuk } from "@/lib/emailPembayaran";
-import { imageUploader, validateUploadFile } from "./fileUploader";
+import { imageUploader, validateUploadFile, bufferBukti } from "./fileUploader";
 
 // Peserta (tim DP yang sudah terkonfirmasi) mengunggah bukti transfer pelunasan
 // dari dashboard. Boleh diunggah ulang (menimpa) selama belum dikonfirmasi lunas
@@ -33,7 +33,7 @@ export async function kirimBuktiPelunasan(data: FormData) {
 
   const cek = await validateUploadFile(bukti);
   if (!cek.valid) return { success: false, message: cek.message };
-  const upload = await imageUploader(Buffer.from(await bukti!.arrayBuffer()));
+  const upload = await imageUploader(await bufferBukti(bukti!));
   if (upload.error) return { success: false, message: "Gagal upload bukti pelunasan" };
 
   await prisma.pembayaran.update({

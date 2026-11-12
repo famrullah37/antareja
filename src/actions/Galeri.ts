@@ -16,11 +16,12 @@ import {
 import { incrementCounterUrutFoto } from "@/queries/tiket.query";
 import { catatLog } from "@/lib/activityLog";
 import { getKonfigUmum } from "@/queries/konfigUmum.query";
-import { imageUploader, validateUploadFile } from "./fileUploader";
+import { imageUploader, validateUploadFile, bufferBukti } from "./fileUploader";
 import { addWatermark } from "@/lib/watermark";
 import { fotoGratis, MAKS_FOTO_PER_UPLOAD, type PemilikFoto } from "@/lib/galeri";
 import { sendMailTo } from "@/lib/mailer";
 import prisma from "@/lib/prisma";
+import { siteConfig } from "@/config/site";
 import { toDownloadUrl } from "@/lib/downloadUrl";
 import { escapeHtml } from "@/lib/escapeHtml";
 import { buatKuitansiFoto } from "@/lib/kuitansiPenjualan";
@@ -451,11 +452,9 @@ export async function beliFoto(data: FormData) {
   const metodePembayaran = (data.get("metodePembayaran") as string) || "TRANSFER";
   const kodeUnik = data.get("kodeUnik") as string | null;
 
-  // Bukti wajib untuk transfer manual (admin tidak punya cara lain
-  // memverifikasi) — untuk QRIS opsional karena nominal sudah unik lewat
-  // kodeUnik, admin cocokkan manual dari riwayat QRIS/mutasi rekening.
-  if (metodePembayaran !== "QRIS" && (!bukti || bukti.size === 0)) {
-    return { success: false, message: "Bukti pembayaran wajib diunggah" };
+  // Bukti WAJIB untuk Transfer maupun QRIS (aturan panitia).
+  if (!bukti || bukti.size === 0) {
+    return { success: false, message: "Bukti pembayaran wajib diunggah — untuk QRIS, screenshot bukti berhasil dari aplikasi pembayaran" };
   }
   if (
     !kodeUnik ||
@@ -523,6 +522,7 @@ export async function beliFoto(data: FormData) {
     // Cegah dua transaksi PENDING memakai kodeUnik yang sama — nominal transfer
     // harus presisi unik selama menunggu dicocokkan. Yang sudah VERIFIED tidak
     // dihitung: rentang kode cuma 200, kalau ikut dihitung kode cepat habis.
+    // Cek awal (murah) sebelum upload bukti; dicek ulang secara atomik di bawah.
     const dipakai = await prisma.transaksiFoto.findFirst({
       where: { kodeUnik, status: "PENDING" },
     });
@@ -532,12 +532,18 @@ export async function beliFoto(data: FormData) {
     if (bukti && bukti.size > 0) {
       const fileCheck = await validateUploadFile(bukti);
       if (!fileCheck.valid) return { success: false, message: fileCheck.message };
-      const upload = await imageUploader(Buffer.from(await bukti.arrayBuffer()));
+      const upload = await imageUploader(await bufferBukti(bukti));
       if (!upload.data?.url) return { success: false, message: "Upload bukti gagal" };
       buktiUrl = upload.data.url;
     }
 
-    const transaksi = await createTransaksiFoto({
+    // Kunci per kode unik: dua kiriman bersamaan (klik ganda) dengan kode yang
+    // sama tidak bisa sama-sama lolos — dulu jadi 2 transaksi, 2 email & kas dobel.
+    const transaksi = await prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${"foto:" + kodeUnik}))::text`;
+      const bentrok = await tx.transaksiFoto.findFirst({ where: { kodeUnik, status: "PENDING" }, select: { id: true } });
+      if (bentrok) throw new Error("KODE_DIPAKAI");
+      return tx.transaksiFoto.create({ data: {
       fotoList,
       harga,
       rincianAlbum,
@@ -550,7 +556,8 @@ export async function beliFoto(data: FormData) {
       namaPembeli: namaPembeli || null,
       email: email || null,
       ...(userId ? { user: { connect: { id: userId } } } : {}),
-    } as any);
+    } as any });
+    });
     notifPembayaranMasuk({
       jenis: "Foto",
       pathAdmin: "/admin/galeri/transaksi",
@@ -563,7 +570,8 @@ export async function beliFoto(data: FormData) {
       detail: `${fotoList.length} foto`,
     });
     if (email) {
-      await kirimEmailPesananDiterima({
+      // Tidak ditunggu: SMTP 2–5 detik tidak perlu menahan pembeli.
+      void kirimEmailPesananDiterima({
         to: email,
         nama: namaPembeli || "Pembeli",
         produk: "Foto",
@@ -573,7 +581,12 @@ export async function beliFoto(data: FormData) {
     }
     revalidatePath("/galeri");
     return { success: true, kodeUnik, transaksiId: (transaksi as any).id };
-  } catch { return { success: false }; }
+  } catch (e) {
+    if (e instanceof Error && e.message === "KODE_DIPAKAI")
+      return { success: false, message: "Pembelian ini sudah terkirim (kode unik sudah terpakai). Cek email Anda." };
+    console.error("beliFoto error:", e);
+    return { success: false };
+  }
 }
 
 // ─── Admin: Verifikasi Pembelian Foto ─────────────────────────────────────────
@@ -603,36 +616,61 @@ export async function verifikasiFoto(transaksiId: string) {
     await prisma.kasTransaksi.create({
       data: { tipe: "PEMASUKAN", keterangan: `Foto${pembeliInfo}${kodeInfo}`, jumlah: transaksi.harga, kategori: "FOTO", sumber: "FOTO", referensiId: transaksiId },
     });
-    const userEmail = t.email as string | null;
-    const namaPembeli = (t.namaPembeli as string | null) ?? "Pembeli";
-    if (userEmail) {
-      try {
-        const fotoIds = transaksi.fotoList as string[];
-        const fotos = await prisma.foto.findMany({ where: { id: { in: fotoIds } }, select: { id: true, pathAsli: true, tagTim: true } });
-        const baseUrl = (process.env.NEXTAUTH_URL ?? "").replace(/\/$/, "");
-        const downloadPageUrl = `${baseUrl}/galeri/download/${transaksiId}`;
-        const fotoLinks = fotos.map((f, i) =>
-          `<li style="margin-bottom:8px"><a href="${toDownloadUrl(f.pathAsli, f.tagTim ?? `Foto-${i + 1}`)}" download style="background:#F70048;color:#fff;padding:6px 14px;border-radius:6px;text-decoration:none;font-weight:bold;font-size:13px;display:inline-block">⬇ Unduh Foto ${i + 1}${f.tagTim ? ` — ${f.tagTim}` : ""}</a></li>`
-        ).join("");
-        const kuitansi = await buatKuitansiFoto(transaksiId).catch((e) => {
-          console.error("Gagal membuat kuitansi foto:", e);
-          return null;
-        });
-        await sendMailTo({
-          to: userEmail,
-          ...(kuitansi
-            ? { fileAttachments: [{ filename: kuitansi.filename, content: kuitansi.pdf, contentType: "application/pdf" }] }
-            : {}),
-          subject: `✅ Foto LPKBB Antareja 2026 — Siap Diunduh`,
-          html: `<div style="font-family:sans-serif;max-width:520px;margin:auto"><h2 style="color:#F70048">Foto Anda Siap Diunduh!</h2><p>Halo <b>${escapeHtml(namaPembeli)}</b>,</p><p>Pembayaran Anda telah diverifikasi. Silakan unduh foto Anda:</p>${blokRingkasanPembayaran(ringkasanFoto({ harga: transaksi.harga, kodeUnik: t.kodeUnik ?? null, fotoList: transaksi.fotoList, metodePembayaran: t.metodePembayaran, createdAt: transaksi.createdAt }), "Lunas")}${kuitansi ? `<p>Kuitansi pembayaran terlampir (No. <b>${kuitansi.nomor}</b>).</p>` : ""}<div style="margin:16px 0"><a href="${downloadPageUrl}" style="background:#F70048;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;display:inline-block">🔗 Buka Halaman Unduhan</a></div><ul style="padding-left:0;list-style:none">${fotoLinks}</ul><p style="font-size:12px;color:#aaa">LPKBB Antareja 2026 — SMK Telkom Malang</p></div>`,
-        });
-      } catch { /* email failure is non-fatal */ }
-    }
+    const kirim = await kirimEmailFotoSiap(transaksiId);
     revalidatePath("/admin/galeri");
     revalidatePath("/admin/galeri/transaksi");
     revalidatePath("/admin/kas");
-    return { success: true };
+    return { success: true, emailTerkirim: kirim.ok, message: kirim.ok ? undefined : kirim.alasan };
   } catch { return { success: false }; }
+}
+
+// Email "Foto Siap Diunduh" + kuitansi. Tujuan = email di form, atau email akun
+// pembeli bila form kosong (transaksi lama) — dulu transaksi tanpa email form
+// tidak pernah dikirimi link. Kegagalan dilaporkan, tidak ditelan diam-diam.
+async function kirimEmailFotoSiap(transaksiId: string): Promise<{ ok: boolean; alasan?: string }> {
+  const transaksi = await prisma.transaksiFoto.findUnique({
+    where: { id: transaksiId },
+    include: { user: { select: { email: true, nama: true } } },
+  });
+  if (!transaksi || transaksi.status !== "VERIFIED") return { ok: false, alasan: "Transaksi belum terverifikasi" };
+  const t = transaksi as any;
+  const email = ((t.email as string | null) || transaksi.user?.email || "").trim();
+  if (!email) return { ok: false, alasan: "Pembeli tidak punya email — kirim link unduhan lewat WA (tombol Salin link)" };
+  const namaPembeli = (t.namaPembeli as string | null) ?? transaksi.user?.nama ?? "Pembeli";
+  try {
+    const fotoIds = transaksi.fotoList as string[];
+    const fotos = await prisma.foto.findMany({ where: { id: { in: fotoIds } }, select: { id: true, pathAsli: true, tagTim: true } });
+    // Cadangan alamat situs: NEXTAUTH_URL kosong = link relatif yang tidak bisa diklik di email.
+    const baseUrl = (process.env.NEXTAUTH_URL || siteConfig.url).replace(/\/$/, "");
+    const downloadPageUrl = `${baseUrl}/galeri/download/${transaksiId}`;
+    const fotoLinks = fotos.map((f, i) =>
+      `<li style="margin-bottom:8px"><a href="${toDownloadUrl(f.pathAsli, f.tagTim ?? `Foto-${i + 1}`)}" download style="background:#F70048;color:#fff;padding:6px 14px;border-radius:6px;text-decoration:none;font-weight:bold;font-size:13px;display:inline-block">⬇ Unduh Foto ${i + 1}${f.tagTim ? ` — ${f.tagTim}` : ""}</a></li>`
+    ).join("");
+    const kuitansi = await buatKuitansiFoto(transaksiId).catch((e) => {
+      console.error("Gagal membuat kuitansi foto:", e);
+      return null;
+    });
+    await sendMailTo({
+      to: email,
+      ...(kuitansi
+        ? { fileAttachments: [{ filename: kuitansi.filename, content: kuitansi.pdf, contentType: "application/pdf" }] }
+        : {}),
+      subject: `✅ Foto LPKBB Antareja 2026 — Siap Diunduh`,
+      html: `<div style="font-family:sans-serif;max-width:520px;margin:auto"><h2 style="color:#F70048">Foto Anda Siap Diunduh!</h2><p>Halo <b>${escapeHtml(namaPembeli)}</b>,</p><p>Pembayaran Anda telah diverifikasi. Silakan unduh foto Anda:</p>${blokRingkasanPembayaran(ringkasanFoto({ harga: transaksi.harga, kodeUnik: t.kodeUnik ?? null, fotoList: transaksi.fotoList, metodePembayaran: t.metodePembayaran, createdAt: transaksi.createdAt }), "Lunas")}${kuitansi ? `<p>Kuitansi pembayaran terlampir (No. <b>${kuitansi.nomor}</b>).</p>` : ""}<div style="margin:16px 0"><a href="${downloadPageUrl}" style="background:#F70048;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;display:inline-block">🔗 Buka Halaman Unduhan</a></div><ul style="padding-left:0;list-style:none">${fotoLinks}</ul><p style="font-size:12px;color:#aaa">LPKBB Antareja 2026 — SMK Telkom Malang</p></div>`,
+    });
+    return { ok: true };
+  } catch (e) {
+    console.error("kirimEmailFotoSiap error:", e);
+    return { ok: false, alasan: "Email gagal terkirim — coba Kirim ulang, atau kirim link lewat WA" };
+  }
+}
+
+// Admin: kirim ulang email link unduhan (mis. pembeli bilang belum menerima).
+export async function kirimUlangEmailFoto(transaksiId: string) {
+  await requireAdminOrBendahara();
+  const r = await kirimEmailFotoSiap(transaksiId);
+  if (r.ok) await catatLog("KIRIM_ULANG_EMAIL_FOTO", transaksiId);
+  return r.ok ? { success: true } : { success: false, message: r.alasan };
 }
 
 // Unduh kuitansi PDF pembelian foto terverifikasi — nomor sama tiap unduh.
