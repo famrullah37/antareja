@@ -6,6 +6,14 @@ export type PemilikFoto = {
   fotograferNama: string | null;
 };
 
+// Link unduhan foto berlaku sekian hari SEJAK DIVERIFIKASI (bukan sejak checkout
+// — dulu verifikasi yang lambat ikut memotong masa unduh pembeli). Admin bisa
+// memperpanjang dari tabel Transaksi Foto.
+export const MASA_UNDUH_HARI = 30;
+export function batasUnduhDari(mulai: Date = new Date()) {
+  return new Date(mulai.getTime() + MASA_UNDUH_HARI * 24 * 60 * 60 * 1000);
+}
+
 // Batas jumlah foto sekali upload (form & server).
 export const MAKS_FOTO_PER_UPLOAD = 10;
 

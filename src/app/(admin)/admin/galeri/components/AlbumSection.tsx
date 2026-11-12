@@ -34,12 +34,14 @@ export default function AlbumSection({
   tims,
   isAdmin,
   userId,
+  jumlahGratis,
 }: {
   albums: Album[];
   fotografers: Fotografer[];
   tims: TimOpsi[];
   isAdmin: boolean;
   userId: string | null;
+  jumlahGratis: Record<string, number>;
 }) {
   const [cariTim, setCariTim] = useState("");
   const [timBaru, setTimBaru] = useState("");
@@ -221,10 +223,18 @@ export default function AlbumSection({
                     >
                       {album._count.fotos} foto →
                     </Link>
+                    {album.tipe === "BERBAYAR" && (jumlahGratis[album.id] ?? 0) > 0 && (
+                      <span className="text-green-700 font-medium" title="Foto yang ditandai gratis di album berbayar">
+                        · {jumlahGratis[album.id]} gratis
+                      </span>
+                    )}
                     <span>·</span>
                     <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-semibold ${TIPE_COLORS[album.tipe] ?? "bg-neutral-100 text-neutral-600"}`}>
                       {album.tipe}
                     </span>
+                    {album.tipe === "BERBAYAR" && (jumlahGratis[album.id] ?? 0) > 0 && (
+                      <span className="px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-green-100 text-green-700">+ GRATIS</span>
+                    )}
                     {album.tipe === "BERBAYAR" && album.harga > 0 && (
                       <>
                         <span>·</span>

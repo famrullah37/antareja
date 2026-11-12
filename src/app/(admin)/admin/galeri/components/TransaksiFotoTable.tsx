@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { kirimUlangEmailFoto, rejectFoto, unduhKuitansiFoto, verifikasiFoto } from "@/actions/Galeri";
+import { kirimUlangEmailFoto, perpanjangUnduhFoto, rejectFoto, unduhKuitansiFoto, verifikasiFoto } from "@/actions/Galeri";
 import UnduhKuitansiButton from "../../components/UnduhKuitansiButton";
 import { toast } from "sonner";
 
@@ -52,6 +52,14 @@ export default function TransaksiFotoTable({
     const r = await kirimUlangEmailFoto(id);
     if (r.success) toast.success("Email link unduhan terkirim", { id: toastId });
     else toast.error(r.message ?? "Gagal mengirim email", { id: toastId });
+  }
+
+  async function handlePerpanjang(id: string) {
+    const toastId = toast.loading("Memperpanjang...");
+    const r = await perpanjangUnduhFoto(id);
+    if (r.success && "berlakuSampai" in r && r.berlakuSampai)
+      toast.success(`Masa unduh diperpanjang sampai ${new Date(r.berlakuSampai).toLocaleDateString("id-ID")}`, { id: toastId });
+    else toast.error(("message" in r && r.message) || "Gagal", { id: toastId });
   }
 
   async function handleSalinLink(id: string) {
@@ -162,6 +170,12 @@ export default function TransaksiFotoTable({
                       className="bg-neutral-100 text-neutral-700 px-3 py-1 rounded-lg text-xs hover:bg-neutral-200"
                     >
                       Salin link unduhan
+                    </button>
+                    <button
+                      onClick={() => handlePerpanjang(tr.id)}
+                      className="bg-amber-50 text-amber-700 px-3 py-1 rounded-lg text-xs hover:bg-amber-100"
+                    >
+                      Perpanjang 30 hari
                     </button>
                     <button
                       onClick={() => handleKirimUlang(tr.id)}

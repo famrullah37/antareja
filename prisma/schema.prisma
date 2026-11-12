@@ -501,6 +501,9 @@ model Foto {
   // Foto gratis di album berbayar (bisa diunduh tanpa beli). Album bertipe
   // GRATIS tetap membuat semua fotonya gratis — lihat lib/galeri.ts fotoGratis().
   gratis        Boolean  @default(false)
+  // Versi gaya watermark pada pathWatermark (lib/watermark.ts VERSI_WATERMARK).
+  // Lebih kecil dari versi sekarang → ditawarkan untuk diproses ulang.
+  watermarkVersi Int     @default(1)
   createdAt     DateTime @default(now())
   // Fotografer foto ini (penerima bagi hasil); kosong = ikut fotografer album.
   fotograferId  String?

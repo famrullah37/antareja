@@ -10,14 +10,17 @@ import TransaksiFotoTable from "./components/TransaksiFotoTable";
 import WatermarkFotoLama from "./components/WatermarkFotoLama";
 
 export default async function AdminGaleriPage() {
-  const [albums, transaksis, tanpaWatermark, fotografers, session, tims] = await Promise.all([
+  const [albums, transaksis, tanpaWatermark, fotografers, session, tims, gratisPerAlbum] = await Promise.all([
     findAlbums(),
     findTransaksiFotos(),
     hitungFotoTanpaWatermark(),
     prisma.user.findMany({ where: { role: "FOTOGRAFER" }, select: { id: true, nama: true }, orderBy: { nama: "asc" } }),
     getServerSession(),
     prisma.tim.findMany({ select: { id: true, nama_tim: true, asal_sekolah: true }, orderBy: { nama_tim: "asc" } }),
+    // Foto yang ditandai gratis per album (album berbayar bisa berisi foto gratis).
+    prisma.foto.groupBy({ by: ["albumId"], where: { gratis: true }, _count: { _all: true } }),
   ]);
+  const jumlahGratis = Object.fromEntries(gratisPerAlbum.map((g) => [g.albumId, g._count._all]));
   const timOpsi = tims.map((t) => ({ id: t.id, nama: t.nama_tim, sekolah: t.asal_sekolah }));
 
   return (
@@ -30,6 +33,7 @@ export default async function AdminGaleriPage() {
         tims={timOpsi}
         isAdmin={session?.user?.role === "ADMIN"}
         userId={session?.user?.id ?? null}
+        jumlahGratis={jumlahGratis}
       />
       <UploadFotoSection
         albums={albums as any}

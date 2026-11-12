@@ -17,8 +17,8 @@ import { incrementCounterUrutFoto } from "@/queries/tiket.query";
 import { catatLog } from "@/lib/activityLog";
 import { getKonfigUmum } from "@/queries/konfigUmum.query";
 import { imageUploader, validateUploadFile, bufferBukti } from "./fileUploader";
-import { addWatermark } from "@/lib/watermark";
-import { fotoGratis, MAKS_FOTO_PER_UPLOAD, type PemilikFoto } from "@/lib/galeri";
+import { addWatermark, VERSI_WATERMARK } from "@/lib/watermark";
+import { batasUnduhDari, fotoGratis, MAKS_FOTO_PER_UPLOAD, MASA_UNDUH_HARI, type PemilikFoto } from "@/lib/galeri";
 import { sendMailTo } from "@/lib/mailer";
 import prisma from "@/lib/prisma";
 import { siteConfig } from "@/config/site";
@@ -292,6 +292,7 @@ export async function uploadFoto(data: FormData) {
         album: { connect: { id: albumId } },
         pathAsli: uploaded.data.url,
         pathWatermark: uploadedWatermark.data?.url ?? uploaded.data.url,
+        watermarkVersi: uploadedWatermark.data?.url ? VERSI_WATERMARK : 0,
         tagTim: tagTim || undefined,
         timId: tim?.id,
         statusPublish: true,
@@ -517,7 +518,8 @@ export async function beliFoto(data: FormData) {
     // dua pembelian yang sama tercatat dengan nominal identik di laporan kas
     // (lihat juga totalBayar di Voting.ts/registrationForm.ts).
     const harga = rincianAlbum.reduce((sum, r) => sum + r.harga, 0) + parseInt(kodeUnik);
-    const expiredAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+    // Masa unduh baru dimulai saat diverifikasi (lihat verifikasiFoto).
+    const expiredAt = null;
 
     // Cegah dua transaksi PENDING memakai kodeUnik yang sama — nominal transfer
     // harus presisi unik selama menunggu dicocokkan. Yang sudah VERIFIED tidak
@@ -606,7 +608,7 @@ export async function verifikasiFoto(transaksiId: string) {
     // cek-lalu-update biasa lolos dua kali bila tombol terkirim ganda (kas dobel).
     const klaim = await prisma.transaksiFoto.updateMany({
       where: { id: transaksiId, status: "PENDING" },  // hanya PENDING: transaksi DITOLAK tidak bisa diverifikasi ulang (kode unik-nya mungkin sudah dipakai transaksi lain)
-      data: { status: "VERIFIED", persenFotografer: (await getKonfigUmum()).persenFotografer },
+      data: { status: "VERIFIED", persenFotografer: (await getKonfigUmum()).persenFotografer, expiredAt: batasUnduhDari() },
     });
     if (klaim.count === 0) return { success: false, message: "Transaksi foto sudah diproses (diverifikasi/ditolak) sebelumnya" };
     const t = transaksi as any;
@@ -655,13 +657,37 @@ async function kirimEmailFotoSiap(transaksiId: string): Promise<{ ok: boolean; a
       ...(kuitansi
         ? { fileAttachments: [{ filename: kuitansi.filename, content: kuitansi.pdf, contentType: "application/pdf" }] }
         : {}),
-      subject: `✅ Foto LPKBB Antareja 2026 — Siap Diunduh`,
-      html: `<div style="font-family:sans-serif;max-width:520px;margin:auto"><h2 style="color:#F70048">Foto Anda Siap Diunduh!</h2><p>Halo <b>${escapeHtml(namaPembeli)}</b>,</p><p>Pembayaran Anda telah diverifikasi. Silakan unduh foto Anda:</p>${blokRingkasanPembayaran(ringkasanFoto({ harga: transaksi.harga, kodeUnik: t.kodeUnik ?? null, fotoList: transaksi.fotoList, metodePembayaran: t.metodePembayaran, createdAt: transaksi.createdAt }), "Lunas")}${kuitansi ? `<p>Kuitansi pembayaran terlampir (No. <b>${kuitansi.nomor}</b>).</p>` : ""}<div style="margin:16px 0"><a href="${downloadPageUrl}" style="background:#F70048;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;display:inline-block">🔗 Buka Halaman Unduhan</a></div><ul style="padding-left:0;list-style:none">${fotoLinks}</ul><p style="font-size:12px;color:#aaa">LPKBB Antareja 2026 — SMK Telkom Malang</p></div>`,
+      // Kode transaksi di judul: tanpa ini semua email foto berjudul sama, Gmail
+      // menggabungkannya dalam satu utas & melipat isi yang mirip di balik "•••"
+      // — link unduhan (dulu di bawah) ikut tersembunyi.
+      subject: `✅ Foto LPKBB Antareja 2026 — Siap Diunduh${t.kodeUnik ? ` #${t.kodeUnik}` : ""}`,
+      // Tombol & link unduhan di ATAS, sebelum rincian pembayaran.
+      html: `<div style="font-family:sans-serif;max-width:520px;margin:auto"><h2 style="color:#F70048">Foto Anda Siap Diunduh!</h2><p>Halo <b>${escapeHtml(namaPembeli)}</b>,</p><p>Pembayaran Anda telah diverifikasi. Silakan unduh foto Anda:</p><div style="margin:16px 0"><a href="${downloadPageUrl}" style="background:#F70048;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;display:inline-block">🔗 Buka Halaman Unduhan</a></div><ul style="padding-left:0;list-style:none">${fotoLinks}</ul>${transaksi.expiredAt ? `<p style="background:#fff7ed;border-radius:8px;padding:10px 12px;font-size:13px;color:#9a3412">Link unduhan berlaku sampai <b>${transaksi.expiredAt.toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Jakarta" })}</b>. Segera unduh &amp; simpan foto Anda.</p>` : ""}<p style="font-size:13px;color:#555">Tombol tidak bisa diklik? Salin link ini ke browser:<br><a href="${downloadPageUrl}" style="color:#F70048;word-break:break-all">${downloadPageUrl}</a></p>${blokRingkasanPembayaran(ringkasanFoto({ harga: transaksi.harga, kodeUnik: t.kodeUnik ?? null, fotoList: transaksi.fotoList, metodePembayaran: t.metodePembayaran, createdAt: transaksi.createdAt }), "Lunas")}${kuitansi ? `<p>Kuitansi pembayaran terlampir (No. <b>${kuitansi.nomor}</b>).</p>` : ""}<p style="font-size:12px;color:#aaa">LPKBB Antareja 2026 — SMK Telkom Malang</p></div>`,
     });
     return { ok: true };
   } catch (e) {
     console.error("kirimEmailFotoSiap error:", e);
     return { ok: false, alasan: "Email gagal terkirim — coba Kirim ulang, atau kirim link lewat WA" };
+  }
+}
+
+// Admin: perpanjang masa unduh MASA_UNDUH_HARI hari — dihitung dari batas lama
+// bila masih berlaku, atau dari hari ini bila sudah kedaluwarsa.
+export async function perpanjangUnduhFoto(transaksiId: string) {
+  await requireAdminOrBendahara();
+  try {
+    const t = await prisma.transaksiFoto.findUnique({ where: { id: transaksiId }, select: { status: true, expiredAt: true } });
+    if (!t || t.status !== "VERIFIED") return { success: false, message: "Hanya pembelian yang sudah diverifikasi" };
+    const mulai = t.expiredAt && t.expiredAt.getTime() > Date.now() ? t.expiredAt : new Date();
+    const baru = batasUnduhDari(mulai);
+    await prisma.transaksiFoto.update({ where: { id: transaksiId }, data: { expiredAt: baru } });
+    await catatLog("PERPANJANG_UNDUH_FOTO", `${transaksiId} → ${baru.toISOString().slice(0, 10)}`);
+    revalidatePath("/admin/galeri");
+    revalidatePath("/admin/galeri/transaksi");
+    revalidatePath(`/galeri/download/${transaksiId}`);
+    return { success: true, berlakuSampai: baru.toISOString(), hari: MASA_UNDUH_HARI };
+  } catch {
+    return { success: false, message: "Gagal memperpanjang" };
   }
 }
 
@@ -696,7 +722,7 @@ const BATCH_WATERMARK = 10;
 
 export async function hitungFotoTanpaWatermark() {
   await requireAdminOrFotografer();
-  const rows = await prisma.$queryRaw<{ n: bigint }[]>`SELECT COUNT(*)::bigint AS n FROM "Foto" WHERE "pathWatermark" = "pathAsli"`;
+  const rows = await prisma.$queryRaw<{ n: bigint }[]>`SELECT COUNT(*)::bigint AS n FROM "Foto" WHERE "pathWatermark" = "pathAsli" OR "watermarkVersi" < ${VERSI_WATERMARK}`;
   return Number(rows[0]?.n ?? 0);
 }
 
@@ -720,7 +746,7 @@ async function unduhFoto(url: string): Promise<Buffer> {
 export async function buatWatermarkFotoLama() {
   await requireAdminOrFotografer();
   const fotos = await prisma.$queryRaw<{ id: string; pathAsli: string }[]>`
-    SELECT id, "pathAsli" FROM "Foto" WHERE "pathWatermark" = "pathAsli" ORDER BY "createdAt" LIMIT ${BATCH_WATERMARK}`;
+    SELECT id, "pathAsli" FROM "Foto" WHERE "pathWatermark" = "pathAsli" OR "watermarkVersi" < ${VERSI_WATERMARK} ORDER BY "createdAt" LIMIT ${BATCH_WATERMARK}`;
   let berhasil = 0;
   const gagal: string[] = [];
   for (const f of fotos) {
@@ -731,7 +757,7 @@ export async function buatWatermarkFotoLama() {
       if (wm === asli) throw new Error("watermark gagal dibuat");
       const up = await imageUploader(wm);
       if (!up.data?.url) throw new Error(up.message || "upload gagal");
-      await prisma.foto.update({ where: { id: f.id }, data: { pathWatermark: up.data.url } });
+      await prisma.foto.update({ where: { id: f.id }, data: { pathWatermark: up.data.url, watermarkVersi: VERSI_WATERMARK } });
       berhasil++;
     } catch (e) {
       gagal.push(e instanceof Error ? e.message : "error");
