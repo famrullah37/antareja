@@ -50,12 +50,16 @@ function parseProduk(data: FormData) {
   const nama = ((data.get("nama") as string) || "").trim();
   const deskripsi = ((data.get("deskripsi") as string) || "").trim() || null;
   const harga = parseInt((data.get("harga") as string) || "0");
+  const hargaBeliRaw = ((data.get("hargaBeli") as string) || "").trim();
+  const hargaBeli = hargaBeliRaw === "" ? null : parseInt(hargaBeliRaw);
   const ukuranList = daftarUkuran(data.get("ukuran") as string);
   const urutan = parseInt((data.get("urutan") as string) || "0") || 0;
   if (!nama) return { error: "Nama produk wajib diisi" };
-  if (!Number.isFinite(harga) || harga <= 0) return { error: "Harga tidak valid" };
+  if (!Number.isFinite(harga) || harga <= 0) return { error: "Harga jual tidak valid" };
+  if (hargaBeli !== null && (!Number.isFinite(hargaBeli) || hargaBeli < 0 || hargaBeli > 10_000_000))
+    return { error: "Harga beli tidak valid" };
   return {
-    produk: { nama, deskripsi, harga, ukuran: ukuranList.length ? ukuranList.join(",") : null, urutan },
+    produk: { nama, deskripsi, harga, hargaBeli, ukuran: ukuranList.length ? ukuranList.join(",") : null, urutan },
   };
 }
 
@@ -129,7 +133,10 @@ export async function createMerchandise(data: FormData) {
     const up = await uploadFotos(files);
     if (up.error) return { success: false, message: up.error };
     const merch = await prisma.merchandise.create({ data: { ...parsed.produk!, fotos: up.urls! } });
-    await catatLog("TAMBAH_MERCHANDISE", `${merch.nama} — Rp${merch.harga}`);
+    await catatLog(
+      "TAMBAH_MERCHANDISE",
+      `${merch.nama} — jual Rp${merch.harga}, beli ${merch.hargaBeli == null ? "-" : `Rp${merch.hargaBeli}`}`
+    );
     revalidateMerch();
     return { success: true };
   } catch (e) {
@@ -159,7 +166,11 @@ export async function updateMerchandise(data: FormData, id: string) {
       where: { id },
       data: { ...parsed.produk!, fotos: [...lama.fotos, ...up.urls!] },
     });
-    await catatLog("UBAH_MERCHANDISE", parsed.produk!.nama);
+    const pr = parsed.produk!;
+    await catatLog(
+      "UBAH_MERCHANDISE",
+      `${pr.nama} — jual Rp${pr.harga}, beli ${pr.hargaBeli == null ? "-" : `Rp${pr.hargaBeli}`}`
+    );
     revalidateMerch();
     return { success: true };
   } catch (e) {
@@ -304,7 +315,7 @@ export async function pesanMerchandise(data: FormData) {
     const ukuran = pilihan.length ? k.ukuran : null;
     if (pilihan.length && (!ukuran || !pilihan.includes(ukuran)))
       return { success: false, message: `Pilih ukuran untuk ${p.nama}` };
-    items.push({ merchId: p.id, nama: p.nama, ukuran, harga: p.harga, jumlah });
+    items.push({ merchId: p.id, nama: p.nama, ukuran, harga: p.harga, hargaBeli: p.hargaBeli, jumlah });
   }
   const subtotal = items.reduce((s, i) => s + i.harga * i.jumlah, 0);
   const totalBayar = subtotal + parseInt(kodeUnik);

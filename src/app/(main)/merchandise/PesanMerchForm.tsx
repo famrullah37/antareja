@@ -3,7 +3,10 @@
 import { pesanMerchandise, reserveKodeMerch } from "@/actions/Merchandise";
 import { getDynamicQrisTiket } from "@/actions/Tiket";
 import { daftarUkuran } from "@/lib/merchandise";
-import { Merchandise } from "@prisma/client";
+import { Merchandise as MerchandiseDb } from "@prisma/client";
+
+// Produk untuk halaman publik — tanpa harga beli (khusus panitia).
+type Merchandise = Omit<MerchandiseDb, "hargaBeli">;
 import Image from "next/image";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";

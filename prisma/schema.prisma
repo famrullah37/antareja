@@ -550,7 +550,11 @@ model Merchandise {
   id        String   @id @default(uuid())
   nama      String
   deskripsi String?
+  // Harga jual ke pemesan.
   harga     Int
+  // Harga beli/produksi dari vendor per barang — untuk hitung laba. null =
+  // belum diisi. Khusus panitia, JANGAN dikirim ke halaman publik.
+  hargaBeli Int?
   // Bisa lebih dari satu (depan/belakang/detail) — foto pertama = sampul.
   fotos     String[] @default([])
   // Pilihan ukuran dipisah koma, mis. "S,M,L,XL". Kosong = tanpa ukuran.

@@ -48,7 +48,7 @@ export default async function MerchandisePage() {
         </div>
       ) : (
         <PesanMerchForm
-          produk={produk}
+          produk={produk.map(({ hargaBeli: _hb, ...p }) => p)} // harga beli khusus panitia
           terbuka={terbuka}
           konfig={konfigBayar}
         />

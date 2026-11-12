@@ -23,9 +23,17 @@ function FieldsProduk({ p }: { p?: Merchandise }) {
           <label className="text-sm font-medium">Nama Produk</label>
           <input name="nama" required defaultValue={p?.nama} placeholder="Kaos Antareja 2026" className={inputCls} />
         </div>
-        <div className="flex flex-col gap-1">
-          <label className="text-sm font-medium">Harga (Rp)</label>
-          <input name="harga" type="number" min={1} required defaultValue={p?.harga} placeholder="85000" className={inputCls} />
+        <div className="grid grid-cols-2 gap-3">
+          <div className="flex flex-col gap-1">
+            <label className="text-sm font-medium">
+              Harga Beli <span className="text-gray-500 font-normal">(vendor)</span>
+            </label>
+            <input name="hargaBeli" type="number" min={0} defaultValue={p?.hargaBeli ?? ""} placeholder="60000" className={inputCls} />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-sm font-medium">Harga Jual</label>
+            <input name="harga" type="number" min={1} required defaultValue={p?.harga} placeholder="85000" className={inputCls} />
+          </div>
         </div>
         <div className="flex flex-col gap-1">
           <label className="text-sm font-medium">
@@ -130,7 +138,21 @@ function KartuAdmin({ p }: { p: Merchandise }) {
         <>
           <div>
             <p className="font-semibold">{p.nama}</p>
-            <p className="text-primary-500 font-bold">Rp{p.harga.toLocaleString("id-ID")}</p>
+            <p className="text-sm">
+              <span className="text-gray-500">Jual</span>{" "}
+              <b className="text-primary-500">Rp{p.harga.toLocaleString("id-ID")}</b>
+              <span className="text-gray-500"> · Beli </span>
+              {p.hargaBeli == null ? (
+                <span className="text-amber-600">belum diisi</span>
+              ) : (
+                <b>Rp{p.hargaBeli.toLocaleString("id-ID")}</b>
+              )}
+            </p>
+            {p.hargaBeli != null && (
+              <p className={`text-xs font-semibold ${p.harga - p.hargaBeli < 0 ? "text-red-600" : "text-green-700"}`}>
+                {p.harga - p.hargaBeli < 0 ? "Rugi" : "Laba"} Rp{Math.abs(p.harga - p.hargaBeli).toLocaleString("id-ID")}/barang
+              </p>
+            )}
             {p.ukuran && <p className="text-xs text-gray-500">Ukuran: {p.ukuran.split(",").join(", ")}</p>}
             {!p.aktif && <p className="text-xs text-red-500 font-medium">Disembunyikan</p>}
           </div>
