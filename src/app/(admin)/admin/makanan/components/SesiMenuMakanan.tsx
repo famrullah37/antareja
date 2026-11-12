@@ -104,29 +104,34 @@ function FormMenu({ sesiId, menu, onSelesai }: { sesiId: string; menu?: Menu; on
         if (menu) data.set("id", menu.id);
         if (await jalankan(() => simpanMenuMakanan(data), "Menu disimpan")) onSelesai();
       }}
-      className="grid gap-2 sm:grid-cols-[2fr_1fr_1fr_80px] items-end bg-neutral-50 rounded-lg p-3"
+      // Bertumpuk (bukan 4 kolom sejajar) supaya tidak meluber di kartu sesi yang sempit.
+      className="flex flex-col gap-3 bg-neutral-50 rounded-lg p-3 min-w-0"
     >
       <div className="flex flex-col gap-1">
         <label className="text-xs font-medium">Nama menu</label>
-        <input name="nama" required maxLength={100} defaultValue={menu?.nama} placeholder="mis. Nasi Ayam Bakar" className={inputCls} />
+        <input name="nama" required maxLength={100} defaultValue={menu?.nama} placeholder="mis. Nasi Ayam Bakar" className={`${inputCls} w-full min-w-0`} />
       </div>
-      <div className="flex flex-col gap-1">
-        <label className="text-xs font-medium">Harga Beli (katering)</label>
-        <input type="number" name="hargaBeli" min={0} defaultValue={menu?.hargaBeli ?? ""} placeholder="opsional" className={inputCls} />
+      <div className="grid grid-cols-2 gap-3">
+        <div className="flex flex-col gap-1 min-w-0">
+          <label className="text-xs font-medium">Harga Beli</label>
+          <input type="number" name="hargaBeli" min={0} defaultValue={menu?.hargaBeli ?? ""} placeholder="dari katering" className={`${inputCls} w-full min-w-0`} />
+        </div>
+        <div className="flex flex-col gap-1 min-w-0">
+          <label className="text-xs font-medium">Harga Jual</label>
+          <input type="number" name="harga" required min={1} defaultValue={menu?.harga} placeholder="ke tim" className={`${inputCls} w-full min-w-0`} />
+        </div>
       </div>
-      <div className="flex flex-col gap-1">
-        <label className="text-xs font-medium">Harga Jual (Rp)</label>
-        <input type="number" name="harga" required min={1} defaultValue={menu?.harga} className={inputCls} />
+      <div className="grid grid-cols-[1fr_72px] gap-3">
+        <div className="flex flex-col gap-1 min-w-0">
+          <label className="text-xs font-medium">Deskripsi (opsional)</label>
+          <input name="deskripsi" maxLength={300} defaultValue={menu?.deskripsi ?? ""} placeholder="mis. + air mineral" className={`${inputCls} w-full min-w-0`} />
+        </div>
+        <div className="flex flex-col gap-1 min-w-0">
+          <label className="text-xs font-medium">Urutan</label>
+          <input type="number" name="urutan" defaultValue={menu?.urutan ?? 0} className={`${inputCls} w-full min-w-0`} />
+        </div>
       </div>
-      <div className="flex flex-col gap-1">
-        <label className="text-xs font-medium">Urutan</label>
-        <input type="number" name="urutan" defaultValue={menu?.urutan ?? 0} className={inputCls} />
-      </div>
-      <div className="flex flex-col gap-1 sm:col-span-4">
-        <label className="text-xs font-medium">Deskripsi (opsional)</label>
-        <input name="deskripsi" maxLength={300} defaultValue={menu?.deskripsi ?? ""} placeholder="mis. + air mineral" className={inputCls} />
-      </div>
-      <div className="flex gap-2 sm:col-span-4">
+      <div className="flex gap-2">
         <button type="submit" disabled={busy} className={btnPrimary}>
           {menu ? "Simpan Menu" : "Tambah Menu"}
         </button>
@@ -184,14 +189,15 @@ function KartuSesi({ sesi }: { sesi: Sesi }) {
               <FormMenu sesiId={sesi.id} menu={m} onSelesai={() => setEditMenu(null)} />
             </div>
           ) : (
-            <div key={m.id} className={`flex flex-wrap items-center gap-3 p-3 text-sm ${m.aktif ? "" : "opacity-50"}`}>
-              <div className="flex-1 min-w-0">
+            // Baris 1: nama + harga; baris 2: tombol aksi — supaya nama tidak terjepit.
+            <div key={m.id} className={`grid grid-cols-[1fr_auto] gap-x-3 gap-y-1.5 p-3 text-sm ${m.aktif ? "" : "opacity-50"}`}>
+              <div className="min-w-0">
                 <div className="font-medium">
                   {m.nama} {!m.aktif && <span className="text-xs text-gray-400">(nonaktif)</span>}
                 </div>
                 {m.deskripsi && <div className="text-xs text-gray-400">{m.deskripsi}</div>}
               </div>
-              <div className="text-right">
+              <div className="text-right whitespace-nowrap">
                 <div>
                   <span className="text-xs text-gray-500">Jual </span>
                   <span className="font-semibold">{formatRupiah(m.harga)}</span>
@@ -210,7 +216,7 @@ function KartuSesi({ sesi }: { sesi: Sesi }) {
                   )}
                 </div>
               </div>
-              <div className="flex gap-3 text-xs">
+              <div className="col-span-2 flex gap-4 text-xs">
                 <button type="button" onClick={() => setEditMenu(m.id)} className="text-primary-600 hover:underline">
                   Ubah
                 </button>
