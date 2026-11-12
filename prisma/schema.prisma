@@ -562,6 +562,19 @@ model Merchandise {
   aktif     Boolean  @default(true)
   urutan    Int      @default(0)
   createdAt DateTime @default(now())
+  stokReady StokMerch[]
+}
+
+// Stok ready (barang jadi) untuk dijual setelah PO ditutup. Per produk & ukuran;
+// ukuran "" = produk tanpa pilihan ukuran.
+model StokMerch {
+  id      String      @id @default(uuid())
+  merchId String
+  ukuran  String      @default("")
+  stok    Int         @default(0)
+  merch   Merchandise @relation(fields: [merchId], references: [id], onDelete: Cascade)
+
+  @@unique([merchId, ukuran])
 }
 
 model KonfigMerch {
@@ -572,6 +585,8 @@ model KonfigMerch {
   // Info pengambilan/estimasi jadi, ditampilkan di halaman & email.
   infoPengambilan String?
   counterUrut     Int       @default(0)
+  // Jual ready stock (dari StokMerch) saat PO tidak terbuka.
+  readyAktif      Boolean   @default(false)
 }
 
 model PesananMerch {
@@ -584,16 +599,35 @@ model PesananMerch {
   // master bisa berubah, nominal yang sudah dibayar tidak boleh ikut berubah.
   items            Json
   subtotal         Int
+  // "" selama MENUNGGU_ONGKIR (kode baru diterbitkan saat siap dibayar).
   kodeUnik         String
   totalBayar       Int
   metodePembayaran String    @default("TRANSFER")
   bukti            String?
-  // PENDING | VERIFIED | REJECTED | DIAMBIL
+  // PO: PENDING | VERIFIED | REJECTED | DIAMBIL
+  // READY: MENUNGGU_ONGKIR | MENUNGGU_BAYAR | PENDING | VERIFIED | DIKIRIM |
+  //        DIAMBIL | REJECTED | BATAL  (REJECTED/BATAL mengembalikan stok)
   status           String    @default("PENDING")
   catatanAdmin     String?
   diambilAt        DateTime?
   createdAt        DateTime  @default(now())
+  // PO | READY (ready stock setelah PO ditutup)
+  jenis            String    @default("PO")
+  // READY: KIRIM | AMBIL
+  pengiriman       String?
+  alamat           String?
+  // Ongkir dikonfirmasi admin; ikut di totalBayar, diteruskan ke kurir.
+  ongkir           Int?
+  // Batas bayar setelah siap dibayar — lewat → BATAL & stok kembali.
+  batasBayar       DateTime?
+  kurir            String?
+  resi             String?
+  dikirimAt        DateTime?
+  // Token link halaman pesanan untuk pembeli (tanpa login).
+  aksesToken       String?   @unique
   user             User?     @relation(fields: [userId], references: [id])
+
+  @@index([status])
 }
 
 // ─── POS Produk (penjualan langsung di stand) ────────────────────────────────

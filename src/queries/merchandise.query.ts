@@ -4,6 +4,7 @@ import { Prisma } from "@prisma/client";
 export async function findMerchandises(where?: Prisma.MerchandiseWhereInput) {
   return prisma.merchandise.findMany({
     where,
+    include: { stokReady: true },
     orderBy: [{ urutan: "asc" }, { createdAt: "asc" }],
   });
 }

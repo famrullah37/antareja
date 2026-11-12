@@ -3,6 +3,8 @@ import { findKonfigMerch, findMerchandises } from "@/queries/merchandise.query";
 import { poTerbuka } from "@/lib/merchandise";
 import { formatTanggalWib } from "./format";
 import PesanMerchForm from "./PesanMerchForm";
+import ReadyStockForm from "./ReadyStockForm";
+import { kedaluwarsakanPesananReady } from "@/lib/merchReady";
 import InfoHalaman from "../components/InfoHalaman";
 
 import type { Metadata } from "next";
@@ -16,12 +18,16 @@ export const metadata: Metadata = {
 };
 
 export default async function MerchandisePage() {
+  // Lepas stok pesanan ready yang lewat batas bayar sebelum stok ditampilkan.
+  await kedaluwarsakanPesananReady();
   const [produk, konfigMerch, konfigBayar] = await Promise.all([
     findMerchandises({ aktif: true }),
     findKonfigMerch(),
     findKonfigTiket(),
   ]);
   const terbuka = poTerbuka(konfigMerch);
+  // PO tutup + ready stock dibuka → tampilkan form ready stock.
+  const modeReady = !terbuka && !!konfigMerch?.readyAktif;
 
   return (
     <>
@@ -46,9 +52,21 @@ export default async function MerchandisePage() {
         <div className="bg-gray-50 rounded-2xl p-8 text-center text-gray-400 mt-6">
           Merchandise belum tersedia. Pantau terus website ini.
         </div>
+      ) : modeReady ? (
+        <ReadyStockForm
+          produk={produk.map((p) => ({
+            id: p.id,
+            nama: p.nama,
+            deskripsi: p.deskripsi,
+            harga: p.harga,
+            fotos: p.fotos,
+            ukuran: p.ukuran,
+            stok: Object.fromEntries(p.stokReady.map((s) => [s.ukuran, s.stok])),
+          }))}
+        />
       ) : (
         <PesanMerchForm
-          produk={produk.map(({ hargaBeli: _hb, ...p }) => p)} // harga beli khusus panitia
+          produk={produk.map(({ hargaBeli: _hb, stokReady: _s, ...p }) => p)} // harga beli khusus panitia
           terbuka={terbuka}
           konfig={konfigBayar}
         />

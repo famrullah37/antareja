@@ -14,6 +14,17 @@ import { findKonfigMerch, incrementCounterUrutMerch } from "@/queries/merchandis
 import { compressPhoto, imageUploader, validateUploadFile } from "./fileUploader";
 import { notifPembayaranMasuk } from "@/lib/emailPembayaran";
 import { cekTokenKode, terbitkanTokenKode } from "@/lib/kodeUnikToken";
+import {
+  batasBayarDariSekarang,
+  BATAS_BAYAR_JAM,
+  buatAksesToken,
+  kedaluwarsakanPesananReady,
+  kembalikanStokMerch,
+  linkPesananMerch,
+  STATUS_KODE_AKTIF,
+  terbitkanKodeUnikMerch,
+  tokenCocok,
+} from "@/lib/merchReady";
 
 // Verifikasi pembayaran merch = urusan uang, jadi Bendahara juga boleh.
 async function requireAdminOrBendahara() {
@@ -73,8 +84,12 @@ async function kirimEmailBuktiPesanan(pesanan: {
   totalBayar: number;
   metodePembayaran: string;
   createdAt: Date;
+  jenis?: string;
+  ongkir?: number | null;
+  pengiriman?: string | null;
 }) {
   const items = pesanan.items as ItemPesanan[];
+  const ready = pesanan.jenis === "READY";
   const konfig = await findKonfigMerch();
   const rp = (n: number) => `Rp${n.toLocaleString("id-ID")}`;
   const tanggal = pesanan.createdAt.toLocaleString("id-ID", {
@@ -97,13 +112,16 @@ async function kirimEmailBuktiPesanan(pesanan: {
         <div style="font-family:sans-serif;max-width:520px;margin:auto">
           <h2 style="color:#F70048">Bukti Pemesanan Merchandise</h2>
           <p>Halo <b>${escapeHtml(pesanan.nama)}</b>,</p>
-          <p>Pembayaran pre-order merchandise Anda sudah diverifikasi panitia. Pesanan Anda resmi masuk daftar produksi.</p>
+          <p>${ready
+            ? `Pembayaran merchandise Anda sudah diverifikasi panitia. ${pesanan.pengiriman === "KIRIM" ? "Pesanan segera kami kemas & kirim; nomor resi menyusul lewat email." : "Pesanan siap diambil."}`
+            : "Pembayaran pre-order merchandise Anda sudah diverifikasi panitia. Pesanan Anda resmi masuk daftar produksi."}</p>
           <div style="background:#f9f9f9;border-radius:8px;padding:16px;margin:16px 0">
             <p style="margin:0 0 4px"><b>Kode Pesanan:</b> <span style="font-family:monospace;font-size:16px">#${pesanan.kodeUnik}</span></p>
             <p style="margin:0 0 4px"><b>Tanggal Pesan:</b> ${tanggal} WIB</p>
             <p style="margin:0 0 12px"><b>Status:</b> Lunas · ${pesanan.metodePembayaran === "QRIS" ? "QRIS" : "Transfer Bank"}</p>
             <table style="width:100%;border-collapse:collapse;font-size:14px">
               ${baris}
+              ${pesanan.ongkir ? `<tr><td style="padding:6px 0">Ongkos kirim</td><td style="padding:6px 0;text-align:right">${rp(pesanan.ongkir)}</td></tr>` : ""}
               <tr><td style="padding:6px 0;border-top:1px solid #ddd">Kode unik</td><td style="padding:6px 0;border-top:1px solid #ddd;text-align:right">+${parseInt(pesanan.kodeUnik)}</td></tr>
               <tr><td style="padding:6px 0;font-weight:bold">Total Dibayar</td><td style="padding:6px 0;text-align:right;font-weight:bold">${rp(pesanan.totalBayar)}</td></tr>
             </table>
@@ -225,19 +243,23 @@ export async function deleteMerchandise(id: string) {
 export async function saveKonfigMerch(data: FormData) {
   await requireAdminOrBendahara();
   const poAktif = data.get("poAktif") === "on";
+  const readyAktif = data.get("readyAktif") === "on";
   const tutupRaw = data.get("tutupPada") as string;
   const tutupPada = parseWibDatetimeLocal(tutupRaw);
   if (tutupRaw && !tutupPada) return { success: false, message: "Batas PO tidak valid" };
   const infoPengambilan = ((data.get("infoPengambilan") as string) || "").trim() || null;
 
   try {
-    const isi = { poAktif, tutupPada, infoPengambilan };
+    const isi = { poAktif, tutupPada, infoPengambilan, readyAktif };
     await prisma.konfigMerch.upsert({
       where: { id: "singleton" },
       create: { id: "singleton", ...isi },
       update: isi,
     });
-    await catatLog("UBAH_KONFIG_MERCH", poAktif ? "PO dibuka" : "PO ditutup");
+    await catatLog(
+      "UBAH_KONFIG_MERCH",
+      `${poAktif ? "PO dibuka" : "PO ditutup"} · ready stock ${readyAktif ? "dibuka" : "ditutup"}`
+    );
     revalidateMerch();
     return { success: true };
   } catch {
@@ -332,7 +354,7 @@ export async function pesanMerchandise(data: FormData) {
   try {
     await prisma.$transaction(async (tx) => {
       const dipakai = await tx.pesananMerch.findFirst({
-        where: { kodeUnik, status: { in: ["PENDING", "VERIFIED"] } },
+        where: { kodeUnik, status: { in: STATUS_KODE_AKTIF } },
       });
       if (dipakai) throw new Error("KODE_UNIK_DIPAKAI");
       await tx.pesananMerch.create({
@@ -390,7 +412,7 @@ export async function verifikasiPesananMerch(id: string) {
       prisma.kasTransaksi.create({
         data: {
           tipe: "PEMASUKAN",
-          keterangan: `Merchandise PO: ${label} (${pesanan.nama}) [#${pesanan.kodeUnik}]`,
+          keterangan: `Merchandise ${pesanan.jenis === "READY" ? "Ready" : "PO"}: ${label}${pesanan.ongkir ? ` + ongkir Rp${pesanan.ongkir}` : ""} (${pesanan.nama}) [#${pesanan.kodeUnik}]`,
           jumlah: pesanan.totalBayar,
           kategori: "MERCHANDISE",
           sumber: "MERCHANDISE",
@@ -415,10 +437,12 @@ export async function verifikasiPesananMerch(id: string) {
 export async function tolakPesananMerch(id: string) {
   await requireAdminOrBendahara();
   try {
-    const pesanan = await prisma.pesananMerch.update({
-      where: { id, status: "PENDING" },
-      data: { status: "REJECTED" },
+    const pesanan = await prisma.$transaction(async (tx) => {
+      const p = await tx.pesananMerch.update({ where: { id, status: "PENDING" }, data: { status: "REJECTED" } });
+      if (p.jenis === "READY") await kembalikanStokMerch(tx, p.items as ItemPesanan[]);
+      return p;
     });
+    revalidatePath("/merchandise");
     await catatLog("TOLAK_MERCH", `${labelItems(pesanan.items as ItemPesanan[])} (${pesanan.nama})`);
     revalidatePath("/admin/merchandise");
     return { success: true };
@@ -439,5 +463,323 @@ export async function tandaiDiambilMerch(id: string) {
     return { success: true };
   } catch {
     return { success: false };
+  }
+}
+
+// ─── Ready Stock (setelah PO ditutup) ─────────────────────────────────────────
+
+const rpTeks = (n: number) => `Rp${n.toLocaleString("id-ID")}`;
+
+function revalidateReady(id?: string) {
+  revalidateMerch();
+  if (id) revalidatePath(`/merchandise/pesanan/${id}`);
+}
+
+// Tambah/kurangi stok ready secara relatif (atomik); stok tidak boleh < 0.
+export async function ubahStokMerch(merchId: string, ukuran: string, delta: number) {
+  await requireAdminOrBendahara();
+  if (!Number.isInteger(delta) || delta === 0 || Math.abs(delta) > 100000)
+    return { success: false, message: "Jumlah perubahan stok tidak valid" };
+  try {
+    const p = await prisma.merchandise.findUnique({ where: { id: merchId } });
+    if (!p) return { success: false, message: "Produk tidak ditemukan" };
+    const pilihan = daftarUkuran(p.ukuran);
+    if (pilihan.length ? !pilihan.includes(ukuran) : ukuran !== "")
+      return { success: false, message: "Ukuran tidak valid" };
+
+    if (delta > 0) {
+      await prisma.stokMerch.upsert({
+        where: { merchId_ukuran: { merchId, ukuran } },
+        create: { merchId, ukuran, stok: delta },
+        update: { stok: { increment: delta } },
+      });
+    } else {
+      const r = await prisma.stokMerch.updateMany({
+        where: { merchId, ukuran, stok: { gte: -delta } },
+        data: { stok: { increment: delta } },
+      });
+      if (r.count === 0) return { success: false, message: "Stok tidak cukup untuk dikurangi" };
+    }
+    await catatLog("UBAH_STOK_MERCH", `${p.nama}${ukuran ? ` (${ukuran})` : ""} ${delta > 0 ? "+" : ""}${delta}`);
+    revalidateMerch();
+    return { success: true };
+  } catch (e) {
+    console.error("ubahStokMerch error:", e);
+    return { success: false, message: "Gagal mengubah stok" };
+  }
+}
+
+async function emailPesananReady(
+  p: { id: string; nama: string; email: string; items: unknown; aksesToken: string | null },
+  judul: string,
+  isiHtml: string
+) {
+  if (!p.aksesToken) return;
+  const link = linkPesananMerch(p.id, p.aksesToken);
+  try {
+    await sendMailTo({
+      to: p.email,
+      subject: `${judul} — Merchandise LPKBB Antareja 2026`,
+      html: `
+        <div style="font-family:sans-serif;max-width:520px;margin:auto">
+          <h2 style="color:#F70048">${escapeHtml(judul)}</h2>
+          <p>Halo <b>${escapeHtml(p.nama)}</b>,</p>
+          ${isiHtml}
+          <p style="background:#f9f9f9;border-radius:8px;padding:12px;font-size:14px">${escapeHtml(labelItems(p.items as ItemPesanan[]))}</p>
+          <p><a href="${link}" style="display:inline-block;background:#F70048;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none">Lihat Pesanan</a></p>
+          <p style="font-size:12px;color:#888">Simpan email ini — link di atas adalah akses ke pesanan Anda.</p>
+          <p style="font-size:12px;color:#aaa">LPKBB Antareja 2026 — SMK Telkom Malang</p>
+        </div>`,
+    });
+  } catch (e) {
+    console.error("Gagal kirim email merch ready:", e);
+  }
+}
+
+// Publik: pesan ready stock. KIRIM → menunggu ongkir dari admin; AMBIL →
+// langsung bisa dibayar. Stok ditahan sejak pesanan dibuat.
+export async function pesanMerchReady(data: FormData) {
+  const dibatasi = await batasiAksi("beli", 40, 10 * 60 * 1000);
+  if (dibatasi) return { success: false, message: dibatasi };
+  const userId = (await getServerSession())?.user?.id;
+  const nama = ((data.get("nama") as string) || "").trim();
+  const email = ((data.get("email") as string) || "").trim();
+  const noHp = ((data.get("noHp") as string) || "").trim();
+  const pengiriman = data.get("pengiriman") as string;
+  const alamat = ((data.get("alamat") as string) || "").trim().slice(0, 500);
+
+  const salahData = cekDataPemesan({ nama, email, noHp });
+  if (salahData) return { success: false, message: salahData };
+  if (pengiriman !== "KIRIM" && pengiriman !== "AMBIL") return { success: false, message: "Pilih cara pengambilan" };
+  if (pengiriman === "KIRIM" && alamat.length < 15)
+    return { success: false, message: "Alamat pengiriman wajib diisi lengkap (jalan, kota, kode pos)" };
+
+  let keranjang: { merchId: string; ukuran: string | null; jumlah: number }[];
+  try {
+    keranjang = JSON.parse((data.get("items") as string) || "[]");
+  } catch {
+    return { success: false, message: "Data pesanan tidak valid" };
+  }
+  if (!Array.isArray(keranjang) || keranjang.length === 0) return { success: false, message: "Pilih minimal 1 produk" };
+
+  const konfig = await findKonfigMerch();
+  if (!konfig?.readyAktif || poTerbuka(konfig))
+    return { success: false, message: "Penjualan ready stock sedang tidak dibuka" };
+
+  await kedaluwarsakanPesananReady();
+
+  const produkList = await prisma.merchandise.findMany({
+    where: { id: { in: keranjang.map((k) => k.merchId) }, aktif: true },
+  });
+  const gabung = new Map<string, ItemPesanan>();
+  for (const k of keranjang) {
+    const p = produkList.find((x) => x.id === k.merchId);
+    if (!p) return { success: false, message: "Ada produk yang sudah tidak tersedia, muat ulang halaman" };
+    const jumlah = Number(k.jumlah);
+    if (!Number.isInteger(jumlah) || jumlah < 1 || jumlah > MAKS_JUMLAH_PER_ITEM)
+      return { success: false, message: `Jumlah ${p.nama} tidak valid` };
+    const pilihan = daftarUkuran(p.ukuran);
+    const ukuran = pilihan.length ? k.ukuran : null;
+    if (pilihan.length && (!ukuran || !pilihan.includes(ukuran)))
+      return { success: false, message: `Pilih ukuran untuk ${p.nama}` };
+    const key = `${p.id}|${ukuran ?? ""}`;
+    const ada = gabung.get(key);
+    if (ada) ada.jumlah += jumlah;
+    else gabung.set(key, { merchId: p.id, nama: p.nama, ukuran, harga: p.harga, hargaBeli: p.hargaBeli, jumlah });
+  }
+  const items = Array.from(gabung.values());
+  const subtotal = items.reduce((s, i) => s + i.harga * i.jumlah, 0);
+  const aksesToken = buatAksesToken();
+
+  try {
+    const pesanan = await prisma.$transaction(async (tx) => {
+      for (const i of items) {
+        const r = await tx.stokMerch.updateMany({
+          where: { merchId: i.merchId, ukuran: i.ukuran ?? "", stok: { gte: i.jumlah } },
+          data: { stok: { decrement: i.jumlah } },
+        });
+        if (r.count === 0) throw new Error(`STOK:${i.nama}${i.ukuran ? ` (${i.ukuran})` : ""}`);
+      }
+      const ambil = pengiriman === "AMBIL";
+      const kodeUnik = ambil ? await terbitkanKodeUnikMerch(tx) : "";
+      return tx.pesananMerch.create({
+        data: {
+          nama,
+          email,
+          noHp,
+          items,
+          subtotal,
+          kodeUnik,
+          totalBayar: ambil ? subtotal + parseInt(kodeUnik) : subtotal,
+          jenis: "READY",
+          pengiriman,
+          alamat: ambil ? null : alamat,
+          status: ambil ? "MENUNGGU_BAYAR" : "MENUNGGU_ONGKIR",
+          batasBayar: ambil ? batasBayarDariSekarang() : null,
+          aksesToken,
+          ...(userId ? { user: { connect: { id: userId } } } : {}),
+        },
+      });
+    });
+
+    await emailPesananReady(
+      pesanan,
+      pesanan.status === "MENUNGGU_BAYAR" ? "Pesanan Diterima — Silakan Bayar" : "Pesanan Diterima — Menunggu Ongkir",
+      pesanan.status === "MENUNGGU_BAYAR"
+        ? `<p>Pesanan Anda (ambil sendiri) sudah kami terima. Total yang harus dibayar <b>${rpTeks(pesanan.totalBayar)}</b> (termasuk kode unik). Bayar &amp; unggah bukti paling lambat <b>${BATAS_BAYAR_JAM} jam</b>, lewat dari itu pesanan otomatis batal.</p>`
+        : `<p>Pesanan Anda sudah kami terima dan barangnya sudah kami sisihkan. Panitia akan menghitung <b>ongkos kirim</b> ke alamat Anda, lalu mengirim email berisi total pembayaran.</p>`
+    );
+    await catatLog("PESAN_MERCH_READY", `${labelItems(items)} (${nama}) — ${pengiriman}`);
+    revalidateReady();
+    return { success: true, link: `/merchandise/pesanan/${pesanan.id}?t=${aksesToken}` };
+  } catch (e: any) {
+    if (typeof e?.message === "string" && e.message.startsWith("STOK:"))
+      return { success: false, message: `Stok ${e.message.slice(5)} tidak cukup, muat ulang halaman` };
+    console.error("pesanMerchReady error:", e);
+    return { success: false, message: "Gagal memproses pesanan" };
+  }
+}
+
+// Admin: isi ongkir → pesanan siap dibayar (kode unik terbit, batas bayar mulai).
+export async function konfirmasiOngkirMerch(id: string, ongkir: number) {
+  await requireAdminOrBendahara();
+  if (!Number.isInteger(ongkir) || ongkir < 0 || ongkir > 5_000_000)
+    return { success: false, message: "Ongkir tidak valid" };
+  try {
+    const pesanan = await prisma.$transaction(async (tx) => {
+      const p = await tx.pesananMerch.findUnique({ where: { id } });
+      if (!p || p.status !== "MENUNGGU_ONGKIR") return null;
+      const kodeUnik = await terbitkanKodeUnikMerch(tx);
+      return tx.pesananMerch.update({
+        where: { id, status: "MENUNGGU_ONGKIR" },
+        data: {
+          ongkir,
+          kodeUnik,
+          totalBayar: p.subtotal + ongkir + parseInt(kodeUnik),
+          status: "MENUNGGU_BAYAR",
+          batasBayar: batasBayarDariSekarang(),
+        },
+      });
+    });
+    if (!pesanan) return { success: false, message: "Pesanan sudah diproses" };
+    await emailPesananReady(
+      pesanan,
+      "Ongkir Sudah Dihitung — Silakan Bayar",
+      `<table style="width:100%;font-size:14px;border-collapse:collapse">
+        <tr><td>Subtotal barang</td><td style="text-align:right">${rpTeks(pesanan.subtotal)}</td></tr>
+        <tr><td>Ongkos kirim</td><td style="text-align:right">${rpTeks(ongkir)}</td></tr>
+        <tr><td>Kode unik</td><td style="text-align:right">+${parseInt(pesanan.kodeUnik)}</td></tr>
+        <tr><td style="font-weight:bold;border-top:1px solid #ddd">Total bayar</td><td style="text-align:right;font-weight:bold;border-top:1px solid #ddd">${rpTeks(pesanan.totalBayar)}</td></tr>
+      </table>
+      <p>Bayar dengan nominal <b>tepat</b> lalu unggah bukti di halaman pesanan paling lambat <b>${BATAS_BAYAR_JAM} jam</b>. Lewat dari itu pesanan otomatis batal.</p>`
+    );
+    await catatLog("ONGKIR_MERCH", `${pesanan.nama} — ongkir Rp${ongkir}, total Rp${pesanan.totalBayar}`);
+    revalidateReady(id);
+    return { success: true };
+  } catch (e) {
+    console.error("konfirmasiOngkirMerch error:", e);
+    return { success: false, message: "Gagal menyimpan ongkir" };
+  }
+}
+
+// Publik: pembeli mengunggah bukti bayar dari halaman pesanan.
+export async function bayarMerchReady(data: FormData) {
+  const dibatasi = await batasiAksi("beli", 40, 10 * 60 * 1000);
+  if (dibatasi) return { success: false, message: dibatasi };
+  const id = data.get("id") as string;
+  const token = data.get("t") as string;
+  const metodePembayaran = (data.get("metodePembayaran") as string) || "TRANSFER";
+  const bukti = data.get("bukti") as File | null;
+  if (metodePembayaran !== "TRANSFER" && metodePembayaran !== "QRIS")
+    return { success: false, message: "Metode pembayaran hanya QRIS atau Transfer" };
+  if (!bukti || bukti.size === 0) return { success: false, message: "Bukti pembayaran wajib diunggah" };
+
+  await kedaluwarsakanPesananReady();
+  const p = await prisma.pesananMerch.findUnique({ where: { id } });
+  if (!p || !tokenCocok(p.aksesToken, token)) return { success: false, message: "Pesanan tidak ditemukan" };
+  if (p.status !== "MENUNGGU_BAYAR")
+    return {
+      success: false,
+      message: p.status === "BATAL" ? "Pesanan sudah batal (lewat batas bayar)" : "Pesanan tidak sedang menunggu pembayaran",
+    };
+
+  const cek = await validateUploadFile(bukti);
+  if (!cek.valid) return { success: false, message: cek.message };
+  const upload = await imageUploader(Buffer.from(await bukti.arrayBuffer()));
+  if (upload.error) return { success: false, message: upload.message };
+
+  try {
+    const r = await prisma.pesananMerch.updateMany({
+      where: { id, status: "MENUNGGU_BAYAR" },
+      data: { status: "PENDING", metodePembayaran, bukti: upload.data?.url },
+    });
+    if (r.count === 0) return { success: false, message: "Pesanan tidak sedang menunggu pembayaran" };
+    notifPembayaranMasuk({
+      jenis: "Merchandise (Ready Stock)",
+      pathAdmin: "/admin/merchandise",
+      nama: p.nama,
+      kontak: `${p.email} · ${p.noHp}`,
+      totalBayar: p.totalBayar,
+      kodeUnik: p.kodeUnik,
+      metodePembayaran,
+      buktiUrl: upload.data?.url,
+      detail: labelItems(p.items as ItemPesanan[]),
+    });
+    revalidateReady(id);
+    return { success: true };
+  } catch (e) {
+    console.error("bayarMerchReady error:", e);
+    return { success: false, message: "Gagal menyimpan pembayaran" };
+  }
+}
+
+// Admin: batalkan pesanan READY yang belum dibayar → stok kembali.
+export async function batalPesananMerchReady(id: string, alasan: string) {
+  await requireAdminOrBendahara();
+  const catatan = (alasan ?? "").trim().slice(0, 200);
+  if (!catatan) return { success: false, message: "Alasan wajib diisi" };
+  try {
+    const p = await prisma.$transaction(async (tx) => {
+      const klaim = await tx.pesananMerch.updateMany({
+        where: { id, jenis: "READY", status: { in: ["MENUNGGU_ONGKIR", "MENUNGGU_BAYAR"] } },
+        data: { status: "BATAL", catatanAdmin: catatan },
+      });
+      if (klaim.count === 0) return null;
+      const row = await tx.pesananMerch.findUniqueOrThrow({ where: { id } });
+      await kembalikanStokMerch(tx, row.items as ItemPesanan[]);
+      return row;
+    });
+    if (!p) return { success: false, message: "Pesanan sudah diproses" };
+    await emailPesananReady(p, "Pesanan Dibatalkan", `<p>Pesanan Anda dibatalkan panitia. Alasan: ${escapeHtml(catatan)}</p>`);
+    await catatLog("BATAL_MERCH_READY", `${p.nama} — ${catatan}`);
+    revalidateReady(id);
+    return { success: true };
+  } catch (e) {
+    console.error("batalPesananMerchReady error:", e);
+    return { success: false, message: "Gagal membatalkan" };
+  }
+}
+
+// Admin: pesanan KIRIM yang sudah lunas → dikirim + nomor resi.
+export async function tandaiDikirimMerch(id: string, kurir: string, resi: string) {
+  await requireAdminOrBendahara();
+  const k = (kurir ?? "").trim().slice(0, 50);
+  const r = (resi ?? "").trim().slice(0, 80);
+  if (!k || !r) return { success: false, message: "Kurir & nomor resi wajib diisi" };
+  try {
+    const p = await prisma.pesananMerch.update({
+      where: { id, status: "VERIFIED", pengiriman: "KIRIM" },
+      data: { status: "DIKIRIM", kurir: k, resi: r, dikirimAt: new Date() },
+    });
+    await emailPesananReady(
+      p,
+      "Pesanan Sudah Dikirim",
+      `<p>Pesanan Anda sudah dikirim lewat <b>${escapeHtml(k)}</b> dengan nomor resi <b style="font-family:monospace">${escapeHtml(r)}</b>.</p>`
+    );
+    await catatLog("MERCH_DIKIRIM", `${p.nama} — ${k} ${r}`);
+    revalidateReady(id);
+    return { success: true };
+  } catch {
+    return { success: false, message: "Pesanan belum lunas atau sudah diproses" };
   }
 }

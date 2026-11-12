@@ -5,52 +5,112 @@ import {
   deleteMerchandise,
   hapusFotoMerchandise,
   toggleAktifMerchandise,
+  ubahStokMerch,
   updateMerchandise,
 } from "@/actions/Merchandise";
 import SubmitButton from "@/app/components/global/SubmitButton";
-import { Merchandise } from "@prisma/client";
+import type { Merchandise, StokMerch } from "@prisma/client";
+import { daftarUkuran } from "@/lib/merchandise";
 import Image from "next/image";
-import { useRef, useState } from "react";
+import { useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 
-const inputCls = "border border-neutral-300 rounded-lg px-3 py-2 text-sm w-full";
+const inputCls = "border border-neutral-300 rounded-lg px-3 py-2 text-sm w-full min-w-0";
 
+type Produk = Merchandise & { stokReady: StokMerch[] };
+
+// Tata letak dibuat aman untuk kartu sempit (edit) maupun form lebar (tambah):
+// label pendek di atas, keterangan kecil di bawah input — tidak ada kolom yang
+// terjepit sampai angkanya terpotong.
 function FieldsProduk({ p }: { p?: Merchandise }) {
+  const labelCls = "text-sm font-medium";
+  const hintCls = "text-xs text-gray-500";
   return (
-    <>
-      <div className="grid sm:grid-cols-2 gap-3">
-        <div className="flex flex-col gap-1">
-          <label className="text-sm font-medium">Nama Produk</label>
-          <input name="nama" required defaultValue={p?.nama} placeholder="Kaos Antareja 2026" className={inputCls} />
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-1">
+        <label className={labelCls}>Nama Produk</label>
+        <input name="nama" required defaultValue={p?.nama} placeholder="Kaos Antareja" className={inputCls} />
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="flex flex-col gap-1 min-w-0">
+          <label className={labelCls}>Harga Beli</label>
+          <input name="hargaBeli" type="number" min={0} defaultValue={p?.hargaBeli ?? ""} placeholder="60000" className={inputCls} />
+          <span className={hintCls}>Dari vendor (opsional)</span>
         </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div className="flex flex-col gap-1">
-            <label className="text-sm font-medium">
-              Harga Beli <span className="text-gray-500 font-normal">(vendor)</span>
-            </label>
-            <input name="hargaBeli" type="number" min={0} defaultValue={p?.hargaBeli ?? ""} placeholder="60000" className={inputCls} />
-          </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-sm font-medium">Harga Jual</label>
-            <input name="harga" type="number" min={1} required defaultValue={p?.harga} placeholder="85000" className={inputCls} />
-          </div>
+        <div className="flex flex-col gap-1 min-w-0">
+          <label className={labelCls}>Harga Jual</label>
+          <input name="harga" type="number" min={1} required defaultValue={p?.harga} placeholder="85000" className={inputCls} />
+          <span className={hintCls}>Ke pembeli</span>
         </div>
-        <div className="flex flex-col gap-1">
-          <label className="text-sm font-medium">
-            Pilihan Ukuran <span className="text-gray-400 font-normal">— pisah koma, kosongkan jika tidak ada</span>
-          </label>
+      </div>
+      <div className="grid grid-cols-[1fr_88px] gap-3">
+        <div className="flex flex-col gap-1 min-w-0">
+          <label className={labelCls}>Pilihan Ukuran</label>
           <input name="ukuran" defaultValue={p?.ukuran ?? ""} placeholder="S,M,L,XL,XXL" className={inputCls} />
+          <span className={hintCls}>Pisah koma, kosongkan jika tidak ada</span>
         </div>
-        <div className="flex flex-col gap-1">
-          <label className="text-sm font-medium">Urutan Tampil</label>
+        <div className="flex flex-col gap-1 min-w-0">
+          <label className={labelCls}>Urutan</label>
           <input name="urutan" type="number" defaultValue={p?.urutan ?? 0} className={inputCls} />
         </div>
       </div>
       <div className="flex flex-col gap-1">
-        <label className="text-sm font-medium">Deskripsi</label>
-        <textarea name="deskripsi" rows={2} defaultValue={p?.deskripsi ?? ""} placeholder="Bahan cotton combed 30s, sablon plastisol" className={inputCls} />
+        <label className={labelCls}>Deskripsi</label>
+        <textarea name="deskripsi" rows={3} defaultValue={p?.deskripsi ?? ""} placeholder="Bahan cotton combed 30s, sablon plastisol" className={inputCls} />
       </div>
-    </>
+    </div>
+  );
+}
+
+// Stok ready (barang jadi) per ukuran — dipakai saat penjualan ready stock dibuka.
+function StokReady({ p }: { p: Produk }) {
+  const ukuranList = daftarUkuran(p.ukuran);
+  const baris = ukuranList.length ? ukuranList : [""];
+  const stokDari = (u: string) => p.stokReady.find((s) => s.ukuran === u)?.stok ?? 0;
+  const total = baris.reduce((s, u) => s + stokDari(u), 0);
+  const [delta, setDelta] = useState<Record<string, string>>({});
+  const [pending, startTransition] = useTransition();
+
+  function ubah(u: string, tanda: 1 | -1) {
+    const n = parseInt(delta[u] ?? "");
+    if (!Number.isInteger(n) || n <= 0) return toast.error("Isi jumlah lebih dari 0");
+    startTransition(async () => {
+      const r = await ubahStokMerch(p.id, u, n * tanda);
+      if (r.success) {
+        toast.success(`Stok ${tanda > 0 ? "ditambah" : "dikurangi"} ${n}`);
+        setDelta((d) => ({ ...d, [u]: "" }));
+      } else toast.error(r.message ?? "Gagal mengubah stok");
+    });
+  }
+
+  return (
+    <details className="border border-neutral-200 rounded-lg">
+      <summary className="px-3 py-2 text-sm font-medium cursor-pointer select-none">
+        Stok Ready <span className="text-gray-500 font-normal">— total {total}</span>
+      </summary>
+      <div className="px-3 pb-3 flex flex-col gap-1.5">
+        {baris.map((u) => (
+          <div key={u} className="flex items-center gap-2 text-sm">
+            <span className="w-12 font-medium truncate">{u || "—"}</span>
+            <span className={`w-10 text-right font-semibold ${stokDari(u) === 0 ? "text-red-600" : ""}`}>{stokDari(u)}</span>
+            <input
+              type="number"
+              min={1}
+              value={delta[u] ?? ""}
+              onChange={(e) => setDelta((d) => ({ ...d, [u]: e.target.value }))}
+              placeholder="Jml"
+              className="border border-neutral-300 rounded-md px-2 py-1 text-sm w-16 min-w-0"
+            />
+            <button type="button" disabled={pending} onClick={() => ubah(u, 1)} className="border border-green-300 text-green-700 rounded-md px-2 py-1 text-xs font-bold disabled:opacity-50" aria-label="Tambah stok">
+              +
+            </button>
+            <button type="button" disabled={pending} onClick={() => ubah(u, -1)} className="border border-red-300 text-red-700 rounded-md px-2 py-1 text-xs font-bold disabled:opacity-50" aria-label="Kurangi stok">
+              −
+            </button>
+          </div>
+        ))}
+      </div>
+    </details>
   );
 }
 
@@ -73,7 +133,7 @@ function InputGambar({ wajib }: { wajib?: boolean }) {
   );
 }
 
-function KartuAdmin({ p }: { p: Merchandise }) {
+function KartuAdmin({ p }: { p: Produk }) {
   const [edit, setEdit] = useState(false);
 
   async function handleUpdate(data: FormData) {
@@ -156,6 +216,7 @@ function KartuAdmin({ p }: { p: Merchandise }) {
             {p.ukuran && <p className="text-xs text-gray-500">Ukuran: {p.ukuran.split(",").join(", ")}</p>}
             {!p.aktif && <p className="text-xs text-red-500 font-medium">Disembunyikan</p>}
           </div>
+          <StokReady p={p} />
           <div className="flex flex-wrap gap-2 text-xs">
             <button onClick={() => setEdit(true)} className="px-3 py-1.5 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100">
               Edit
@@ -173,7 +234,7 @@ function KartuAdmin({ p }: { p: Merchandise }) {
   );
 }
 
-export default function ProdukMerch({ produk }: { produk: Merchandise[] }) {
+export default function ProdukMerch({ produk }: { produk: Produk[] }) {
   const formRef = useRef<HTMLFormElement>(null);
 
   async function handleCreate(data: FormData) {
