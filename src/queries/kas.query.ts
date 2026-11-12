@@ -76,6 +76,9 @@ export async function getLaporanKas() {
   const totalMerchVerified = kasTransaksis
     .filter((k) => k.tipe === "PEMASUKAN" && k.sumber === "MERCHANDISE")
     .reduce((s, k) => s + k.jumlah, 0);
+  const totalPosProduk = kasTransaksis
+    .filter((k) => k.tipe === "PEMASUKAN" && k.sumber === "POS_PRODUK")
+    .reduce((s, k) => s + k.jumlah, 0);
   const totalMakananVerified = kasTransaksis
     .filter((k) => k.tipe === "PEMASUKAN" && k.sumber === "MAKANAN")
     .reduce((s, k) => s + k.jumlah, 0);
@@ -87,6 +90,7 @@ export async function getLaporanKas() {
     totalPendaftaranVerified,
     totalMerchVerified,
     totalMakananVerified,
+    totalPosProduk,
     totalPendapatan: totalPemasukan,
     totalPengeluaran,
     saldo: totalPemasukan - totalPengeluaran,

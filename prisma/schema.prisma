@@ -592,6 +592,62 @@ model PesananMerch {
   user             User?     @relation(fields: [userId], references: [id])
 }
 
+// ─── POS Produk (penjualan langsung di stand) ────────────────────────────────
+
+// Katalog terpisah dari Merchandise PO: barang yang dijual langsung di lokasi
+// (atribut, snack, minuman, dll). Stok disimpan per varian/ukuran.
+model ProdukPOS {
+  id        String            @id @default(uuid())
+  nama      String
+  // Harga jual ke pembeli.
+  harga     Int
+  // Harga beli/modal per barang — untuk hitung laba. null = belum diisi.
+  // Hanya untuk Admin/Bendahara, tidak dikirim ke halaman kasir.
+  hargaBeli Int?
+  foto      String?
+  aktif     Boolean           @default(true)
+  urutan    Int               @default(0)
+  createdAt DateTime          @default(now())
+  varian    VarianProdukPOS[]
+}
+
+model VarianProdukPOS {
+  id       String    @id @default(uuid())
+  produkId String
+  // Ukuran/varian, mis. "L". "" = produk tanpa ukuran (hanya satu varian).
+  nama     String    @default("")
+  stok     Int       @default(0)
+  urutan   Int       @default(0)
+  produk   ProdukPOS @relation(fields: [produkId], references: [id], onDelete: Cascade)
+
+  @@unique([produkId, nama])
+}
+
+// Tanpa FK ke User/Produk: kasir & barang di-snapshot supaya riwayat tetap utuh
+// walau user dihapus pasca kegiatan atau produk diubah/dihapus.
+model TransaksiPOS {
+  id               String    @id @default(uuid())
+  nomor            Int       @unique @default(autoincrement())
+  // Snapshot: [{produkId, varianId, nama, varian, harga, jumlah}]
+  items            Json
+  total            Int
+  // CASH | QRIS
+  metodePembayaran String
+  uangDiterima     Int?
+  namaPembeli      String?
+  catatan          String?
+  kasirId          String?
+  kasirNama        String
+  // SELESAI | BATAL
+  status           String    @default("SELESAI")
+  batalAt          DateTime?
+  batalAlasan      String?
+  batalOleh        String?
+  createdAt        DateTime  @default(now())
+
+  @@index([createdAt])
+}
+
 // Penghitung pembatas laju (rate limit) & percobaan login gagal — di database,
 // bukan memori proses, supaya tetap berlaku walau container restart.
 // key mis. "login:<email>" atau "aksi:pesanMerch:<ip>".

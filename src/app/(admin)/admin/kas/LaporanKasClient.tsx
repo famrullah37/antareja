@@ -37,7 +37,7 @@ type TransaksiFoto = {
 type KasData = {
   totalPendapatan: number; totalTiketVerified: number; totalFotoVerified: number;
   totalVotingVerified: number; totalPendaftaranVerified: number;
-  totalMerchVerified: number; totalMakananVerified: number;
+  totalMerchVerified: number; totalMakananVerified: number; totalPosProduk: number;
   totalOffline: number; totalOnline: number; totalPengeluaran: number;
   totalPemasukanManual: number; saldo: number; timsConfirmed: number;
   perJenisTiket: PerJenis[];
@@ -156,6 +156,7 @@ export default function LaporanKasClient({ data }: { data: KasData }) {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <SummaryCard label="Merchandise (Verified)" value={formatRupiah(data.totalMerchVerified)} color="blue" />
         <SummaryCard label="Makanan (Verified)" value={formatRupiah(data.totalMakananVerified)} color="green" />
+        <SummaryCard label="Penjualan Produk (POS)" value={formatRupiah(data.totalPosProduk)} color="blue" />
         <SummaryCard label="Pemasukan Manual" value={formatRupiah(data.totalPemasukanManual)} color="orange" />
       </div>
 
