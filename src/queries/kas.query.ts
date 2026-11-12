@@ -17,7 +17,10 @@ export type PendapatanUsaha = {
 async function getPendapatanUsaha(): Promise<PendapatanUsaha[]> {
   const lunas = { status: { in: ["VERIFIED", "DIAMBIL"] } };
   const [merch, makanan, pos] = await Promise.all([
-    prisma.pesananMerch.findMany({ where: lunas, select: { items: true, totalBayar: true } }),
+    prisma.pesananMerch.findMany({
+      where: { status: { in: ["VERIFIED", "DIAMBIL", "DIKIRIM"] } },
+      select: { items: true, totalBayar: true, ongkir: true },
+    }),
     prisma.pesananMakanan.findMany({ where: lunas, select: { items: true, totalBayar: true } }),
     prisma.transaksiPOS.findMany({ where: { status: "SELESAI" }, select: { items: true, total: true } }),
   ]);
@@ -28,7 +31,8 @@ async function getPendapatanUsaha(): Promise<PendapatanUsaha[]> {
   let mMasuk = 0, mModal = 0, mTanpa = 0;
   for (const p of merch) {
     const h = hitungModalMerch(p.items as ItemPesanan[]);
-    mMasuk += p.totalBayar; mModal += h.modal; mTanpa += h.barangTanpaHargaBeli;
+    // Ongkir diteruskan ke kurir — tidak dihitung sebagai uang masuk usaha.
+    mMasuk += p.totalBayar - (p.ongkir ?? 0); mModal += h.modal; mTanpa += h.barangTanpaHargaBeli;
   }
   let kMasuk = 0, kModal = 0, kTanpa = 0;
   for (const p of makanan) {
@@ -125,6 +129,14 @@ export async function getLaporanKas() {
   const totalMerchVerified = kasTransaksis
     .filter((k) => k.tipe === "PEMASUKAN" && k.sumber === "MERCHANDISE")
     .reduce((s, k) => s + k.jumlah, 0);
+  // Bazar: pemasukan (sewa stand/bagi hasil tenant) & pengeluaran (tenda,
+  // listrik, dll) dicatat manual dengan kategori BAZAR.
+  const bazarMasuk = kasTransaksis
+    .filter((k) => k.tipe === "PEMASUKAN" && k.kategori === "BAZAR")
+    .reduce((s, k) => s + k.jumlah, 0);
+  const bazarKeluar = kasTransaksis
+    .filter((k) => k.tipe === "PENGELUARAN" && k.kategori === "BAZAR")
+    .reduce((s, k) => s + k.jumlah, 0);
   const totalPosProduk = kasTransaksis
     .filter((k) => k.tipe === "PEMASUKAN" && k.sumber === "POS_PRODUK")
     .reduce((s, k) => s + k.jumlah, 0);
@@ -140,6 +152,8 @@ export async function getLaporanKas() {
     totalMerchVerified,
     totalMakananVerified,
     totalPosProduk,
+    bazarMasuk,
+    bazarKeluar,
     totalPendapatan: totalPemasukan,
     totalPengeluaran,
     saldo: totalPemasukan - totalPengeluaran,

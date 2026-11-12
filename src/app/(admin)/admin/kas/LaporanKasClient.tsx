@@ -41,6 +41,7 @@ type KasData = {
   totalMerchVerified: number; totalMakananVerified: number; totalPosProduk: number;
   totalOffline: number; totalOnline: number; totalPengeluaran: number;
   totalPemasukanManual: number; saldo: number; timsConfirmed: number;
+  bazarMasuk: number; bazarKeluar: number;
   perJenisTiket: PerJenis[];
   transaksiTikets: TransaksiTiket[];
   transaksiFotos: TransaksiFoto[];
@@ -238,6 +239,11 @@ export default function LaporanKasClient({ data }: { data: KasData }) {
         <SummaryCard label="Makanan (Verified)" value={formatRupiah(data.totalMakananVerified)} color="green" />
         <SummaryCard label="Penjualan Produk (POS)" value={formatRupiah(data.totalPosProduk)} color="blue" />
         <SummaryCard label="Pemasukan Manual" value={formatRupiah(data.totalPemasukanManual)} color="orange" />
+        <SummaryCard
+          label={`Bazar bersih (masuk ${formatRupiah(data.bazarMasuk)} − keluar ${formatRupiah(data.bazarKeluar)})`}
+          value={formatRupiah(data.bazarMasuk - data.bazarKeluar)}
+          color={data.bazarMasuk - data.bazarKeluar >= 0 ? "green" : "red"}
+        />
       </div>
 
       <PendapatanBersihUsaha data={data.pendapatanUsaha} />
@@ -400,6 +406,7 @@ export default function LaporanKasClient({ data }: { data: KasData }) {
                       <>
                         <option value="SPONSOR">Sponsor</option>
                         <option value="PENDAFTARAN_TIM">Pendaftaran Tim</option>
+                        <option value="BAZAR">Bazar (sewa stand, bagi hasil tenant)</option>
                         <option value="LAINNYA">Lainnya</option>
                       </>
                     ) : (
@@ -408,6 +415,7 @@ export default function LaporanKasClient({ data }: { data: KasData }) {
                         <option value="KONSUMSI">Konsumsi</option>
                         <option value="PERLENGKAPAN">Perlengkapan</option>
                         <option value="TRANSPORTASI">Transportasi</option>
+                        <option value="BAZAR">Bazar (tenda, listrik, perlengkapan stand)</option>
                         <option value="LAINNYA">Lainnya</option>
                       </>
                     )}
