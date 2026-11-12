@@ -91,8 +91,16 @@ export default function MasukanSuaraJuri({
     let stream: MediaStream;
     try {
       stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    } catch {
-      toast.error("Izin mikrofon ditolak. Aktifkan mikrofon di pengaturan browser.");
+    } catch (e) {
+      // Bedakan penyebab supaya juri tahu harus berbuat apa.
+      const nama = (e as DOMException)?.name;
+      toast.error(
+        nama === "NotFoundError"
+          ? "Mikrofon tidak ditemukan di perangkat ini."
+          : nama === "NotReadableError"
+            ? "Mikrofon sedang dipakai aplikasi lain. Tutup aplikasi tersebut lalu coba lagi."
+            : "Izin mikrofon ditolak. Klik ikon gembok di samping alamat situs → izinkan Mikrofon, lalu muat ulang halaman."
+      );
       return;
     }
     const mimeType = TIPE_REKAM.find((t) => MediaRecorder.isTypeSupported(t));

@@ -47,7 +47,10 @@ const nextConfig = {
       { key: "X-Content-Type-Options", value: "nosniff" },
       { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
       { key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" },
-      { key: "Permissions-Policy", value: "camera=(self), microphone=(), geolocation=()" },
+      // microphone=(self): rekam Masukan Suara juri (penilaian-baru/input). Dulu
+      // microphone=() memblokir mikrofon di seluruh situs — browser langsung
+      // menolak tanpa menampilkan pop-up izin.
+      { key: "Permissions-Policy", value: "camera=(self), microphone=(self), geolocation=()" },
     ];
     return [
       { source: "/:path*", headers: security },
