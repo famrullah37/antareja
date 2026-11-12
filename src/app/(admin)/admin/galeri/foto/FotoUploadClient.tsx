@@ -1,6 +1,6 @@
 "use client";
 
-import { deleteFotoAdmin, setGratisFoto } from "@/actions/Galeri";
+import { deleteFotoAdmin, deleteFotoMassal, setGratisFoto } from "@/actions/Galeri";
 import { useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
 
@@ -27,6 +27,9 @@ export default function FotoUploadClient({ fotos, isAdmin, albumAwal }: { fotos:
   const [cari, setCari] = useState("");
   const [tampil, setTampil] = useState(PER_HALAMAN);
   const [pending, startTransition] = useTransition();
+  // Mode centang: pilih banyak foto lalu hapus sekaligus.
+  const [modePilih, setModePilih] = useState(false);
+  const [pilih, setPilih] = useState<Set<string>>(new Set());
 
   const albums = useMemo(() => {
     const m = new Map<string, { nama: string; jumlah: number }>();
@@ -50,6 +53,46 @@ export default function FotoUploadClient({ fotos, isAdmin, albumAwal }: { fotos:
       (!q || (f.tim ?? "").toLowerCase().includes(q) || f.albumNama.toLowerCase().includes(q))
   );
   const totalTerjual = tersaring.reduce((s, f) => s + f.terjual, 0);
+  // Foto yang sudah dibeli tidak bisa dipilih (tidak bisa dihapus).
+  const bisaDipilih = tersaring.filter((f) => f.terjual === 0);
+  const jumlahPilih = tersaring.filter((f) => pilih.has(f.id)).length;
+
+  function togglePilih(id: string) {
+    setPilih((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function keluarModePilih() {
+    setModePilih(false);
+    setPilih(new Set());
+  }
+
+  function hapusTerpilih() {
+    const ids = tersaring.filter((f) => pilih.has(f.id)).map((f) => f.id);
+    if (ids.length === 0) return toast.error("Belum ada foto dipilih");
+    if (!confirm(`Hapus ${ids.length} foto terpilih? Tindakan ini tidak bisa dibatalkan.`)) return;
+    startTransition(async () => {
+      const r = await deleteFotoMassal(ids);
+      if (!r.success) return void toast.error(("message" in r && r.message) || "Gagal menghapus foto");
+      const dilewati = (r.dilewatiTerjual ?? 0) + (r.dilewatiBukanMilik ?? 0);
+      toast.success(
+        `${r.dihapus} foto dihapus` +
+          (dilewati > 0
+            ? ` · ${dilewati} dilewati (${[
+                r.dilewatiTerjual ? `${r.dilewatiTerjual} sudah dibeli/dipesan` : "",
+                r.dilewatiBukanMilik ? `${r.dilewatiBukanMilik} bukan milik Anda` : "",
+              ]
+                .filter(Boolean)
+                .join(", ")})`
+            : "")
+      );
+      keluarModePilih();
+    });
+  }
   const fotoTerjual = tersaring.filter((f) => f.terjual > 0).length;
 
   function ubahGratis(f: Foto) {
@@ -127,16 +170,95 @@ export default function FotoUploadClient({ fotos, isAdmin, albumAwal }: { fotos:
         />
       </div>
 
+      {tersaring.length > 0 && (
+        <div
+          className={`flex flex-wrap items-center gap-2 rounded-xl px-3 py-2 text-sm ${
+            modePilih ? "bg-red-50 border border-red-200 sticky top-2 z-10" : ""
+          }`}
+        >
+          {!modePilih ? (
+            <button
+              type="button"
+              onClick={() => setModePilih(true)}
+              className="border border-neutral-300 rounded-lg px-3 py-1.5 hover:bg-neutral-50"
+            >
+              ☑ Pilih beberapa foto
+            </button>
+          ) : (
+            <>
+              <span className="font-semibold">{jumlahPilih} dipilih</span>
+              <button
+                type="button"
+                onClick={() => setPilih(new Set(bisaDipilih.map((f) => f.id)))}
+                className="border border-neutral-300 bg-white rounded-lg px-3 py-1.5 hover:bg-neutral-50"
+              >
+                Pilih semua hasil filter ({bisaDipilih.length})
+              </button>
+              {jumlahPilih > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setPilih(new Set())}
+                  className="border border-neutral-300 bg-white rounded-lg px-3 py-1.5 hover:bg-neutral-50"
+                >
+                  Kosongkan
+                </button>
+              )}
+              <button
+                type="button"
+                disabled={pending || jumlahPilih === 0}
+                onClick={hapusTerpilih}
+                className="bg-red-600 text-white rounded-lg px-3 py-1.5 font-semibold hover:bg-red-700 disabled:opacity-50"
+              >
+                {pending ? "Menghapus..." : `Hapus terpilih (${jumlahPilih})`}
+              </button>
+              <button type="button" onClick={keluarModePilih} className="text-gray-600 hover:underline ml-auto">
+                Selesai
+              </button>
+              {bisaDipilih.length < tersaring.length && (
+                <p className="w-full text-xs text-gray-500">
+                  {tersaring.length - bisaDipilih.length} foto sudah dibeli sehingga tidak bisa dipilih.
+                </p>
+              )}
+            </>
+          )}
+        </div>
+      )}
+
       {tersaring.length === 0 ? (
         <p className="text-sm text-gray-500">Belum ada foto.</p>
       ) : (
         <>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
             {tersaring.slice(0, tampil).map((f) => (
-              <div key={f.id} className="bg-white rounded-xl border border-neutral-200 overflow-hidden flex flex-col">
-                <a href={f.urlAsli} target="_blank" rel="noopener noreferrer" className="relative block aspect-square bg-neutral-100">
+              <div
+                key={f.id}
+                className={`bg-white rounded-xl border-2 overflow-hidden flex flex-col ${
+                  pilih.has(f.id) ? "border-red-500" : "border-neutral-200"
+                }`}
+              >
+                <a
+                  href={f.urlAsli}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => {
+                    if (!modePilih) return;
+                    e.preventDefault();
+                    if (f.terjual === 0) togglePilih(f.id);
+                  }}
+                  className={`relative block aspect-square bg-neutral-100 ${modePilih && f.terjual > 0 ? "cursor-not-allowed" : ""}`}
+                >
                   {/* eslint-disable-next-line @next/next/no-img-element -- thumbnail Cloudinary, banyak & ukuran bebas */}
                   <img src={f.url} alt={f.tim ?? f.albumNama} loading="lazy" className="absolute inset-0 w-full h-full object-cover" />
+                  {modePilih && f.terjual === 0 && (
+                    <span
+                      className={`absolute top-2 left-2 w-6 h-6 rounded-md border-2 flex items-center justify-center text-sm font-bold ${
+                        pilih.has(f.id) ? "bg-red-600 border-red-600 text-white" : "bg-white/90 border-neutral-400"
+                      }`}
+                    >
+                      {pilih.has(f.id) ? "✓" : ""}
+                    </span>
+                  )}
+                  {modePilih && pilih.has(f.id) && <span className="absolute inset-0 bg-red-500/20" />}
                   {f.terjual > 0 && (
                     <span className="absolute top-2 left-2 bg-green-600 text-white text-[11px] font-bold px-2 py-0.5 rounded-full">
                       Terjual {f.terjual}×

@@ -18,7 +18,7 @@ import { catatLog } from "@/lib/activityLog";
 import { getKonfigUmum } from "@/queries/konfigUmum.query";
 import { imageUploader, validateUploadFile } from "./fileUploader";
 import { addWatermark } from "@/lib/watermark";
-import { fotoGratis } from "@/lib/galeri";
+import { fotoGratis, MAKS_FOTO_PER_UPLOAD } from "@/lib/galeri";
 import { sendMailTo } from "@/lib/mailer";
 import prisma from "@/lib/prisma";
 import { toDownloadUrl } from "@/lib/downloadUrl";
@@ -250,7 +250,10 @@ export async function deleteAlbumAdmin(albumId: string) {
 export async function uploadFoto(data: FormData) {
   const user = await requireAdminOrFotografer();
   const albumId = data.get("albumId") as string;
-  const files = data.getAll("fotos") as File[];
+  const files = (data.getAll("fotos") as File[]).filter((f) => f && f.size > 0);
+  if (files.length === 0) return { success: false, uploaded: 0, failed: 0, failedReasons: ["Pilih minimal 1 foto"] };
+  if (files.length > MAKS_FOTO_PER_UPLOAD)
+    return { success: false, uploaded: 0, failed: files.length, failedReasons: [`Maksimal ${MAKS_FOTO_PER_UPLOAD} foto per upload`] };
   // Tim dipilih dari daftar tim terdaftar (bukan diketik) supaya foto pasti
   // terhubung ke tim yang benar; tagTim diisi nama tim sebagai teks tampilan.
   // Album yang sudah terhubung ke tim menang: semua fotonya milik tim album.
@@ -307,6 +310,44 @@ export async function uploadFoto(data: FormData) {
 
 // Fotografer hanya boleh menghapus fotonya sendiri (fotograferId = dia, atau
 // foto tanpa fotografer di album miliknya); admin boleh semua.
+// Hapus banyak foto sekaligus (mode centang di Foto Ter-upload). Aturan sama
+// dengan hapus satuan: fotografer hanya fotonya sendiri, foto yang sudah
+// dibeli / sedang dipesan dilewati. Mengembalikan ringkasan.
+export async function deleteFotoMassal(fotoIds: string[]) {
+  const user = await requireAdminOrFotografer();
+  if (!Array.isArray(fotoIds) || fotoIds.length === 0) return { success: false, message: "Belum ada foto dipilih" };
+  if (fotoIds.length > 500) return { success: false, message: "Maksimal 500 foto sekali hapus" };
+  const ids = Array.from(new Set(fotoIds.filter((x) => typeof x === "string")));
+  try {
+    const fotos = await prisma.foto.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, fotograferId: true, album: { select: { fotograferId: true } } },
+    });
+    const milik = user.role === "ADMIN" ? fotos : fotos.filter((f) => (f.fotograferId ?? f.album.fotograferId) === user.id);
+    const bukanMilik = fotos.length - milik.length;
+
+    const transaksi = await prisma.transaksiFoto.findMany({
+      where: { status: { in: ["PENDING", "VERIFIED"] } },
+      select: { fotoList: true },
+    });
+    const terpakai = new Set(transaksi.flatMap((t) => (Array.isArray(t.fotoList) ? (t.fotoList as string[]) : [])));
+    const bolehHapus = milik.filter((f) => !terpakai.has(f.id)).map((f) => f.id);
+    const terjual = milik.length - bolehHapus.length;
+
+    if (bolehHapus.length > 0) {
+      await prisma.foto.deleteMany({ where: { id: { in: bolehHapus } } });
+      await catatLog("HAPUS_FOTO_MASSAL", `${bolehHapus.length} foto`);
+      revalidatePath("/admin/galeri");
+      revalidatePath("/admin/galeri/foto");
+      revalidatePath("/galeri");
+    }
+    return { success: true, dihapus: bolehHapus.length, dilewatiTerjual: terjual, dilewatiBukanMilik: bukanMilik };
+  } catch (e) {
+    console.error("deleteFotoMassal error:", e);
+    return { success: false, message: "Gagal menghapus foto" };
+  }
+}
+
 export async function deleteFotoAdmin(fotoId: string) {
   const user = await requireAdminOrFotografer();
   try {

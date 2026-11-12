@@ -1,3 +1,6 @@
+// Batas jumlah foto sekali upload (form & server).
+export const MAKS_FOTO_PER_UPLOAD = 10;
+
 // Foto gratis = albumnya bertipe GRATIS, atau fotonya ditandai gratis di album
 // berbayar. Dipakai di galeri publik, keranjang, beliFoto, & preview beranda —
 // semuanya harus memakai aturan yang sama.
