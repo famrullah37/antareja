@@ -498,6 +498,9 @@ model Foto {
   // migrasi idempotent (lihat db/sql/0046); tagTim tetap teks tampilannya.
   timId         String?
   statusPublish Boolean  @default(false)
+  // Foto gratis di album berbayar (bisa diunduh tanpa beli). Album bertipe
+  // GRATIS tetap membuat semua fotonya gratis — lihat lib/galeri.ts fotoGratis().
+  gratis        Boolean  @default(false)
   createdAt     DateTime @default(now())
   // Fotografer foto ini (penerima bagi hasil); kosong = ikut fotografer album.
   fotograferId  String?

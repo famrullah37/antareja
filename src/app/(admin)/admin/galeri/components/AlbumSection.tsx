@@ -33,11 +33,13 @@ export default function AlbumSection({
   fotografers,
   tims,
   isAdmin,
+  userId,
 }: {
   albums: Album[];
   fotografers: Fotografer[];
   tims: TimOpsi[];
   isAdmin: boolean;
+  userId: string | null;
 }) {
   const [cariTim, setCariTim] = useState("");
   const [timBaru, setTimBaru] = useState("");
@@ -75,15 +77,20 @@ export default function AlbumSection({
     const result = await publishAlbum(id, !current);
     if (result.success)
       toast.success(current ? "Album disembunyikan" : "Album dipublish!", { id: toastId });
-    else toast.error("Gagal", { id: toastId });
+    else toast.error(("message" in result && result.message) || "Gagal", { id: toastId });
   }
 
   async function handleDelete(id: string) {
-    if (!confirm("Hapus album beserta semua fotonya?")) return;
+    if (
+      !confirm(
+        "Hapus album beserta SEMUA fotonya? Tindakan ini tidak bisa dibatalkan.\n\nAlbum yang fotonya sudah dibeli tidak bisa dihapus — sembunyikan saja."
+      )
+    )
+      return;
     const toastId = toast.loading("Menghapus...");
     const result = await deleteAlbumAdmin(id);
     if (result.success) toast.success("Album dihapus", { id: toastId });
-    else toast.error("Gagal", { id: toastId });
+    else toast.error(result.message ?? "Gagal menghapus album", { id: toastId });
   }
 
   return (
@@ -261,12 +268,14 @@ export default function AlbumSection({
                   >
                     {album.statusPublish ? "Sembunyikan" : "Publish"}
                   </button>
+                  {(isAdmin || album.fotograferId === userId) && (
                   <button
                     onClick={() => handleDelete(album.id)}
                     className="text-xs px-3 py-1 rounded-lg border border-red-200 text-red-500 hover:bg-red-50 transition-colors"
                   >
                     Hapus
                   </button>
+                  )}
                 </div>
               </div>
             ))

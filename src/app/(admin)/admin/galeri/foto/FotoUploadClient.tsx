@@ -1,6 +1,6 @@
 "use client";
 
-import { deleteFotoAdmin } from "@/actions/Galeri";
+import { deleteFotoAdmin, setGratisFoto } from "@/actions/Galeri";
 import { useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
 
@@ -11,6 +11,7 @@ type Foto = {
   albumId: string;
   albumNama: string;
   albumTipe: string;
+  gratis: boolean;
   harga: number;
   tim: string | null;
   fotografer: string | null;
@@ -50,6 +51,14 @@ export default function FotoUploadClient({ fotos, isAdmin, albumAwal }: { fotos:
   );
   const totalTerjual = tersaring.reduce((s, f) => s + f.terjual, 0);
   const fotoTerjual = tersaring.filter((f) => f.terjual > 0).length;
+
+  function ubahGratis(f: Foto) {
+    startTransition(async () => {
+      const r = await setGratisFoto(f.id, !f.gratis);
+      if (r.success) toast.success(f.gratis ? "Foto dijadikan berbayar" : "Foto dijadikan gratis");
+      else toast.error(r.message ?? "Gagal mengubah foto");
+    });
+  }
 
   function hapus(f: Foto) {
     if (!confirm("Hapus foto ini dari galeri? Tindakan ini tidak bisa dibatalkan.")) return;
@@ -133,6 +142,13 @@ export default function FotoUploadClient({ fotos, isAdmin, albumAwal }: { fotos:
                       Terjual {f.terjual}×
                     </span>
                   )}
+                  <span
+                    className={`absolute top-2 right-2 text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                      f.gratis ? "bg-emerald-500 text-white" : "bg-black/60 text-white"
+                    }`}
+                  >
+                    {f.gratis ? "GRATIS" : `Rp${f.harga.toLocaleString("id-ID")}`}
+                  </span>
                 </a>
                 <div className="p-2 text-xs flex flex-col gap-0.5">
                   <p className="font-medium truncate" title={f.albumNama}>
@@ -149,6 +165,16 @@ export default function FotoUploadClient({ fotos, isAdmin, albumAwal }: { fotos:
                       timeZone: "Asia/Jakarta",
                     })}
                   </p>
+                  {f.albumTipe !== "GRATIS" && (
+                    <button
+                      type="button"
+                      disabled={pending}
+                      onClick={() => ubahGratis(f)}
+                      className="self-start mt-1 text-emerald-700 hover:underline disabled:opacity-50"
+                    >
+                      {f.gratis ? "Jadikan berbayar" : "Jadikan gratis"}
+                    </button>
+                  )}
                   {f.terjual > 0 ? (
                     <span className="mt-1 text-gray-400" title="Foto yang sudah dibeli tidak bisa dihapus">
                       Terkunci (sudah dibeli)

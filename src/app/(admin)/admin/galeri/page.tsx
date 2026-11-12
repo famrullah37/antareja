@@ -29,6 +29,7 @@ export default async function AdminGaleriPage() {
         fotografers={fotografers}
         tims={timOpsi}
         isAdmin={session?.user?.role === "ADMIN"}
+        userId={session?.user?.id ?? null}
       />
       <UploadFotoSection
         albums={albums as any}

@@ -63,6 +63,7 @@ export default async function FotoUploadPage({ searchParams }: { searchParams: {
           albumId: f.album.id,
           albumNama: f.album.nama,
           albumTipe: f.album.tipe,
+          gratis: f.album.tipe === "GRATIS" || f.gratis,
           harga: f.album.harga,
           tim: f.tagTim,
           fotografer: f.fotografer?.nama ?? f.album.fotografer?.nama ?? null,

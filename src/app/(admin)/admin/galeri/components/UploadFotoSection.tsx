@@ -4,7 +4,7 @@ import { uploadFoto } from "@/actions/Galeri";
 import { useState } from "react";
 import { toast } from "sonner";
 
-type Album = { id: string; nama: string; timId: string | null };
+type Album = { id: string; nama: string; timId: string | null; tipe: string };
 type Fotografer = { id: string; nama: string };
 type TimOpsi = { id: string; nama: string; sekolah: string };
 
@@ -162,6 +162,18 @@ export default function UploadFotoSection({
             <p className="text-xs text-primary-600">{fileCount} foto dipilih</p>
           )}
         </div>
+
+        {albums.find((a) => a.id === albumId)?.tipe !== "GRATIS" && (
+          <label className="flex items-start gap-2 text-sm">
+            <input type="checkbox" name="gratis" className="w-4 h-4 mt-0.5 accent-green-600" />
+            <span>
+              Jadikan foto ini <b>gratis</b>
+              <span className="block text-xs text-gray-500">
+                Bisa diunduh tanpa beli walau albumnya berbayar. Bisa diubah per foto di halaman Foto Ter-upload.
+              </span>
+            </span>
+          </label>
+        )}
 
         <button
           type="submit"

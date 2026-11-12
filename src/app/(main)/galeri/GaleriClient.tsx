@@ -16,6 +16,8 @@ type FotoItem = {
   timId: string | null;
   albumId: string;
   album: { nama: string; tipe: string; harga: number };
+  // Album GRATIS atau foto ditandai gratis (lihat lib/galeri.ts).
+  gratis: boolean;
 };
 
 type TimItem = { id: string; nama: string; sekolah: string };
@@ -120,7 +122,7 @@ export default function GaleriClient({
   }
 
   // Harga per foto: tiap foto dikenai harga albumnya (sama dengan beliFoto di server).
-  const cartFotos = fotos.filter((f) => cart.has(f.id));
+  const cartFotos = fotos.filter((f) => cart.has(f.id) && !f.gratis);
   const totalHarga = cartFotos.reduce((s, f) => s + f.album.harga, 0);
 
   const totalBayar = kodeUnik ? totalHarga + parseInt(kodeUnik) : 0;
@@ -288,7 +290,7 @@ export default function GaleriClient({
       </div>
 
       {/* Info */}
-      {filtered.some((f) => f.album.tipe !== "GRATIS") && (
+      {filtered.some((f) => !f.gratis) && (
         <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-sm text-blue-800 flex items-start gap-3">
           <span className="text-lg leading-none">💡</span>
           <span>Klik foto berbayar untuk menambahkan ke keranjang, lalu isi data dan unggah bukti transfer.</span>
@@ -331,7 +333,7 @@ export default function GaleriClient({
       {/* Grid Foto */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
         {filtered.map((foto) => {
-          const isGratis = foto.album.tipe === "GRATIS";
+          const isGratis = foto.gratis;
           const inCart = cart.has(foto.id);
           return (
             <div
