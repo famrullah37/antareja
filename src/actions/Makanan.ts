@@ -106,16 +106,23 @@ export async function simpanMenuMakanan(data: FormData): Promise<Hasil> {
   const nama = teks(data, "nama", 100);
   const deskripsi = teks(data, "deskripsi", 300) || null;
   const harga = parseInt((data.get("harga") as string) || "0", 10);
+  const hargaBeliRaw = ((data.get("hargaBeli") as string) || "").trim();
+  const hargaBeli = hargaBeliRaw === "" ? null : parseInt(hargaBeliRaw, 10);
   const urutan = parseInt((data.get("urutan") as string) || "0", 10) || 0;
 
   if (!nama) return { success: false, message: "Nama menu wajib diisi" };
-  if (!Number.isInteger(harga) || harga <= 0 || harga > 10_000_000) return { success: false, message: "Harga tidak valid" };
+  if (!Number.isInteger(harga) || harga <= 0 || harga > 10_000_000) return { success: false, message: "Harga jual tidak valid" };
+  if (hargaBeli !== null && (!Number.isInteger(hargaBeli) || hargaBeli < 0 || hargaBeli > 10_000_000))
+    return { success: false, message: "Harga beli tidak valid" };
 
   try {
-    const isi = { nama, deskripsi, harga, urutan };
+    const isi = { nama, deskripsi, harga, hargaBeli, urutan };
     if (id) await prisma.menuMakanan.update({ where: { id }, data: isi });
     else await prisma.menuMakanan.create({ data: { ...isi, sesiId } });
-    await catatLog(id ? "UBAH_MENU_MAKAN" : "TAMBAH_MENU_MAKAN", `${nama} — Rp${harga}`);
+    await catatLog(
+      id ? "UBAH_MENU_MAKAN" : "TAMBAH_MENU_MAKAN",
+      `${nama} — jual Rp${harga}, beli ${hargaBeli == null ? "-" : `Rp${hargaBeli}`}`
+    );
     segarkan();
     return { success: true };
   } catch (e) {
@@ -295,7 +302,7 @@ export async function pesanMakanan(data: FormData): Promise<Hasil> {
     if (!Number.isInteger(jumlah) || jumlah < 1 || jumlah > MAKS_PORSI_PER_MENU)
       return { success: false, message: `Jumlah ${menu.nama} harus 1–${MAKS_PORSI_PER_MENU}` };
     if (items.some((i) => i.menuId === menu.id)) return { success: false, message: "Data pesanan tidak valid" };
-    items.push({ menuId: menu.id, nama: menu.nama, harga: menu.harga, jumlah });
+    items.push({ menuId: menu.id, nama: menu.nama, harga: menu.harga, hargaBeli: menu.hargaBeli, jumlah });
   }
   if (items.length === 0) return { success: false, message: "Pilih minimal 1 menu" };
 

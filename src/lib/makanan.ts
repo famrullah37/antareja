@@ -4,9 +4,34 @@
 export type ItemMakanan = {
   menuId: string;
   nama: string;
-  harga: number;
+  harga: number; // harga jual
+  // Harga beli dari katering saat pesan (snapshot). null/undefined = belum diisi
+  // atau pesanan lama. JANGAN dikirim ke dashboard tim.
+  hargaBeli?: number | null;
   jumlah: number;
 };
+
+// Buang harga beli sebelum items dikirim ke dashboard tim.
+export function tanpaHargaBeliMakanan(items: ItemMakanan[]): ItemMakanan[] {
+  return items.map(({ hargaBeli: _hb, ...i }) => i);
+}
+
+// Modal & laba. Item tanpa harga beli tidak ikut dihitung labanya
+// (nominalnya dicatat di nominalTanpaModal).
+export function hitungLabaMakanan(items: ItemMakanan[]) {
+  let modal = 0;
+  let laba = 0;
+  let nominalTanpaModal = 0;
+  for (const i of items) {
+    if (i.hargaBeli == null) {
+      nominalTanpaModal += i.harga * i.jumlah;
+      continue;
+    }
+    modal += i.hargaBeli * i.jumlah;
+    laba += (i.harga - i.hargaBeli) * i.jumlah;
+  }
+  return { modal, laba, nominalTanpaModal };
+}
 
 export const MAKS_PORSI_PER_MENU = 200;
 

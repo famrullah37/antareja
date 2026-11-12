@@ -976,7 +976,11 @@ model MenuMakanan {
   sesiId    String
   nama      String
   deskripsi String?
+  // Harga jual ke tim.
   harga     Int
+  // Harga beli dari katering per porsi — untuk hitung laba. null = belum diisi.
+  // Hanya untuk panitia, tidak dikirim ke dashboard tim.
+  hargaBeli Int?
   aktif     Boolean   @default(true)
   urutan    Int       @default(0)
   createdAt DateTime  @default(now())
