@@ -24,7 +24,7 @@ export default function UserForm({
     { label: "SIE_ACARA — Sie Acara", value: "SIE_ACARA" },
     { label: "SIE_HUMAS — Sie Humas", value: "SIE_HUMAS" },
     { label: "JURI — Juri Penilaian", value: "JURI" },
-    { label: "TIKET — Petugas Tiket", value: "TIKET" },
+    { label: "TIKET — Petugas Tiket & Kasir", value: "TIKET" },
     { label: "BENDAHARA — Bendahara", value: "BENDAHARA" },
     { label: "FOTOGRAFER — Fotografer", value: "FOTOGRAFER" },
   ];
