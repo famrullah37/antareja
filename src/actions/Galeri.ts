@@ -18,7 +18,7 @@ import { catatLog } from "@/lib/activityLog";
 import { getKonfigUmum } from "@/queries/konfigUmum.query";
 import { imageUploader, validateUploadFile } from "./fileUploader";
 import { addWatermark } from "@/lib/watermark";
-import { fotoGratis, MAKS_FOTO_PER_UPLOAD } from "@/lib/galeri";
+import { fotoGratis, MAKS_FOTO_PER_UPLOAD, type PemilikFoto } from "@/lib/galeri";
 import { sendMailTo } from "@/lib/mailer";
 import prisma from "@/lib/prisma";
 import { toDownloadUrl } from "@/lib/downloadUrl";
@@ -481,7 +481,14 @@ export async function beliFoto(data: FormData) {
     // fotoList inilah yang nanti dibuka di halaman unduhan setelah verifikasi.
     const fotos = await prisma.foto.findMany({
       where: { id: { in: fotoList }, statusPublish: true, album: { statusPublish: true } },
-      select: { albumId: true, gratis: true, album: { select: { nama: true, harga: true, tipe: true } } },
+      select: {
+        id: true,
+        albumId: true,
+        gratis: true,
+        fotograferId: true,
+        fotografer: { select: { nama: true } },
+        album: { select: { nama: true, harga: true, tipe: true, fotograferId: true, fotografer: { select: { nama: true } } } },
+      },
     });
     if (fotos.length !== fotoList.length)
       return { success: false, message: "Ada foto yang tidak tersedia, muat ulang halaman" };
@@ -499,6 +506,14 @@ export async function beliFoto(data: FormData) {
       perAlbum.set(f.albumId, r);
     }
     const rincianAlbum = Array.from(perAlbum.values());
+    // Pemilik efektif tiap foto saat beli (foto → fotografer foto, kosong →
+    // fotografer album). Cadangan bagi hasil bila foto/album/akun terhapus.
+    const pemilikFoto: PemilikFoto[] = fotos.map((f) => ({
+      fotoId: f.id,
+      albumId: f.albumId,
+      fotograferId: f.fotograferId ?? f.album.fotograferId ?? null,
+      fotograferNama: f.fotograferId ? f.fotografer?.nama ?? null : f.album.fotografer?.nama ?? null,
+    }));
     // Nominal akhir = total harga foto + kode unik — kalau tidak ditambahkan,
     // dua pembelian yang sama tercatat dengan nominal identik di laporan kas
     // (lihat juga totalBayar di Voting.ts/registrationForm.ts).
@@ -526,6 +541,7 @@ export async function beliFoto(data: FormData) {
       fotoList,
       harga,
       rincianAlbum,
+      pemilikFoto,
       ...(buktiUrl ? { bukti: buktiUrl } : {}),
       status: "PENDING",
       expiredAt,

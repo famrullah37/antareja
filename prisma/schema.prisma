@@ -531,6 +531,10 @@ model TransaksiFoto {
   kuitansiTanggal  DateTime?
   // Snapshot saat beli: [{albumId, nama, harga}] — dasar bagi hasil fotografer.
   rincianAlbum     Json?
+  // Snapshot pemilik tiap foto saat beli: [{fotoId, albumId, fotograferId,
+  // fotograferNama}] — dipakai bagi hasil bila foto/album/akun sudah terhapus,
+  // supaya riwayat pendapatan fotografer tidak hilang.
+  pemilikFoto      Json?
   // Snapshot KonfigUmum.persenFotografer saat diverifikasi.
   persenFotografer Int?
   createdAt        DateTime  @default(now())

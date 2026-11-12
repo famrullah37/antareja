@@ -1,3 +1,11 @@
+// Snapshot pemilik foto per transaksi (TransaksiFoto.pemilikFoto).
+export type PemilikFoto = {
+  fotoId: string;
+  albumId: string;
+  fotograferId: string | null;
+  fotograferNama: string | null;
+};
+
 // Batas jumlah foto sekali upload (form & server).
 export const MAKS_FOTO_PER_UPLOAD = 10;
 
