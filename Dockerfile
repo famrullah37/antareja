@@ -14,9 +14,13 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN npx prisma generate
-# Kode commit untuk label versi di sidebar admin (lihat next.config.mjs).
+# Kode commit & jumlah commit untuk label versi di sidebar admin (lihat
+# next.config.mjs). Kirim lewat ./deploy.sh — `docker build` polos tanpa
+# --build-arg membuat label tetap "v1.0.0 · dev".
 ARG GIT_SHA=dev
 ENV GIT_SHA=$GIT_SHA
+ARG GIT_COUNT=
+ENV GIT_COUNT=$GIT_COUNT
 RUN npm run build
 
 # Production image
