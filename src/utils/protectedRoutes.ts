@@ -18,6 +18,7 @@ export const protectedRoutes: ProtectedRoutes[] = [
   { title: "Juri", path: "/admin/juri", roles: ["ADMIN", "SIE_LOMBA"] },
   { title: "Penghargaan", path: "/admin/penghargaan", roles: ["ADMIN", "SIE_LOMBA"] },
   { title: "Galeri", path: "/admin/galeri", roles: ["ADMIN", "FOTOGRAFER"] },
+  { title: "Foto Ter-upload", path: "/admin/galeri/foto", roles: ["ADMIN", "FOTOGRAFER"] },
   { title: "Transaksi Foto", path: "/admin/galeri/transaksi", roles: ["ADMIN", "BENDAHARA"] },
   { title: "Bagi Hasil Foto", path: "/admin/galeri/bagi-hasil", roles: ["ADMIN", "BENDAHARA"] },
   { title: "Pendapatan Saya", path: "/admin/galeri/pendapatan", roles: ["FOTOGRAFER"] },

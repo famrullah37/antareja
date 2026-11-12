@@ -257,13 +257,32 @@ export async function uploadFoto(data: FormData) {
   return { success: true, uploaded: files.length - failedReasons.length, failed: failedReasons.length, failedReasons };
 }
 
+// Fotografer hanya boleh menghapus fotonya sendiri (fotograferId = dia, atau
+// foto tanpa fotografer di album miliknya); admin boleh semua.
 export async function deleteFotoAdmin(fotoId: string) {
-  await requireAdminOrFotografer();
+  const user = await requireAdminOrFotografer();
   try {
+    if (user.role !== "ADMIN") {
+      const foto = await prisma.foto.findUnique({
+        where: { id: fotoId },
+        select: { fotograferId: true, album: { select: { fotograferId: true } } },
+      });
+      const pemilik = foto?.fotograferId ?? foto?.album.fotograferId;
+      if (!foto || pemilik !== user.id) return { success: false, message: "Anda hanya bisa menghapus foto milik sendiri" };
+    }
+    // Foto yang sudah dibeli / sedang dalam pesanan tidak boleh dihapus —
+    // halaman unduhan pembeli mengambil foto dari tabel ini (lewat fotoList).
+    const dipakai = await prisma.transaksiFoto.count({
+      where: { status: { in: ["PENDING", "VERIFIED"] }, fotoList: { array_contains: [fotoId] } },
+    });
+    if (dipakai > 0)
+      return { success: false, message: "Foto ini sudah dibeli atau sedang dipesan, jadi tidak bisa dihapus" };
     await deleteFoto({ id: fotoId });
     revalidatePath("/admin/galeri");
+    revalidatePath("/admin/galeri/foto");
+    revalidatePath("/galeri");
     return { success: true };
-  } catch { return { success: false }; }
+  } catch { return { success: false, message: "Gagal menghapus foto" }; }
 }
 
 // ─── User: Beli Foto ──────────────────────────────────────────────────────────

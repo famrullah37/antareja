@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import { createAlbumAdmin, deleteAlbumAdmin, publishAlbum, setFotograferAlbum, setTimAlbum } from "@/actions/Galeri";
+import Link from "next/link";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -206,7 +207,13 @@ export default function AlbumSection({
                     ))}
                   </select>
                   <div className="text-xs text-gray-400 flex items-center gap-1.5 flex-wrap mt-0.5">
-                    <span>{album._count.fotos} foto</span>
+                    <Link
+                      href={`/admin/galeri/foto?album=${album.id}`}
+                      className="text-primary-600 hover:underline font-medium"
+                      title="Lihat foto di album ini"
+                    >
+                      {album._count.fotos} foto →
+                    </Link>
                     <span>·</span>
                     <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-semibold ${TIPE_COLORS[album.tipe] ?? "bg-neutral-100 text-neutral-600"}`}>
                       {album.tipe}
