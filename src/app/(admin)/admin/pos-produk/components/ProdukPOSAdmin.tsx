@@ -85,39 +85,42 @@ function BarisStok({ v }: { v: VarianProdukPOS }) {
     });
   }
 
+  // Satu baris fleksibel (bukan tabel) supaya tombol tidak keluar dari kartu
+  // yang sempit; kontrol stok turun ke baris berikutnya kalau tidak muat.
   return (
-    <tr>
-      <td className="py-1.5 pr-3">{v.nama || "—"}</td>
-      <td className={`py-1.5 pr-3 font-semibold ${v.stok === 0 ? "text-red-600" : ""}`}>{v.stok}</td>
-      <td className="py-1.5">
-        <div className="flex items-center gap-1.5">
-          <input
-            type="number"
-            min={1}
-            value={delta}
-            onChange={(e) => setDelta(e.target.value)}
-            placeholder="Jml"
-            className="border border-neutral-300 rounded-md px-2 py-1 text-sm w-20"
-          />
-          <button
-            type="button"
-            disabled={pending}
-            onClick={() => simpan(1)}
-            className="border border-green-300 text-green-700 rounded-md px-2 py-1 text-xs font-semibold disabled:opacity-50"
-          >
-            + Tambah
-          </button>
-          <button
-            type="button"
-            disabled={pending}
-            onClick={() => simpan(-1)}
-            className="border border-red-300 text-red-700 rounded-md px-2 py-1 text-xs font-semibold disabled:opacity-50"
-          >
-            − Kurangi
-          </button>
-        </div>
-      </td>
-    </tr>
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 py-2">
+      <div className="flex items-baseline gap-2 min-w-0 flex-1 basis-32">
+        <span className="truncate" title={v.nama || undefined}>{v.nama || "Tanpa ukuran"}</span>
+        <span className={`ml-auto font-semibold tabular-nums ${v.stok === 0 ? "text-red-600" : ""}`}>{v.stok}</span>
+      </div>
+      <div className="flex items-center gap-1.5 shrink-0">
+        <input
+          type="number"
+          min={1}
+          value={delta}
+          onChange={(e) => setDelta(e.target.value)}
+          placeholder="Jml"
+          aria-label={`Jumlah ubah stok ${v.nama || ""}`}
+          className="border border-neutral-300 rounded-md px-2 py-1 text-sm w-16"
+        />
+        <button
+          type="button"
+          disabled={pending}
+          onClick={() => simpan(1)}
+          className="border border-green-300 text-green-700 rounded-md px-2 py-1 text-xs font-semibold whitespace-nowrap disabled:opacity-50"
+        >
+          + Tambah
+        </button>
+        <button
+          type="button"
+          disabled={pending}
+          onClick={() => simpan(-1)}
+          className="border border-red-300 text-red-700 rounded-md px-2 py-1 text-xs font-semibold whitespace-nowrap disabled:opacity-50"
+        >
+          − Kurangi
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -154,15 +157,24 @@ function KartuProduk({ p }: { p: Produk }) {
         )}
         <div className="flex-1 min-w-0">
           <p className="font-semibold">{p.nama}</p>
-          <p className="text-sm">
-            <span className="text-gray-500">Jual</span> <b className="text-primary-600">{rp(p.harga)}</b>
-            <span className="text-gray-500"> · Beli </span>
-            {p.hargaBeli == null ? <span className="text-amber-600">belum diisi</span> : <b>{rp(p.hargaBeli)}</b>}
+          <p className="text-sm flex flex-wrap gap-x-2">
+            <span className="whitespace-nowrap">
+              <span className="text-gray-500">Jual</span> <b className="text-primary-600">{rp(p.harga)}</b>
+            </span>
+            <span className="whitespace-nowrap">
+              <span className="text-gray-500">Beli</span>{" "}
+              {p.hargaBeli == null ? <span className="text-amber-600">belum diisi</span> : <b>{rp(p.hargaBeli)}</b>}
+            </span>
           </p>
           {p.hargaBeli != null && (
             <p className={`text-xs font-semibold ${p.harga - p.hargaBeli < 0 ? "text-red-600" : "text-green-700"}`}>
               {p.harga - p.hargaBeli < 0 ? "Rugi" : "Laba"} {rp(Math.abs(p.harga - p.hargaBeli))}/barang
               {p.hargaBeli > 0 && ` (${Math.round(((p.harga - p.hargaBeli) / p.hargaBeli) * 100)}%)`}
+            </p>
+          )}
+          {p.hargaBeli != null && p.hargaBeli > p.harga && (
+            <p className="text-xs text-amber-700 bg-amber-50 rounded px-2 py-1 mt-1">
+              Harga beli lebih besar dari harga jual. Pastikan harga beli diisi <b>per barang</b>, bukan per dus/pak.
             </p>
           )}
           <p className="text-xs text-gray-500">
@@ -171,20 +183,14 @@ function KartuProduk({ p }: { p: Produk }) {
         </div>
       </div>
 
-      <table className="text-sm">
-        <thead className="text-gray-500 text-xs text-left">
-          <tr>
-            <th className="font-medium pb-1">Ukuran</th>
-            <th className="font-medium pb-1">Stok</th>
-            <th className="font-medium pb-1">Ubah stok</th>
-          </tr>
-        </thead>
-        <tbody>
+      <div className="text-sm">
+        <p className="text-gray-500 text-xs font-medium pb-1 border-b border-neutral-100">Varian · stok · ubah stok</p>
+        <div className="divide-y divide-neutral-100">
           {p.varian.map((v) => (
             <BarisStok key={v.id} v={v} />
           ))}
-        </tbody>
-      </table>
+        </div>
+      </div>
 
       {edit && (
         <form action={handleUpdate} className="flex flex-col gap-3 border-t border-neutral-100 pt-3">
