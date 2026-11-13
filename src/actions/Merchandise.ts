@@ -197,6 +197,45 @@ export async function updateMerchandise(data: FormData, id: string) {
   }
 }
 
+// Harga beli disalin ke pesanan saat pesan, jadi pesanan yang masuk sebelum
+// harga beli diisi tetap kosong. Aksi ini HANYA mengisi item yang masih kosong
+// dengan harga beli produk sekarang — item yang sudah punya harga beli tidak diubah.
+export async function isiHargaBeliPesananLamaMerch() {
+  await requireAdminOrBendahara();
+  try {
+    const produk = await prisma.merchandise.findMany({ select: { id: true, hargaBeli: true } });
+    const hargaBeliProduk = new Map(produk.filter((p) => p.hargaBeli != null).map((p) => [p.id, p.hargaBeli!]));
+    const pesanan = await prisma.pesananMerch.findMany({ select: { id: true, items: true } });
+
+    let barangTerisi = 0;
+    let pesananDiubah = 0;
+    for (const p of pesanan) {
+      const items = p.items as ItemPesanan[];
+      let berubah = false;
+      const baru = items.map((i) => {
+        if (i.hargaBeli != null) return i;
+        const hb = hargaBeliProduk.get(i.merchId);
+        if (hb == null) return i;
+        berubah = true;
+        barangTerisi += i.jumlah;
+        return { ...i, hargaBeli: hb };
+      });
+      if (berubah) {
+        await prisma.pesananMerch.update({ where: { id: p.id }, data: { items: baru } });
+        pesananDiubah++;
+      }
+    }
+
+    if (pesananDiubah > 0)
+      await catatLog("ISI_HARGA_BELI_PESANAN_MERCH", `${barangTerisi} barang di ${pesananDiubah} pesanan`);
+    revalidateMerch();
+    return { success: true, barangTerisi, pesananDiubah };
+  } catch (e) {
+    console.error("isiHargaBeliPesananLamaMerch error:", e);
+    return { success: false, message: "Gagal mengisi harga beli pesanan lama" };
+  }
+}
+
 export async function hapusFotoMerchandise(id: string, url: string) {
   await requireAdminOrBendahara();
   try {

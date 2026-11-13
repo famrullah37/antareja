@@ -5,6 +5,7 @@ import { hitungModalMerch, type ItemPesanan } from "@/lib/merchandise";
 import KonfigMerchForm from "./components/KonfigMerchForm";
 import ProdukMerch from "./components/ProdukMerch";
 import PesananMerchTable from "./components/PesananMerchTable";
+import IsiHargaBeliLamaButton from "./components/IsiHargaBeliLamaButton";
 import { kedaluwarsakanPesananReady } from "@/lib/merchReady";
 
 // Lunas = sudah diverifikasi (termasuk yang sudah diambil/dikirim).
@@ -92,11 +93,14 @@ export default async function AdminMerchandisePage() {
           </div>
         </div>
         {barangTanpaHargaBeli > 0 && (
-          <p className="text-sm bg-amber-50 border border-amber-200 text-amber-800 rounded-lg px-3 py-2 mb-4 max-w-3xl">
+          <div className="text-sm bg-amber-50 border border-amber-200 text-amber-800 rounded-lg px-3 py-2 mb-4 max-w-3xl">
             {barangTanpaHargaBeli} barang lunas belum punya harga beli, jadi biaya vendornya belum terhitung dan
             pendapatan panitia terlihat lebih besar dari seharusnya. Pesanan yang masuk sebelum harga beli diisi
             tetap memakai harga lama (kosong).
-          </p>
+            <div>
+              <IsiHargaBeliLamaButton />
+            </div>
+          </div>
         )}
         {rekapList.length === 0 ? (
           <p className="text-gray-400 text-sm">Belum ada pesanan terverifikasi.</p>
