@@ -14,8 +14,18 @@ set -euo pipefail
 
 IMAGE_TAG="ghcr.io/famrullah37/antareja:latest"
 
-echo "==> Menarik perubahan terbaru dari git..."
-git pull
+if [ -z "${DEPLOY_SETELAH_PULL:-}" ]; then
+  echo "==> Menarik perubahan terbaru dari git..."
+  git pull
+  # git pull bisa mengubah skrip ini sendiri, padahal bash masih menjalankan
+  # versi lama yang sudah dimuat. Jalankan ulang supaya selalu pakai versi terbaru.
+  DEPLOY_SETELAH_PULL=1 exec "$0" "$@"
+fi
+
+# Clone dangkal (--depth) membuat jumlah commit salah; ambil riwayat lengkap.
+if [ "$(git rev-parse --is-shallow-repository)" = "true" ]; then
+  git fetch --unshallow
+fi
 
 GIT_SHA="$(git rev-parse --short HEAD)"
 GIT_COUNT="$(git rev-list --count HEAD)"
