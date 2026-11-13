@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { deleteTiketAdmin, setKhususTimTiket, tambahKuotaTiket, updateBundlingTiket } from "@/actions/Tiket";
+import { deleteTiketAdmin, setPembeliTiket, tambahKuotaTiket, updateBundlingTiket, type PembeliTiket } from "@/actions/Tiket";
 import { Tiket } from "@prisma/client";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -40,13 +40,17 @@ export default function TiketMasterTable({ tikets }: { tikets: Tiket[] }) {
   const [editWajib, setEditWajib] = useState<string | null>(null);
 
   async function handleSaveWajib(data: FormData, id: string) {
-    const khususTim = data.get("khususTim") === "on";
+    const pembeli = (data.get("pembeli") as PembeliTiket) || "UMUM";
     const jumlahPerTim = parseInt((data.get("jumlahPerTim") as string) || "1");
     const toastId = toast.loading("Menyimpan...");
-    const result = await setKhususTimTiket(id, khususTim, jumlahPerTim);
+    const result = await setPembeliTiket(id, pembeli, jumlahPerTim);
     if (result.success) {
       toast.success(
-        khususTim ? `Tiket wajib tim: ${jumlahPerTim} tiket per tim` : "Tiket kini terbuka untuk umum",
+        pembeli === "TIM"
+          ? `Tiket wajib tim: ${jumlahPerTim} tiket per tim`
+          : pembeli === "OTS"
+          ? "Tiket OTS: hanya dijual di loket"
+          : "Tiket kini terbuka untuk umum",
         { id: toastId }
       );
       setEditWajib(null);
@@ -123,15 +127,21 @@ export default function TiketMasterTable({ tikets }: { tikets: Tiket[] }) {
               <td className="px-4 py-3">
                 {editWajib === t.id ? (
                   <form action={(data) => handleSaveWajib(data, t.id)} className="flex flex-wrap items-center gap-2">
-                    <label className="flex items-center gap-1 text-xs">
-                      <input type="checkbox" name="khususTim" defaultChecked={t.khususTim} />
-                      Wajib tim
-                    </label>
+                    <select
+                      name="pembeli"
+                      defaultValue={t.khususTim ? "TIM" : t.khususOts ? "OTS" : "UMUM"}
+                      className="border border-neutral-200 rounded-lg px-2 py-1 text-xs"
+                    >
+                      <option value="UMUM">Umum</option>
+                      <option value="TIM">Wajib tim</option>
+                      <option value="OTS">OTS (loket)</option>
+                    </select>
                     <input
                       name="jumlahPerTim"
                       type="number"
                       min={1}
                       defaultValue={t.jumlahPerTim}
+                      title="Jumlah tiket per tim (hanya untuk wajib tim)"
                       className="border border-neutral-200 rounded-lg px-2 py-1 text-xs w-16"
                     />
                     <span className="text-xs text-gray-500">/tim</span>
@@ -151,6 +161,10 @@ export default function TiketMasterTable({ tikets }: { tikets: Tiket[] }) {
                     {t.khususTim ? (
                       <span className="text-xs font-semibold text-primary-700 bg-primary-50 rounded px-2 py-0.5">
                         Wajib tim · {t.jumlahPerTim}/tim
+                      </span>
+                    ) : t.khususOts ? (
+                      <span className="text-xs font-semibold text-amber-800 bg-amber-100 rounded px-2 py-0.5">
+                        OTS · loket saja
                       </span>
                     ) : (
                       <span className="text-xs text-gray-500">Umum</span>

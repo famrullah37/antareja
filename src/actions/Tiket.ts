@@ -114,9 +114,12 @@ export async function createTiketAdmin(data: FormData) {
   const harga = parseInt(data.get("harga") as string);
   const kuota = parseInt(data.get("kuota") as string);
   const khususTim = data.get("khususTim") === "on";
+  const khususOts = data.get("khususOts") === "on";
+  if (khususTim && khususOts)
+    return { success: false, message: "Tiket tidak bisa sekaligus wajib tim dan OTS" };
   try {
     await createTiket({
-      jenis, harga, kuota, sisa: kuota, khususTim, jumlahPerTim: parseJumlahPerTim(data), ...parseBundling(data),
+      jenis, harga, kuota, sisa: kuota, khususTim, khususOts, jumlahPerTim: parseJumlahPerTim(data), ...parseBundling(data),
     });
     revalidatePath("/tiket");
     revalidatePath("/admin/tiket");
@@ -185,17 +188,27 @@ export async function updateBundlingTiket(data: FormData, id: string) {
   } catch { return { success: false }; }
 }
 
-// Tandai/lepas tiket sebagai "wajib tim" (hanya bisa dibeli online oleh akun tim).
-export async function setKhususTimTiket(id: string, khususTim: boolean, jumlahPerTim = 1) {
+// Siapa yang boleh membeli tiket: UMUM (online & loket), TIM (wajib tim, hanya
+// online oleh akun tim), OTS (hanya di loket lewat POS Tiket).
+export type PembeliTiket = "UMUM" | "TIM" | "OTS";
+
+export async function setPembeliTiket(id: string, pembeli: PembeliTiket, jumlahPerTim = 1) {
   await requireAdmin();
-  if (!Number.isInteger(jumlahPerTim) || jumlahPerTim < 1) return { success: false, message: "Jumlah per tim minimal 1" };
+  if (!["UMUM", "TIM", "OTS"].includes(pembeli)) return { success: false, message: "Pilihan pembeli tidak valid" };
+  if (pembeli === "TIM" && (!Number.isInteger(jumlahPerTim) || jumlahPerTim < 1))
+    return { success: false, message: "Jumlah per tim minimal 1" };
   try {
-    const tiket = await updateTiket({ id }, khususTim ? { khususTim, jumlahPerTim } : { khususTim });
+    const khususTim = pembeli === "TIM";
+    const khususOts = pembeli === "OTS";
+    const tiket = await updateTiket({ id }, khususTim ? { khususTim, khususOts, jumlahPerTim } : { khususTim, khususOts });
     await catatLog(
-      "UBAH_TIKET_KHUSUS_TIM",
-      `Tiket ${tiket.jenis}: ${khususTim ? `wajib tim, ${jumlahPerTim} tiket per tim` : "terbuka untuk umum"}`
+      "UBAH_TIKET_PEMBELI",
+      `Tiket ${tiket.jenis}: ${
+        khususTim ? `wajib tim, ${jumlahPerTim} tiket per tim` : khususOts ? "OTS, hanya dijual di loket" : "terbuka untuk umum"
+      }`
     );
     revalidatePath("/admin/tiket");
+    revalidatePath("/admin/tiket/pos");
     revalidatePath("/tiket");
     revalidatePath("/");
     return { success: true };
@@ -325,9 +338,11 @@ export async function beliTiket(data: FormData) {
   // yang pasti gagal (stok tetap dicek ulang secara atomik di transaksi bawah).
   const tiketCek = await prisma.tiket.findUnique({
     where: { id: tiketId },
-    select: { sisa: true, khususTim: true, jumlahPerTim: true },
+    select: { sisa: true, khususTim: true, khususOts: true, jumlahPerTim: true },
   });
   if (!tiketCek) return { success: false, message: "Tiket tidak ditemukan" };
+  if (tiketCek.khususOts)
+    return { success: false, message: "Tiket OTS hanya dijual di loket pada hari acara" };
   // Tiket wajib tim: wajib login dengan akun yang sudah mendaftarkan tim,
   // jumlah ditetapkan admin (jumlahPerTim), dan hanya satu pesanan aktif per tim.
   if (tiketCek.khususTim) {
@@ -365,7 +380,7 @@ export async function beliTiket(data: FormData) {
     const dibuat = await prisma.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT 1 FROM (SELECT pg_advisory_xact_lock(hashtext(${`tiket-stok:${tiketId}`}))) AS kunci`;
       const tiket = await tx.tiket.findUnique({ where: { id: tiketId } });
-      if (!tiket) throw new Error("TIKET_TIDAK_DITEMUKAN");
+      if (!tiket || tiket.khususOts) throw new Error("TIKET_TIDAK_DITEMUKAN");
       if (jumlah < 1) throw new Error("JUMLAH_INVALID");
       if (tiket.sisa - (await jumlahTertahan(tx, tiketId)) < jumlah) throw new Error("STOK_KURANG");
       if (!Number.isInteger(bundleJumlah) || bundleJumlah < 0 || bundleJumlah > jumlah)

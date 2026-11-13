@@ -11,7 +11,8 @@ export default async function TiketSection() {
   // Landing page hanya untuk tiket penonton umum — tiket wajib tim (khususTim)
   // diumumkan lewat dashboard tim & tetap bisa dibeli di /tiket oleh akun tim.
   const tikets = await findTikets({ khususTim: false });
-  const available = tikets.filter((t) => t.sisa > 0);
+  // Tiket OTS hanya dijual di loket — tidak dihitung untuk tombol "Lihat Semua Tiket".
+  const available = tikets.filter((t) => t.sisa > 0 && !t.khususOts);
 
   return (
     <SectionWrapper id="tiket">
@@ -92,6 +93,11 @@ export default async function TiketSection() {
                       {habis ? (
                         <div className="text-center py-3 text-sm text-gray-400 border border-gray-200 rounded-2xl font-medium">
                           Tiket Habis
+                        </div>
+                      ) : tiket.khususOts ? (
+                        <div className="text-center py-3 px-3 text-sm text-primary-700 bg-primary-50 border border-primary-100 rounded-2xl font-semibold">
+                          Beli di loket pada hari acara
+                          <span className="block text-xs font-normal text-gray-500 mt-0.5">Tidak dijual online</span>
                         </div>
                       ) : (
                         <PrimaryLinkButton href="/tiket" className="w-full flex items-center justify-center gap-2 py-3 text-sm font-bold group/btn rounded-2xl">

@@ -12,7 +12,7 @@ export default function TiketForm() {
     if (result.success) {
       toast.success("Tiket berhasil ditambahkan!", { id: toastId });
     } else {
-      toast.error("Gagal menambahkan tiket", { id: toastId });
+      toast.error(result.message ?? "Gagal menambahkan tiket", { id: toastId });
     }
   }
 
@@ -66,6 +66,15 @@ export default function TiketForm() {
             className="border border-neutral-200 rounded-lg px-2 py-1 text-sm w-20"
           />
           <span className="text-xs text-gray-500">tiket (hanya untuk tiket wajib tim)</span>
+        </label>
+        <label className="flex items-start gap-2 text-sm cursor-pointer">
+          <input type="checkbox" name="khususOts" className="mt-1" />
+          <span>
+            <span className="font-medium">Tiket OTS (on the spot)</span>
+            <span className="block text-xs text-gray-500">
+              Hanya dijual di loket lewat POS Tiket dengan kuota sendiri. Tampil di web sebagai info, tanpa tombol beli.
+            </span>
+          </span>
         </label>
       </div>
       <div className="border-t border-neutral-100 pt-4 flex flex-col gap-3">
