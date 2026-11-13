@@ -31,6 +31,44 @@ function segarkan() {
   revalidatePath("/dashboard");
 }
 
+// Harga beli disalin ke pesanan saat pesan, jadi pesanan yang dibuat sebelum
+// harga beli diisi tetap kosong. Aksi ini HANYA mengisi item yang masih kosong
+// dengan harga beli menu sekarang — item yang sudah punya harga beli tidak diubah.
+export async function isiHargaBeliPesananLamaMakanan() {
+  await requireKeuangan();
+  try {
+    const menu = await prisma.menuMakanan.findMany({ select: { id: true, hargaBeli: true } });
+    const hargaBeliMenu = new Map(menu.filter((m) => m.hargaBeli != null).map((m) => [m.id, m.hargaBeli!]));
+    const pesanan = await prisma.pesananMakanan.findMany({ select: { id: true, items: true } });
+
+    let barangTerisi = 0;
+    let pesananDiubah = 0;
+    for (const p of pesanan) {
+      let berubah = false;
+      const baru = (p.items as ItemMakanan[]).map((i) => {
+        if (i.hargaBeli != null) return i;
+        const hb = hargaBeliMenu.get(i.menuId);
+        if (hb == null) return i;
+        berubah = true;
+        barangTerisi += i.jumlah;
+        return { ...i, hargaBeli: hb };
+      });
+      if (berubah) {
+        await prisma.pesananMakanan.update({ where: { id: p.id }, data: { items: baru } });
+        pesananDiubah++;
+      }
+    }
+
+    if (pesananDiubah > 0)
+      await catatLog("ISI_HARGA_BELI_PESANAN_MAKANAN", `${barangTerisi} porsi di ${pesananDiubah} pesanan`);
+    segarkan();
+    return { success: true, barangTerisi, pesananDiubah };
+  } catch (e) {
+    console.error("isiHargaBeliPesananLamaMakanan error:", e);
+    return { success: false, message: "Gagal mengisi harga beli pesanan lama" };
+  }
+}
+
 function teks(data: FormData, key: string, maks: number) {
   return ((data.get(key) as string) || "").trim().slice(0, maks);
 }

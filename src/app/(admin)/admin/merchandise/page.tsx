@@ -5,7 +5,8 @@ import { hitungModalMerch, type ItemPesanan } from "@/lib/merchandise";
 import KonfigMerchForm from "./components/KonfigMerchForm";
 import ProdukMerch from "./components/ProdukMerch";
 import PesananMerchTable from "./components/PesananMerchTable";
-import IsiHargaBeliLamaButton from "./components/IsiHargaBeliLamaButton";
+import IsiHargaBeliLamaButton from "@/app/components/global/IsiHargaBeliLamaButton";
+import { isiHargaBeliPesananLamaMerch } from "@/actions/Merchandise";
 import { kedaluwarsakanPesananReady } from "@/lib/merchReady";
 
 // Lunas = sudah diverifikasi (termasuk yang sudah diambil/dikirim).
@@ -98,7 +99,7 @@ export default async function AdminMerchandisePage() {
             pendapatan panitia terlihat lebih besar dari seharusnya. Pesanan yang masuk sebelum harga beli diisi
             tetap memakai harga lama (kosong).
             <div>
-              <IsiHargaBeliLamaButton />
+              <IsiHargaBeliLamaButton aksi={isiHargaBeliPesananLamaMerch} />
             </div>
           </div>
         )}

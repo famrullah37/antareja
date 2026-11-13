@@ -9,6 +9,8 @@ import { findPesananMakananAdmin, findSesiMakanAdmin } from "@/queries/makanan.q
 import PengaturanMakanan from "./components/PengaturanMakanan";
 import SesiMenuMakanan from "./components/SesiMenuMakanan";
 import PesananMakananTable from "./components/PesananMakananTable";
+import IsiHargaBeliLamaButton from "@/app/components/global/IsiHargaBeliLamaButton";
+import { isiHargaBeliPesananLamaMakanan } from "@/actions/Makanan";
 
 export default async function AdminMakananPage() {
   const [session, konfig, sesi, pesanan] = await Promise.all([
@@ -109,11 +111,16 @@ export default async function AdminMakananPage() {
           </div>
         </div>
         {total.tanpaHargaBeli > 0 && (
-          <p className="text-sm bg-amber-50 border border-amber-200 text-amber-800 rounded-lg px-3 py-2 mb-4">
+          <div className="text-sm bg-amber-50 border border-amber-200 text-amber-800 rounded-lg px-3 py-2 mb-4">
             {total.tanpaHargaBeli} porsi lunas belum punya harga beli, jadi biaya katering untuk porsi itu belum
             terhitung dan pendapatan panitia terlihat lebih besar dari seharusnya. Isi harga beli di menu.
             Pesanan yang dibuat sebelum harga beli diisi tetap memakai harga lama (kosong).
-          </p>
+            {bolehVerifikasi && (
+              <div>
+                <IsiHargaBeliLamaButton aksi={isiHargaBeliPesananLamaMakanan} satuan="porsi" />
+              </div>
+            )}
+          </div>
         )}
         {rekap.every((r) => r.menu.length === 0) ? (
           <p className="text-gray-400 text-sm">Belum ada pesanan.</p>
