@@ -237,7 +237,7 @@ export default function LaporanKasClient({ data }: { data: KasData }) {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <SummaryCard label="Merchandise (Verified)" value={formatRupiah(data.totalMerchVerified)} color="blue" />
         <SummaryCard label="Makanan (Verified)" value={formatRupiah(data.totalMakananVerified)} color="green" />
-        <SummaryCard label="Penjualan Produk (POS)" value={formatRupiah(data.totalPosProduk)} color="blue" />
+        <SummaryCard label="Penjualan Produk POS (tiket loket masuk di Tiket)" value={formatRupiah(data.totalPosProduk)} color="blue" />
         <SummaryCard label="Pemasukan Manual" value={formatRupiah(data.totalPemasukanManual)} color="orange" />
         <SummaryCard
           label={`Bazar bersih (masuk ${formatRupiah(data.bazarMasuk)} − keluar ${formatRupiah(data.bazarKeluar)})`}

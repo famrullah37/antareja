@@ -576,6 +576,7 @@ export async function jualTiketOffline(data: FormData) {
     });
 
     revalidatePath("/admin/tiket");
+    revalidatePath("/admin/tiket/pos");
     revalidatePath("/admin/kas");
     return { success: true };
   } catch {
@@ -705,6 +706,7 @@ export async function verifikasiTiket(transaksiId: string) {
     }
 
     revalidatePath("/admin/tiket");
+    revalidatePath("/admin/tiket/pos");
     revalidatePath("/admin/kas");
     return { success: true };
   } catch {
