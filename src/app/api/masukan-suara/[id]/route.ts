@@ -6,14 +6,15 @@ import { findOrLinkJuriByUser } from "@/queries/juri.query";
 export const dynamic = "force-dynamic";
 
 // Memutar masukan suara juri. Yang boleh mendengar: Admin/Sie Lomba, juri
-// pemilik rekaman, dan tim yang dinilai — tim hanya setelah nilainya dipublish.
+// pemilik rekaman, dan tim yang dinilai — tim boleh walau nilai belum dipublish
+// (rekaman tidak memuat angka nilai; panitia ingin masukan sampai lebih cepat).
 export async function GET(req: Request, { params }: { params: { id: string } }) {
   const session = await getServerSession();
   if (!session?.user) return new Response("Tidak diizinkan", { status: 401 });
 
   const ms = await prisma.masukanSuara.findUnique({
     where: { id: params.id },
-    include: { penilaian: { select: { published: true, tim: { select: { userId: true } } } } },
+    include: { penilaian: { select: { tim: { select: { userId: true } } } } },
   });
   if (!ms) return new Response("Tidak ditemukan", { status: 404 });
 
@@ -23,7 +24,7 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
     const juri = await findOrLinkJuriByUser(session.user.id);
     boleh = juri?.id === ms.juriId;
   }
-  if (!boleh) boleh = ms.penilaian.published && ms.penilaian.tim.userId === session.user.id;
+  if (!boleh) boleh = ms.penilaian.tim.userId === session.user.id;
   if (!boleh) return new Response("Tidak ditemukan", { status: 404 });
 
   const file = await readUploadFile(ms.file);

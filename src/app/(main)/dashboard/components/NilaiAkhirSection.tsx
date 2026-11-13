@@ -31,6 +31,31 @@ function formatDurasi(detik: number) {
   return `${Math.floor(detik / 60)}:${String(detik % 60).padStart(2, "0")}`;
 }
 
+// Tampil sebelum maupun sesudah nilai dipublish — rekaman tidak memuat angka nilai.
+function MasukanSuaraJuri({ rekaman }: { rekaman: NonNullable<NonNullable<PenilaianBaruData>["masukanSuara"]> }) {
+  if (rekaman.length === 0) return null;
+  return (
+    <div className="mb-4 bg-white rounded-xl border border-neutral-200 p-4">
+      <p className="text-sm font-semibold mb-3">Masukan Suara Juri</p>
+      <div className="flex flex-col gap-4">
+        {rekaman.map((ms) => (
+          <div key={ms.id} className="flex flex-col gap-1.5">
+            <p className="text-sm text-neutral-600">
+              {ms.juri.nama} <span className="text-xs text-gray-400">· {formatDurasi(ms.durasiDetik)}</span>
+            </p>
+            <audio
+              controls
+              preload="none"
+              src={`/api/masukan-suara/${ms.id}?v=${new Date(ms.updatedAt).getTime()}`}
+              className="w-full"
+            />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 const PREDIKAT_COLOR: Record<string, { bg: string; text: string }> = {
   SANGAT_BAGUS:  { bg: "bg-green-100",  text: "text-green-700"  },
   BAGUS:         { bg: "bg-lime-100",   text: "text-lime-700"   },
@@ -193,11 +218,12 @@ export default function NilaiAkhirSection({ penilaianBaru }: { penilaianBaru: Pe
     return (
       <SectionWrapper id="nilai-akhir">
         <H2 className="mb-4">Hasil Penilaian</H2>
+        <MasukanSuaraJuri rekaman={penilaianBaru.masukanSuara ?? []} />
         <div className="bg-blue-50 rounded-xl border border-blue-200 p-10 text-center">
           <div className="text-4xl mb-3">⏳</div>
           <p className="font-semibold text-blue-700">Penilaian sedang diproses</p>
           <p className="text-blue-500 text-sm mt-1">
-            Hasil akan ditampilkan setelah pengumuman resmi dari panitia.
+            Nilai akan ditampilkan setelah pengumuman resmi dari panitia.
           </p>
         </div>
       </SectionWrapper>
@@ -255,26 +281,7 @@ export default function NilaiAkhirSection({ penilaianBaru }: { penilaianBaru: Pe
       )}
 
       {/* Masukan suara juri */}
-      {(penilaianBaru.masukanSuara?.length ?? 0) > 0 && (
-        <div className="mb-4 bg-white rounded-xl border border-neutral-200 p-4">
-          <p className="text-sm font-semibold mb-3">Masukan Suara Juri</p>
-          <div className="flex flex-col gap-4">
-            {penilaianBaru.masukanSuara!.map((ms) => (
-              <div key={ms.id} className="flex flex-col gap-1.5">
-                <p className="text-sm text-neutral-600">
-                  {ms.juri.nama} <span className="text-xs text-gray-400">· {formatDurasi(ms.durasiDetik)}</span>
-                </p>
-                <audio
-                  controls
-                  preload="none"
-                  src={`/api/masukan-suara/${ms.id}?v=${new Date(ms.updatedAt).getTime()}`}
-                  className="w-full"
-                />
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      <MasukanSuaraJuri rekaman={penilaianBaru.masukanSuara ?? []} />
 
       {/* Detail per kategori */}
       {hasDetail ? (

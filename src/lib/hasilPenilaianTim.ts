@@ -6,7 +6,8 @@ import prisma from "@/lib/prisma";
 // lengkap apa adanya:
 //  - sebelum dipublish, tim sudah bisa mengintip nilai & total sebelum pengumuman;
 //  - data juri lengkap (email, no. HP) ikut terkirim.
-// Sekarang: belum dipublish → hanya status; sudah dipublish → hanya field yang tampil.
+// Sekarang: belum dipublish → hanya status + masukan suara juri (boleh didengar
+// tim sebelum pengumuman; tidak memuat nilai); sudah dipublish → hanya field yang tampil.
 export async function hasilPenilaianUntukTim(timId: string) {
   const p = await prisma.penilaianBaru.findUnique({
     where: { timId },
@@ -43,7 +44,7 @@ export async function hasilPenilaianUntukTim(timId: string) {
       nilaiAkhir: 0,
       nilaiJuri: [],
       pelanggaranTim: [],
-      masukanSuara: [],
+      masukanSuara: p.masukanSuara,
     };
   }
 
