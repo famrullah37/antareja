@@ -10,12 +10,13 @@ const XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.s
 // Excel detail voting: Ringkasan, Rekap per kategori (per tim), dan Transaksi.
 export default function ExportVotingButton() {
   const [loading, setLoading] = useState(false);
+  const [jenjang, setJenjang] = useState("");
 
   async function handleClick() {
     setLoading(true);
     const toastId = toast.loading("Menyiapkan file Excel...");
     try {
-      const result = await exportDataVoting();
+      const result = await exportDataVoting(jenjang || undefined);
       if (!result.success || !result.base64) {
         toast.error(result.message ?? "Gagal membuat file Excel", { id: toastId });
         return;
@@ -30,13 +31,28 @@ export default function ExportVotingButton() {
   }
 
   return (
-    <button
+    <div className="flex items-center gap-2">
+      <select
+        value={jenjang}
+        onChange={(e) => setJenjang(e.target.value)}
+        disabled={loading}
+        aria-label="Jenjang yang diexport"
+        className="border border-neutral-300 rounded-lg text-sm px-3 py-2.5 bg-white"
+      >
+        <option value="">Semua Jenjang</option>
+        <option value="SD">SD</option>
+        <option value="SMP">SMP</option>
+        <option value="SMA">SMA</option>
+        <option value="PURNA">Purna</option>
+      </select>
+      <button
       type="button"
       onClick={handleClick}
       disabled={loading}
       className="bg-primary-500 hover:bg-primary-600 disabled:opacity-60 text-white text-sm font-semibold px-5 py-2.5 rounded-lg transition-colors"
     >
       {loading ? "Menyiapkan..." : "Export Excel"}
-    </button>
+      </button>
+    </div>
   );
 }

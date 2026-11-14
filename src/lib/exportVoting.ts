@@ -48,7 +48,7 @@ function waktuWib(d: Date) {
   return new Date(d).toLocaleString("id-ID", { timeZone: "Asia/Jakarta", dateStyle: "short", timeStyle: "medium" });
 }
 
-// Export voting detail: ringkasan, rekap per tim tiap kategori (suara
+// Export voting detail: ringkasan, rekap per sekolah, rekap per tim tiap kategori (suara
 // terverifikasi/pending/ditolak + rupiah), dan seluruh transaksi.
 // "Tercatat di Leaderboard" = Tim.totalVote (tim_favorit) / VotingTally —
 // harus sama dengan "Suara Masuk"; kalau beda berarti ada selisih data.
@@ -102,10 +102,46 @@ export function buildVotingWorkbook(
   });
   XLSX.utils.book_append_sheet(wb, sheet(ringkasan), "Ringkasan");
 
+  // ── Rekap per sekolah (nama sekolah digabung tanpa beda huruf besar/spasi) ──
+  const sekolahMap = new Map<string, { sekolah: string; jenjang: string; timIds: Set<string>; list: TransaksiVotingExport[] }>();
+  const keySekolah = (nama: string, jenjang: string) => `${jenjang}|${nama.trim().replace(/\s+/g, " ").toLowerCase()}`;
+  const ambilSekolah = (nama: string, jenjang: string) => {
+    const key = keySekolah(nama, jenjang);
+    let g = sekolahMap.get(key);
+    if (!g) sekolahMap.set(key, (g = { sekolah: nama.trim(), jenjang, timIds: new Set(), list: [] }));
+    return g;
+  };
+  for (const t of tims) ambilSekolah(t.asal_sekolah, t.jenjang).timIds.add(t.id);
+  for (const t of transaksis) {
+    const g = ambilSekolah(t.tim?.asal_sekolah ?? "-", t.tim?.jenjang ?? "");
+    g.timIds.add(t.timId);
+    g.list.push(t);
+  }
+  const sekolahRows = [...sekolahMap.values()]
+    .map((g) => {
+      const v = g.list.filter((t) => t.status === "VERIFIED");
+      const row: Record<string, string | number> = {
+        "Asal Sekolah": g.sekolah,
+        Jenjang: g.jenjang,
+        "Jumlah Tim": g.timIds.size,
+      };
+      for (const k of kategoriList) {
+        row[`Suara ${k.label}`] = sum(v.filter((t) => t.kategori === k.key), (t) => t.jumlahVote);
+      }
+      row["Total Suara Masuk"] = sum(v, (t) => t.jumlahVote);
+      row["Suara Pending"] = sum(g.list.filter((t) => t.status === "PENDING"), (t) => t.jumlahVote);
+      row["Jumlah Pendukung (Transaksi Terverifikasi)"] = v.length;
+      row["Total Rupiah Terverifikasi"] = sum(v, (t) => t.totalBayar);
+      return row;
+    })
+    .sort((a, b) => Number(b["Total Suara Masuk"]) - Number(a["Total Suara Masuk"]) || String(a["Asal Sekolah"]).localeCompare(String(b["Asal Sekolah"])))
+    .map((r, i) => ({ Peringkat: i + 1, ...r }));
+  XLSX.utils.book_append_sheet(wb, sheet(sekolahRows.length ? sekolahRows : [{ Info: "Belum ada data" }]), "Rekap per Sekolah");
+
   // ── Rekap per tim, satu sheet per kategori ──
   const timIds = new Set([...tims.map((t) => t.id), ...transaksis.map((t) => t.timId)]);
   const timById = new Map(tims.map((t) => [t.id, t]));
-  const usedNames = new Set<string>(["Ringkasan", "Transaksi"]);
+  const usedNames = new Set<string>(["Ringkasan", "Transaksi", "Rekap per Sekolah"]);
 
   for (const k of kategoriList) {
     const rows = [...timIds]

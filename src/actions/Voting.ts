@@ -439,31 +439,40 @@ export async function rejectVoting(transaksiId: string) {
 
 // Export Excel detail voting: ringkasan, rekap per tim tiap kategori, dan
 // seluruh transaksi (data pendukung didekripsi otomatis oleh Prisma).
-export async function exportDataVoting() {
+// jenjang kosong = semua jenjang; diisi = hanya tim & transaksi jenjang itu.
+export async function exportDataVoting(jenjang?: string) {
   try {
     await requireAdminOrBendahara();
   } catch {
     return { success: false, message: "Forbidden" };
   }
+  const JENJANG = ["SD", "SMP", "SMA", "PURNA"] as const;
+  const filterJenjang = JENJANG.find((j) => j === jenjang);
+  if (jenjang && !filterJenjang) return { success: false, message: "Jenjang tidak valid" };
   try {
-    const [konfig, tims, transaksis, tallyMap, dantonMap] = await Promise.all([
+    const [konfig, tims, transaksis, tallyAll, dantonMap] = await Promise.all([
       findKonfigVoting(),
       prisma.tim.findMany({
-        where: { confirmed: true, gugurTanpaVote: false },
+        where: { confirmed: true, gugurTanpaVote: false, ...(filterJenjang && { jenjang: filterJenjang }) },
         select: { id: true, nama_tim: true, asal_sekolah: true, jenjang: true, noUrut: true, pelatih: true, totalVote: true },
       }),
       prisma.transaksiVoting.findMany({
+        where: filterJenjang ? { tim: { jenjang: filterJenjang } } : undefined,
         include: { tim: { select: { nama_tim: true, asal_sekolah: true, jenjang: true } } },
         orderBy: { createdAt: "asc" },
       }),
       findVotingTallyMap(),
       findDantonMap(),
     ]);
+    const timIds = new Set([...tims.map((t) => t.id), ...transaksis.map((t) => t.timId)]);
+    const tallyMap = filterJenjang
+      ? Object.fromEntries(Object.entries(tallyAll).filter(([id]) => timIds.has(id)))
+      : tallyAll;
     const tanggal = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Jakarta" });
     return {
       success: true,
       base64: buildVotingWorkbook(tims, transaksis, getKategoriList(konfig), tallyMap, dantonMap),
-      filename: `Rekap-Voting-${tanggal}.xlsx`,
+      filename: `Rekap-Voting-${filterJenjang ?? "Semua"}-${tanggal}.xlsx`,
     };
   } catch (e) {
     console.error("exportDataVoting error:", e);
