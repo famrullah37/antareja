@@ -5,6 +5,25 @@ import { findOrLinkJuriByUser } from "@/queries/juri.query";
 
 export const dynamic = "force-dynamic";
 
+const EKSTENSI: Record<string, string> = {
+  "audio/webm": "webm",
+  "audio/ogg": "ogg",
+  "audio/mp4": "m4a",
+  "audio/x-m4a": "m4a",
+  "audio/aac": "aac",
+  "audio/mpeg": "mp3",
+  "audio/wav": "wav",
+};
+
+function namaFile(bagian: string[], mime: string) {
+  const ext = EKSTENSI[mime.split(";")[0].trim().toLowerCase()] ?? "webm";
+  const dasar = bagian
+    .map((b) => b.normalize("NFKD").replace(/[^\w\s-]/g, "").trim().replace(/\s+/g, "-"))
+    .filter(Boolean)
+    .join("_");
+  return `${dasar || "Masukan-Suara"}.${ext}`;
+}
+
 // Memutar masukan suara juri. Yang boleh mendengar: Admin/Sie Lomba, juri
 // pemilik rekaman, dan tim yang dinilai — tim boleh walau nilai belum dipublish
 // (rekaman tidak memuat angka nilai; panitia ingin masukan sampai lebih cepat).
@@ -14,7 +33,10 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
 
   const ms = await prisma.masukanSuara.findUnique({
     where: { id: params.id },
-    include: { penilaian: { select: { tim: { select: { userId: true } } } } },
+    include: {
+      penilaian: { select: { tim: { select: { userId: true, nama_tim: true } } } },
+      juri: { select: { nama: true } },
+    },
   });
   if (!ms) return new Response("Tidak ditemukan", { status: 404 });
 
@@ -30,8 +52,13 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
   const file = await readUploadFile(ms.file);
   if (!file) return new Response("Rekaman tidak ditemukan", { status: 404 });
 
-  const headers = {
+  // ?unduh=1 → disimpan sebagai file (tombol Unduh di dashboard tim), bukan diputar.
+  const unduh = new URL(req.url).searchParams.get("unduh") === "1";
+  const headers: Record<string, string> = {
     "Content-Type": ms.mime,
+    ...(unduh && {
+      "Content-Disposition": `attachment; filename="${namaFile(["Masukan-Suara", ms.penilaian.tim.nama_tim, ms.juri.nama], ms.mime)}"`,
+    }),
     "Accept-Ranges": "bytes",
     // Nama file berubah tiap rekam ulang, tapi isinya privat — jangan dicache proxy.
     "Cache-Control": "private, max-age=300",

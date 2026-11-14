@@ -36,13 +36,25 @@ function MasukanSuaraJuri({ rekaman }: { rekaman: NonNullable<NonNullable<Penila
   if (rekaman.length === 0) return null;
   return (
     <div className="mb-4 bg-white rounded-xl border border-neutral-200 p-4">
-      <p className="text-sm font-semibold mb-3">Masukan Suara Juri</p>
+      <p className="text-sm font-semibold mb-1">Masukan Suara Juri</p>
+      <p className="text-xs text-gray-400 mb-3">
+        Unduh dan simpan rekaman ini — data tim dihapus setelah kegiatan selesai.
+      </p>
       <div className="flex flex-col gap-4">
         {rekaman.map((ms) => (
           <div key={ms.id} className="flex flex-col gap-1.5">
-            <p className="text-sm text-neutral-600">
-              {ms.juri.nama} <span className="text-xs text-gray-400">· {formatDurasi(ms.durasiDetik)}</span>
-            </p>
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-sm text-neutral-600">
+                {ms.juri.nama} <span className="text-xs text-gray-400">· {formatDurasi(ms.durasiDetik)}</span>
+              </p>
+              <a
+                href={`/api/masukan-suara/${ms.id}?unduh=1&v=${new Date(ms.updatedAt).getTime()}`}
+                download
+                className="shrink-0 text-xs font-semibold text-primary-600 border border-primary-200 hover:bg-primary-50 rounded-lg px-3 py-1.5 transition-colors"
+              >
+                Unduh
+              </a>
+            </div>
             <audio
               controls
               preload="none"
