@@ -450,6 +450,7 @@ export async function beliFoto(data: FormData) {
   const bukti = data.get("bukti") as File | null;
   const email = (data.get("email") as string) || "";
   const namaPembeli = (data.get("namaPembeli") as string) || "";
+  const noHp = ((data.get("noHp") as string) || "").trim();
   const metodePembayaran = (data.get("metodePembayaran") as string) || "TRANSFER";
   const kodeUnik = data.get("kodeUnik") as string | null;
 
@@ -469,7 +470,7 @@ export async function beliFoto(data: FormData) {
     const salahKode = cekTokenKode(data.get("kodeToken"), kodeUnik);
     if (salahKode) return { success: false, message: salahKode };
   }
-  const salahData = cekDataPemesan({ nama: namaPembeli, email }, { noHpWajib: false });
+  const salahData = cekDataPemesan({ nama: namaPembeli, email, noHp });
   if (salahData) return { success: false, message: salahData };
 
   try {
@@ -557,6 +558,7 @@ export async function beliFoto(data: FormData) {
       metodePembayaran,
       namaPembeli: namaPembeli || null,
       email: email || null,
+      noHp,
       ...(userId ? { user: { connect: { id: userId } } } : {}),
     } as any });
     });

@@ -563,6 +563,24 @@ export default function GaleriClient({
                   />
                 </div>
 
+                {/* No. HP / WhatsApp */}
+                <div className="flex flex-col gap-1">
+                  <label className="text-sm font-medium">
+                    No. HP / WhatsApp <span className="text-red-500">*</span>
+                    <span className="text-xs text-gray-400 font-normal ml-1">— link foto juga dikirim lewat WA</span>
+                  </label>
+                  <input
+                    name="noHp"
+                    type="tel"
+                    inputMode="tel"
+                    required
+                    pattern="\+?[0-9\s\-]{8,20}"
+                    title="Nomor HP 8–20 digit, contoh 081234567890"
+                    placeholder="08xxxxxxxxxx"
+                    className="border border-neutral-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
+                  />
+                </div>
+
                 {/* Bukti */}
                 <div className="flex flex-col gap-1">
                   <label className="text-sm font-medium">

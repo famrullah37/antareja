@@ -13,6 +13,7 @@ type TransaksiFotoItem = {
   bukti: string | null;
   kodeUnik: string | null;
   email: string | null;
+  noHp: string | null;
   createdAt: Date;
   fotoList: unknown;
   expiredAt: Date | null;
@@ -24,6 +25,33 @@ const statusBadge: Record<string, string> = {
   VERIFIED: "bg-green-100 text-green-700",
   REJECTED: "bg-red-100 text-red-700",
 };
+
+// 08xx / 8xx / +62xx / 62xx → 62xx untuk wa.me.
+function nomorWa(noHp: string) {
+  const d = noHp.replace(/\D/g, "");
+  if (d.startsWith("62")) return d;
+  if (d.startsWith("0")) return "62" + d.slice(1);
+  if (d.startsWith("8")) return "62" + d;
+  return d;
+}
+
+function linkWa(tr: TransaksiFotoItem) {
+  const link = `${window.location.origin}/galeri/download/${tr.id}`;
+  const berlaku = tr.expiredAt
+    ? new Date(tr.expiredAt).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Jakarta" })
+    : null;
+  const msg = [
+    `Halo *${tr.namaPembeli ?? tr.user?.nama ?? "Kak"}*,`,
+    `Pembayaran foto Anda (${(tr.fotoList as string[]).length} foto) sudah diverifikasi.`,
+    ``,
+    `*Link unduhan foto:*`,
+    link,
+    ...(berlaku ? [``, `Link berlaku sampai *${berlaku}*. Segera unduh & simpan foto Anda.`] : []),
+    ``,
+    `— LPKBB Antareja 2026, SMK Telkom Malang`,
+  ].join("\n");
+  return `https://wa.me/${nomorWa(tr.noHp ?? "")}?text=${encodeURIComponent(msg)}`;
+}
 
 function formatRupiah(n: number) {
   return new Intl.NumberFormat("id-ID", {
@@ -108,6 +136,7 @@ export default function TransaksiFotoTable({
                 <div className="text-xs text-gray-400">
                   {tr.email ?? tr.user?.email ?? "-"}
                 </div>
+                {tr.noHp && <div className="text-xs text-gray-400">{tr.noHp}</div>}
               </td>
               <td className="px-4 py-3">
                 {tr.kodeUnik ? (
@@ -164,6 +193,16 @@ export default function TransaksiFotoTable({
                 )}
                 {tr.status === "VERIFIED" && (
                   <div className="flex flex-col gap-1.5">
+                    {tr.noHp && (
+                      <a
+                        href={linkWa(tr)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="bg-green-100 text-green-700 px-3 py-1 rounded-lg text-xs hover:bg-green-200 transition-colors text-center font-semibold"
+                      >
+                        Kirim link via WA
+                      </a>
+                    )}
                     <UnduhKuitansiButton id={tr.id} aksi={unduhKuitansiFoto} />
                     <button
                       onClick={() => handleSalinLink(tr.id)}

@@ -573,6 +573,9 @@ model TransaksiFoto {
   userId           String?
   namaPembeli      String?
   email            String?
+  // Wajib untuk pembelian baru (link unduhan juga dikirim lewat WA);
+  // nullable karena transaksi lama belum punya.
+  noHp             String?
   fotoList         Json
   paket            String?
   harga            Int
