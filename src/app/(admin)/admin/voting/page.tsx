@@ -5,6 +5,7 @@ import { H1 } from "@/app/components/global/Text";
 import KonfigVotingForm from "./components/KonfigVotingForm";
 import TransaksiVotingTable from "./components/TransaksiVotingTable";
 import CocokkanNominalVoting from "./components/CocokkanNominalVoting";
+import ExportVotingButton from "./components/ExportVotingButton";
 
 export default async function AdminVotingPage() {
   const [konfig, transaksis, tims, konfigTiket] = await Promise.all([
@@ -16,7 +17,10 @@ export default async function AdminVotingPage() {
 
   return (
     <div className="flex flex-col gap-8">
-      <H1 className="mb-0">Manajemen Voting Dukungan</H1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <H1 className="mb-0">Manajemen Voting Dukungan</H1>
+        <ExportVotingButton />
+      </div>
 
       <div className="grid lg:grid-cols-2 gap-6">
         <KonfigVotingForm

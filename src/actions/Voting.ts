@@ -14,8 +14,12 @@ import { sendMailTo } from "@/lib/mailer";
 import { notifPembayaranMasuk } from "@/lib/emailPembayaran";
 import { markVotingVerified } from "@/lib/votingVerifikasi";
 import { cekTokenKode, terbitkanTokenKode } from "@/lib/kodeUnikToken";
+import { buildVotingWorkbook } from "@/lib/exportVoting";
 import {
+  findDantonMap,
+  findKonfigVoting,
   findTransaksiVoting,
+  findVotingTallyMap,
   getKategoriList,
   updateTransaksiVoting,
   upsertKonfigVoting,
@@ -430,5 +434,39 @@ export async function rejectVoting(transaksiId: string) {
     return { success: true };
   } catch {
     return { success: false };
+  }
+}
+
+// Export Excel detail voting: ringkasan, rekap per tim tiap kategori, dan
+// seluruh transaksi (data pendukung didekripsi otomatis oleh Prisma).
+export async function exportDataVoting() {
+  try {
+    await requireAdminOrBendahara();
+  } catch {
+    return { success: false, message: "Forbidden" };
+  }
+  try {
+    const [konfig, tims, transaksis, tallyMap, dantonMap] = await Promise.all([
+      findKonfigVoting(),
+      prisma.tim.findMany({
+        where: { confirmed: true, gugurTanpaVote: false },
+        select: { id: true, nama_tim: true, asal_sekolah: true, jenjang: true, noUrut: true, pelatih: true, totalVote: true },
+      }),
+      prisma.transaksiVoting.findMany({
+        include: { tim: { select: { nama_tim: true, asal_sekolah: true, jenjang: true } } },
+        orderBy: { createdAt: "asc" },
+      }),
+      findVotingTallyMap(),
+      findDantonMap(),
+    ]);
+    const tanggal = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Jakarta" });
+    return {
+      success: true,
+      base64: buildVotingWorkbook(tims, transaksis, getKategoriList(konfig), tallyMap, dantonMap),
+      filename: `Rekap-Voting-${tanggal}.xlsx`,
+    };
+  } catch (e) {
+    console.error("exportDataVoting error:", e);
+    return { success: false, message: "Gagal membuat file Excel" };
   }
 }
