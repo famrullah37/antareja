@@ -8,6 +8,7 @@ import {
   deleteSertifikatByTim,
 } from "@/queries/sertifikat.query";
 import { revalidatePath } from "next/cache";
+import prisma from "@/lib/prisma";
 
 async function requireAdmin() {
   const session = await getServerSession();
@@ -20,6 +21,13 @@ export async function addSertifikat(data: FormData) {
   const namaAnggota = (data.get("namaAnggota") as string) || null;
   const namaJuara = (data.get("namaJuara") as string) || null;
   const files = data.getAll("files") as File[];
+
+  // Tim mundur / tidak hadir tidak mendapat sertifikat (lib/gugurTim.ts).
+  const tim = typeof timId === "string" && timId
+    ? await prisma.tim.findUnique({ where: { id: timId }, select: { confirmed: true, gugurAt: true } })
+    : null;
+  if (!tim) return { success: false, message: "Tim tidak ditemukan" };
+  if (tim.gugurAt) return { success: false, message: "Tim ditandai mundur / tidak hadir — sertifikat tidak diterbitkan" };
 
   try {
     for (const file of files) {

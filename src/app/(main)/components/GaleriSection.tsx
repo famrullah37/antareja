@@ -1,4 +1,5 @@
 ﻿import { findFotos } from "@/queries/galeri.query";
+import { fotoGratis } from "@/lib/galeri";
 import { PrimaryLinkButton } from "@/app/components/global/LinkButton";
 import { H2, P } from "@/app/components/global/Text";
 import SectionWrapper from "@/app/components/global/Wrapper";
@@ -25,7 +26,7 @@ export default async function GaleriSection() {
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {preview.map((foto) => {
-            const isGratis = foto.album.tipe === "GRATIS";
+            const isGratis = fotoGratis(foto);
             return (
               <div
                 key={foto.id}

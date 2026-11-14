@@ -109,7 +109,7 @@ export default function PilihSlotUjiCoba({
                       className={cn(
                         "rounded-lg border px-2 py-2 text-xs sm:text-sm font-semibold transition-colors",
                         punyaku && "bg-green-500 border-green-500 text-white",
-                        !punyaku && (diambil || lewat) && "bg-neutral-100 border-neutral-200 text-neutral-400 line-through",
+                        !punyaku && (diambil || lewat) && "bg-neutral-100 border-neutral-200 text-gray-400 line-through",
                         !nonaktif && "bg-white border-primary-200 text-primary-600 hover:bg-primary-50"
                       )}
                     >

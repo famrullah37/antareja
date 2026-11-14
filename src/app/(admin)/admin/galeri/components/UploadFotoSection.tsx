@@ -1,10 +1,11 @@
 ﻿"use client";
 
+import { MAKS_FOTO_PER_UPLOAD } from "@/lib/galeri";
 import { uploadFoto } from "@/actions/Galeri";
 import { useState } from "react";
 import { toast } from "sonner";
 
-type Album = { id: string; nama: string; timId: string | null };
+type Album = { id: string; nama: string; timId: string | null; tipe: string };
 type Fotografer = { id: string; nama: string };
 type TimOpsi = { id: string; nama: string; sekolah: string };
 
@@ -37,6 +38,10 @@ export default function UploadFotoSection({
       toast.error("Pilih minimal 1 foto");
       return;
     }
+    if (fileCount > MAKS_FOTO_PER_UPLOAD) {
+      toast.error(`Maksimal ${MAKS_FOTO_PER_UPLOAD} foto per upload`);
+      return;
+    }
     const toastId = toast.loading(`Mengupload ${fileCount} foto...`);
     const result = await uploadFoto(data);
     if (result.success) {
@@ -48,7 +53,7 @@ export default function UploadFotoSection({
         toast.error(`Alasan gagal: ${result.failedReasons.join("; ")}`, { duration: 8000 });
       }
     } else {
-      toast.error("Gagal upload", { id: toastId });
+      toast.error(result.failedReasons?.[0] ?? "Gagal upload", { id: toastId });
     }
   }
 
@@ -146,7 +151,7 @@ export default function UploadFotoSection({
           <label className="text-sm font-medium">
             Pilih Foto{" "}
             <span className="text-gray-400 font-normal">
-              (bisa pilih banyak)
+              (maks. {MAKS_FOTO_PER_UPLOAD} foto per upload)
             </span>
           </label>
           <input
@@ -155,13 +160,35 @@ export default function UploadFotoSection({
             accept="image/*"
             multiple
             required
-            onChange={(e) => setFileCount(e.target.files?.length ?? 0)}
+            onChange={(e) => {
+              const n = e.target.files?.length ?? 0;
+              // Lebih dari batas → kosongkan pilihan supaya tidak terkirim.
+              if (n > MAKS_FOTO_PER_UPLOAD) {
+                toast.error(`Maksimal ${MAKS_FOTO_PER_UPLOAD} foto per upload — Anda memilih ${n}. Pilih ulang.`);
+                e.target.value = "";
+                setFileCount(0);
+                return;
+              }
+              setFileCount(n);
+            }}
             className="border border-neutral-200 py-3 px-3 rounded-xl file:bg-primary-500 file:text-white file:rounded-md file:border-none file:py-1 file:px-3 hover:cursor-pointer file:hover:bg-primary-600 file:transition-colors text-sm"
           />
           {fileCount > 0 && (
             <p className="text-xs text-primary-600">{fileCount} foto dipilih</p>
           )}
         </div>
+
+        {albums.find((a) => a.id === albumId)?.tipe !== "GRATIS" && (
+          <label className="flex items-start gap-2 text-sm">
+            <input type="checkbox" name="gratis" className="w-4 h-4 mt-0.5 accent-green-600" />
+            <span>
+              Jadikan foto ini <b>gratis</b>
+              <span className="block text-xs text-gray-500">
+                Bisa diunduh tanpa beli walau albumnya berbayar. Bisa diubah per foto di halaman Foto Ter-upload.
+              </span>
+            </span>
+          </label>
+        )}
 
         <button
           type="submit"

@@ -1,4 +1,5 @@
 import prisma from "@/lib/prisma";
+import { TIM_IKUT_LOMBA } from "@/lib/gugurTim";
 
 // Nilai 0 adalah nilai SAH (peserta tidak melakukan perintah — sesuai aturan lomba),
 // sedangkan sub-kategori yang belum diisi juri = KOSONG. Keduanya sama-sama
@@ -18,12 +19,16 @@ export type KelengkapanTim = {
   terisi: number;
   kosong: number;
   perJuri: { juri: string; kosong: number }[];
+  // Nilai tersimpan dari juri yang TIDAK (lagi) ditugaskan di kategori itu, atau di
+  // sub-kategori nonaktif — tetap ikut total tim tapi tak terlihat di form juri.
+  yatim: number;
 };
 
 export async function hitungKelengkapanNilai(): Promise<Record<string, KelengkapanTim>> {
   const [tims, penugasan, subs, nilai] = await Promise.all([
     prisma.tim.findMany({
-      where: { confirmed: true },
+      // Tim mundur / tidak hadir tidak dinilai — tidak dihitung "kosong".
+      where: TIM_IKUT_LOMBA,
       select: { id: true, nama_tim: true, asal_sekolah: true, jenjang: true, noUrut: true },
     }),
     prisma.juriKategori.findMany({ select: { juriId: true, kategori: true, juri: { select: { nama: true } } } }),
@@ -31,22 +36,35 @@ export async function hitungKelengkapanNilai(): Promise<Record<string, Kelengkap
     prisma.nilaiJuri.findMany({ select: { juriId: true, subKategoriId: true, penilaian: { select: { timId: true } } } }),
   ]);
 
-  // Pasangan (juri, sub-kategori) yang wajib diisi untuk setiap tim.
-  const wajib = penugasan.flatMap((jk) =>
-    subs
-      .filter((s) => s.kategori.toLowerCase() === jk.kategori.toLowerCase())
-      .map((s) => ({ juriId: jk.juriId, juri: jk.juri.nama, subId: s.id }))
-  );
+  // Pasangan (juri, sub-kategori) yang wajib diisi untuk setiap tim. Dikunci per
+  // juriId|subId: penugasan "PBB" dan "pbb" untuk juri yang sama (unik-nya peka huruf
+  // besar/kecil, pencocokannya tidak) tidak boleh terhitung dua kali.
+  const pasangan = new Map<string, { juriId: string; juri: string; subId: string }>();
+  for (const jk of penugasan) {
+    for (const s of subs) {
+      if (s.kategori.toLowerCase() !== jk.kategori.toLowerCase()) continue;
+      pasangan.set(`${jk.juriId}|${s.id}`, { juriId: jk.juriId, juri: jk.juri.nama, subId: s.id });
+    }
+  }
+  const wajib = Array.from(pasangan.values());
   const terisi = new Set(nilai.map((n) => `${n.penilaian.timId}|${n.juriId}|${n.subKategoriId}`));
+  const yatimPerTim = new Map<string, number>();
+  for (const n of nilai) {
+    if (pasangan.has(`${n.juriId}|${n.subKategoriId}`)) continue;
+    yatimPerTim.set(n.penilaian.timId, (yatimPerTim.get(n.penilaian.timId) ?? 0) + 1);
+  }
 
   const hasil: Record<string, KelengkapanTim> = {};
   for (const t of tims) {
-    const kosongPerJuri = new Map<string, number>();
+    // Per juriId (bukan nama) — dua juri bernama sama tidak boleh tergabung.
+    const kosongPerJuri = new Map<string, { juri: string; kosong: number }>();
     let kosong = 0;
     for (const w of wajib) {
       if (terisi.has(`${t.id}|${w.juriId}|${w.subId}`)) continue;
       kosong++;
-      kosongPerJuri.set(w.juri, (kosongPerJuri.get(w.juri) ?? 0) + 1);
+      const k = kosongPerJuri.get(w.juriId) ?? { juri: w.juri, kosong: 0 };
+      k.kosong++;
+      kosongPerJuri.set(w.juriId, k);
     }
     hasil[t.id] = {
       timId: t.id,
@@ -57,7 +75,8 @@ export async function hitungKelengkapanNilai(): Promise<Record<string, Kelengkap
       diharapkan: wajib.length,
       terisi: wajib.length - kosong,
       kosong,
-      perJuri: Array.from(kosongPerJuri, ([juri, n]) => ({ juri, kosong: n })),
+      perJuri: Array.from(kosongPerJuri.values()),
+      yatim: yatimPerTim.get(t.id) ?? 0,
     };
   }
   return hasil;

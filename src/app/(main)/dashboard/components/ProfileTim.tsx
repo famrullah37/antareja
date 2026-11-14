@@ -16,6 +16,7 @@ import { FaDownload } from "react-icons/fa";
 import SubmitButton from "@/app/components/global/SubmitButton";
 import { downloadFormulir, downloadKuitansi } from "./parts/downloadFormulir";
 import { compressFormDataImage } from "@/lib/compressImageClient";
+import { noUrutLabel } from "@/lib/presensiDp";
 
 const rowsMapNormal = [
   ["b1s1", "b1s2", "b1s3"],
@@ -363,6 +364,16 @@ export default function ProfileTim({
                 Ubah
               </button>
             </div>
+          )}
+        </div>
+
+        {/* No. urut tampil ditentukan panitia di /admin/tim/[id]; sebelum diisi tampil keterangan. */}
+        <div className="flex flex-col gap-1 mb-4">
+          <H3>No. Urut Tampil</H3>
+          {tim.noUrut != null ? (
+            <P className="font-mono font-bold text-primary-600 text-lg">{noUrutLabel(tim.jenjang, tim.noUrut)}</P>
+          ) : (
+            <P className="text-sm text-gray-400">Belum ditentukan panitia.</P>
           )}
         </div>
 

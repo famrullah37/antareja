@@ -67,7 +67,7 @@ export default async function AdminTiketPage() {
       {adaTiketWajib && (
         <div>
           <h2 className="text-xl font-semibold mb-1">Status Tiket Wajib per Tim</h2>
-          <p className="text-sm text-neutral-500 mb-3">
+          <p className="text-sm text-gray-500 mb-3">
             Dihitung dari pembelian online akun tim untuk tiket bertanda &quot;Wajib tim&quot;. Pesanan yang
             ditolak tidak dihitung.
           </p>

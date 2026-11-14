@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { rejectFoto, unduhKuitansiFoto, verifikasiFoto } from "@/actions/Galeri";
+import { kirimUlangEmailFoto, perpanjangUnduhFoto, rejectFoto, unduhKuitansiFoto, verifikasiFoto } from "@/actions/Galeri";
 import UnduhKuitansiButton from "../../components/UnduhKuitansiButton";
 import { toast } from "sonner";
 
@@ -41,9 +41,35 @@ export default function TransaksiFotoTable({
   async function handleVerifikasi(id: string) {
     const toastId = toast.loading("Memverifikasi...");
     const result = await verifikasiFoto(id);
-    if (result.success)
-      toast.success("Akses foto diaktifkan!", { id: toastId });
-    else toast.error("Gagal", { id: toastId });
+    if (!result.success) return void toast.error(("message" in result && result.message) || "Gagal", { id: toastId });
+    if ("emailTerkirim" in result && result.emailTerkirim === false)
+      toast.warning(`Akses aktif, tapi ${result.message ?? "email gagal terkirim"}`, { id: toastId, duration: 8000 });
+    else toast.success("Akses foto diaktifkan & link dikirim ke email pembeli", { id: toastId });
+  }
+
+  async function handleKirimUlang(id: string) {
+    const toastId = toast.loading("Mengirim ulang email...");
+    const r = await kirimUlangEmailFoto(id);
+    if (r.success) toast.success("Email link unduhan terkirim", { id: toastId });
+    else toast.error(r.message ?? "Gagal mengirim email", { id: toastId });
+  }
+
+  async function handlePerpanjang(id: string) {
+    const toastId = toast.loading("Memperpanjang...");
+    const r = await perpanjangUnduhFoto(id);
+    if (r.success && "berlakuSampai" in r && r.berlakuSampai)
+      toast.success(`Masa unduh diperpanjang sampai ${new Date(r.berlakuSampai).toLocaleDateString("id-ID")}`, { id: toastId });
+    else toast.error(("message" in r && r.message) || "Gagal", { id: toastId });
+  }
+
+  async function handleSalinLink(id: string) {
+    const link = `${window.location.origin}/galeri/download/${id}`;
+    try {
+      await navigator.clipboard.writeText(link);
+      toast.success("Link unduhan disalin — bisa dikirim lewat WA");
+    } catch {
+      window.prompt("Salin link unduhan ini:", link);
+    }
   }
 
   async function handleReject(id: string) {
@@ -136,7 +162,29 @@ export default function TransaksiFotoTable({
                     </button>
                   </div>
                 )}
-                {tr.status === "VERIFIED" && <UnduhKuitansiButton id={tr.id} aksi={unduhKuitansiFoto} />}
+                {tr.status === "VERIFIED" && (
+                  <div className="flex flex-col gap-1.5">
+                    <UnduhKuitansiButton id={tr.id} aksi={unduhKuitansiFoto} />
+                    <button
+                      onClick={() => handleSalinLink(tr.id)}
+                      className="bg-neutral-100 text-neutral-700 px-3 py-1 rounded-lg text-xs hover:bg-neutral-200"
+                    >
+                      Salin link unduhan
+                    </button>
+                    <button
+                      onClick={() => handlePerpanjang(tr.id)}
+                      className="bg-amber-50 text-amber-700 px-3 py-1 rounded-lg text-xs hover:bg-amber-100"
+                    >
+                      Perpanjang 30 hari
+                    </button>
+                    <button
+                      onClick={() => handleKirimUlang(tr.id)}
+                      className="bg-blue-50 text-blue-700 px-3 py-1 rounded-lg text-xs hover:bg-blue-100"
+                    >
+                      Kirim ulang email
+                    </button>
+                  </div>
+                )}
               </td>
             </tr>
           ))}

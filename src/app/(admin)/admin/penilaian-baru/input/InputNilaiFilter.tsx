@@ -15,22 +15,27 @@ export default function InputNilaiFilter({
   kategoriLombas,
   defaultValues,
   sembunyikanSekolah = false,
+  juriLoginId,
 }: {
   jenjangList: string[];
   juris: Juri[];
   juriKategoris: JuriKat[];
   kategoriLombas: KategoriLomba[];
-  defaultValues: { jenjang?: string; sekolah?: string; juriId?: string; kategori?: string };
+  defaultValues: { jenjang?: string; sekolah?: string; juriId?: string; kategori?: string; status?: string };
   sembunyikanSekolah?: boolean;
+  // Akun juri: pilihan juri disembunyikan, kategori hanya milik juri ini.
+  juriLoginId?: string;
 }) {
   const router = useRouter();
   const [jenjang, setJenjang] = useState(defaultValues.jenjang ?? "");
   const [sekolah, setSekolah] = useState(defaultValues.sekolah ?? "");
   const [juriId, setJuriId] = useState(defaultValues.juriId ?? "");
   const [kategori, setKategori] = useState(defaultValues.kategori ?? "");
+  const [status, setStatus] = useState(defaultValues.status ?? "");
 
-  const juriKategoriList = juriId
-    ? juriKategoris.filter((jk) => jk.juriId === juriId).map((jk) => jk.kategori)
+  const juriKonteks = juriLoginId ?? juriId;
+  const juriKategoriList = juriKonteks
+    ? juriKategoris.filter((jk) => jk.juriId === juriKonteks).map((jk) => jk.kategori)
     : kategoriLombas.map((k) => k.nama);
 
   function handleFilter() {
@@ -40,12 +45,13 @@ export default function InputNilaiFilter({
     const juriDipilih = juris.find((j) => j.id === juriId);
     if (juriDipilih) params.set("juri", makeSlug(juriDipilih.nama, juriDipilih.id, "juri"));
     if (kategori) params.set("kategori", kategori);
+    if (status && juriKonteks) params.set("status", status);
     const qs = params.toString();
     router.push(qs ? `/admin/penilaian-baru/input?${qs}` : "/admin/penilaian-baru/input");
   }
 
   function handleReset() {
-    setJenjang(""); setSekolah(""); setJuriId(""); setKategori("");
+    setJenjang(""); setSekolah(""); setJuriId(""); setKategori(""); setStatus("");
     router.push("/admin/penilaian-baru/input");
   }
 
@@ -79,6 +85,7 @@ export default function InputNilaiFilter({
         </div>
         )}
 
+        {!juriLoginId && (
         <div className="flex flex-col gap-1">
           <label className="text-xs text-gray-500">Juri</label>
           <select
@@ -92,6 +99,7 @@ export default function InputNilaiFilter({
             ))}
           </select>
         </div>
+        )}
 
         <div className="flex flex-col gap-1">
           <label className="text-xs text-gray-500">Kategori</label>
@@ -106,6 +114,20 @@ export default function InputNilaiFilter({
             ))}
           </select>
         </div>
+
+        {juriKonteks && (
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-gray-500">Status nilai</label>
+            <select
+              value={status}
+              onChange={(e) => setStatus(e.target.value)}
+              className="border border-neutral-300 rounded-lg px-3 py-2 text-sm"
+            >
+              <option value="">Semua tim</option>
+              <option value="belum">Belum selesai dinilai</option>
+            </select>
+          </div>
+        )}
       </div>
 
       <div className="flex gap-2">

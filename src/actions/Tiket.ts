@@ -34,7 +34,7 @@ import {
   updateTransaksiTiket,
   upsertKonfigTiket,
 } from "@/queries/tiket.query";
-import { imageUploader, validateUploadFile } from "./fileUploader";
+import { imageUploader, validateUploadFile, bufferBukti } from "./fileUploader";
 import prisma from "@/lib/prisma";
 import { escapeHtml } from "@/lib/escapeHtml";
 import { formatJamWib } from "@/lib/ujiCoba";
@@ -81,6 +81,17 @@ async function pesananWajibAktif(
   return n > 0;
 }
 
+// Tiket yang sedang "ditahan" pesanan online PENDING. `sisa` baru dipotong saat
+// admin memverifikasi, jadi tanpa ini pesanan yang menunggu verifikasi tidak
+// dihitung dan tiket yang sebenarnya sudah habis tetap bisa dipesan.
+async function jumlahTertahan(db: Pick<typeof prisma, "transaksiTiket">, tiketId: string) {
+  const agg = await db.transaksiTiket.aggregate({
+    where: { tiketId, status: "PENDING" },
+    _sum: { jumlah: true },
+  });
+  return agg._sum.jumlah ?? 0;
+}
+
 // Jumlah tiket wajib per tim dari form admin (minimal 1).
 function parseJumlahPerTim(data: FormData) {
   const n = parseInt((data.get("jumlahPerTim") as string) || "1");
@@ -103,9 +114,12 @@ export async function createTiketAdmin(data: FormData) {
   const harga = parseInt(data.get("harga") as string);
   const kuota = parseInt(data.get("kuota") as string);
   const khususTim = data.get("khususTim") === "on";
+  const khususOts = data.get("khususOts") === "on";
+  if (khususTim && khususOts)
+    return { success: false, message: "Tiket tidak bisa sekaligus wajib tim dan OTS" };
   try {
     await createTiket({
-      jenis, harga, kuota, sisa: kuota, khususTim, jumlahPerTim: parseJumlahPerTim(data), ...parseBundling(data),
+      jenis, harga, kuota, sisa: kuota, khususTim, khususOts, jumlahPerTim: parseJumlahPerTim(data), ...parseBundling(data),
     });
     revalidatePath("/tiket");
     revalidatePath("/admin/tiket");
@@ -118,11 +132,42 @@ export async function updateTiketAdmin(data: FormData, id: string) {
   const jenis = data.get("jenis") as string;
   const harga = parseInt(data.get("harga") as string);
   const kuota = parseInt(data.get("kuota") as string);
+  if (!Number.isInteger(kuota) || kuota < 0) return { success: false, message: "Kuota tidak valid" };
   try {
-    await updateTiket({ id }, { jenis, harga, kuota, ...parseBundling(data) });
+    // Ubah kuota → sisa ikut bergeser sebesar selisihnya (dulu sisa tidak ikut
+    // berubah, jadi menurunkan kuota tidak membuat tiket habis).
+    await prisma.$transaction(async (tx) => {
+      const lama = await tx.tiket.findUnique({ where: { id }, select: { kuota: true, sisa: true } });
+      if (!lama) throw new Error("TIKET_TIDAK_DITEMUKAN");
+      const sisa = Math.max(0, lama.sisa + (kuota - lama.kuota));
+      await tx.tiket.update({ where: { id }, data: { jenis, harga, kuota, sisa, ...parseBundling(data) } });
+    });
+    revalidatePath("/tiket");
     revalidatePath("/admin/tiket");
     return { success: true };
   } catch { return { success: false }; }
+}
+
+// Tambah stok tiket (mis. saat sudah habis) — kuota & sisa naik bersamaan secara
+// atomik. Hanya penambahan; tidak bisa mengurangi supaya tiket yang sudah
+// terjual/terverifikasi tidak ikut "hilang".
+export async function tambahKuotaTiket(id: string, tambahan: number) {
+  await requireAdmin();
+  if (!Number.isInteger(tambahan) || tambahan < 1 || tambahan > 10000)
+    return { success: false, message: "Jumlah tambahan tidak valid (1–10.000)" };
+  try {
+    const tiket = await prisma.tiket.update({
+      where: { id },
+      data: { kuota: { increment: tambahan }, sisa: { increment: tambahan } },
+    });
+    await catatLog("TAMBAH_KUOTA_TIKET", `Tiket ${tiket.jenis}: +${tambahan} (kuota ${tiket.kuota}, sisa ${tiket.sisa})`);
+    revalidatePath("/admin/tiket");
+    revalidatePath("/admin/tiket/pos");
+    revalidatePath("/tiket");
+    return { success: true };
+  } catch {
+    return { success: false };
+  }
 }
 
 export async function updateBundlingTiket(data: FormData, id: string) {
@@ -143,17 +188,27 @@ export async function updateBundlingTiket(data: FormData, id: string) {
   } catch { return { success: false }; }
 }
 
-// Tandai/lepas tiket sebagai "wajib tim" (hanya bisa dibeli online oleh akun tim).
-export async function setKhususTimTiket(id: string, khususTim: boolean, jumlahPerTim = 1) {
+// Siapa yang boleh membeli tiket: UMUM (online & loket), TIM (wajib tim, hanya
+// online oleh akun tim), OTS (hanya di loket lewat POS Tiket).
+export type PembeliTiket = "UMUM" | "TIM" | "OTS";
+
+export async function setPembeliTiket(id: string, pembeli: PembeliTiket, jumlahPerTim = 1) {
   await requireAdmin();
-  if (!Number.isInteger(jumlahPerTim) || jumlahPerTim < 1) return { success: false, message: "Jumlah per tim minimal 1" };
+  if (!["UMUM", "TIM", "OTS"].includes(pembeli)) return { success: false, message: "Pilihan pembeli tidak valid" };
+  if (pembeli === "TIM" && (!Number.isInteger(jumlahPerTim) || jumlahPerTim < 1))
+    return { success: false, message: "Jumlah per tim minimal 1" };
   try {
-    const tiket = await updateTiket({ id }, khususTim ? { khususTim, jumlahPerTim } : { khususTim });
+    const khususTim = pembeli === "TIM";
+    const khususOts = pembeli === "OTS";
+    const tiket = await updateTiket({ id }, khususTim ? { khususTim, khususOts, jumlahPerTim } : { khususTim, khususOts });
     await catatLog(
-      "UBAH_TIKET_KHUSUS_TIM",
-      `Tiket ${tiket.jenis}: ${khususTim ? `wajib tim, ${jumlahPerTim} tiket per tim` : "terbuka untuk umum"}`
+      "UBAH_TIKET_PEMBELI",
+      `Tiket ${tiket.jenis}: ${
+        khususTim ? `wajib tim, ${jumlahPerTim} tiket per tim` : khususOts ? "OTS, hanya dijual di loket" : "terbuka untuk umum"
+      }`
     );
     revalidatePath("/admin/tiket");
+    revalidatePath("/admin/tiket/pos");
     revalidatePath("/tiket");
     revalidatePath("/");
     return { success: true };
@@ -266,11 +321,10 @@ export async function beliTiket(data: FormData) {
   const salahData = cekDataPemesan({ nama, email, noHp });
   if (salahData) return { success: false, message: salahData };
 
-  // Bukti wajib untuk transfer manual (admin tidak punya cara lain
-  // memverifikasi) — untuk QRIS opsional karena nominal sudah unik lewat
-  // kodeUnik, admin cocokkan manual dari riwayat QRIS/mutasi rekening.
-  if (metodePembayaran !== "QRIS" && (!bukti || bukti.size === 0)) {
-    return { success: false, message: "Bukti pembayaran wajib diunggah" };
+  // Bukti WAJIB untuk Transfer maupun QRIS (aturan panitia: verifikasi
+  // berdasarkan bukti, bukan hanya mencocokkan nominal).
+  if (!bukti || bukti.size === 0) {
+    return { success: false, message: "Bukti pembayaran wajib diunggah — untuk QRIS, screenshot bukti berhasil dari aplikasi pembayaran" };
   }
   if (!kodeUnik || !/^\d{3}$/.test(kodeUnik)) {
     return { success: false, message: "Kode pembayaran tidak valid, silakan pilih ulang jumlah tiket" };
@@ -284,9 +338,11 @@ export async function beliTiket(data: FormData) {
   // yang pasti gagal (stok tetap dicek ulang secara atomik di transaksi bawah).
   const tiketCek = await prisma.tiket.findUnique({
     where: { id: tiketId },
-    select: { sisa: true, khususTim: true, jumlahPerTim: true },
+    select: { sisa: true, khususTim: true, khususOts: true, jumlahPerTim: true },
   });
   if (!tiketCek) return { success: false, message: "Tiket tidak ditemukan" };
+  if (tiketCek.khususOts)
+    return { success: false, message: "Tiket OTS hanya dijual di loket pada hari acara" };
   // Tiket wajib tim: wajib login dengan akun yang sudah mendaftarkan tim,
   // jumlah ditetapkan admin (jumlahPerTim), dan hanya satu pesanan aktif per tim.
   if (tiketCek.khususTim) {
@@ -301,14 +357,15 @@ export async function beliTiket(data: FormData) {
       return { success: false, message: "Tim kamu sudah memesan tiket wajib ini — cek di dashboard tim" };
     }
   }
-  if (tiketCek.sisa < jumlah) return { success: false, message: "Stok tiket tidak mencukupi" };
+  if (tiketCek.sisa - (await jumlahTertahan(prisma, tiketId)) < jumlah)
+    return { success: false, message: "Stok tiket tidak mencukupi" };
 
   // Upload bukti dulu sebelum transaksi DB
   let buktiUrl: string | undefined;
   if (bukti && bukti.size > 0) {
     const fileCheck = await validateUploadFile(bukti);
     if (!fileCheck.valid) return { success: false, message: fileCheck.message };
-    const upload = await imageUploader(Buffer.from(await bukti.arrayBuffer()));
+    const upload = await imageUploader(await bufferBukti(bukti));
     if (upload.error) {
       console.error("Upload bukti gagal:", upload.message);
       return { success: false, message: upload.message };
@@ -317,12 +374,15 @@ export async function beliTiket(data: FormData) {
   }
 
   try {
-    // Atomic: decrement sisa hanya jika cukup, lalu buat transaksi
+    // Atomic: kunci per tiket supaya dua pesanan bersamaan tidak sama-sama lolos
+    // cek stok, lalu stok tersedia = sisa − pesanan PENDING (sisa baru dipotong
+    // saat verifikasi).
     const dibuat = await prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT 1 FROM (SELECT pg_advisory_xact_lock(hashtext(${`tiket-stok:${tiketId}`}))) AS kunci`;
       const tiket = await tx.tiket.findUnique({ where: { id: tiketId } });
-      if (!tiket) throw new Error("TIKET_TIDAK_DITEMUKAN");
+      if (!tiket || tiket.khususOts) throw new Error("TIKET_TIDAK_DITEMUKAN");
       if (jumlah < 1) throw new Error("JUMLAH_INVALID");
-      if (tiket.sisa < jumlah) throw new Error("STOK_KURANG");
+      if (tiket.sisa - (await jumlahTertahan(tx, tiketId)) < jumlah) throw new Error("STOK_KURANG");
       if (!Number.isInteger(bundleJumlah) || bundleJumlah < 0 || bundleJumlah > jumlah)
         throw new Error("BUNDLE_INVALID");
       if (bundleJumlah > 0 && !punyaBundling(tiket)) throw new Error("BUNDLE_INVALID");
@@ -374,7 +434,8 @@ export async function beliTiket(data: FormData) {
       detail: `${dibuat.jumlah}× ${dibuat.tiket.jenis}${dibuat.bundleJumlah ? ` (+${dibuat.bundleJumlah} bundling)` : ""}`,
     });
     const linkPesanan = linkPesananTiket(dibuat.id);
-    await kirimEmailPesananDiterima({
+    // Tidak ditunggu: SMTP 2–5 detik tidak perlu menahan pembeli.
+    void kirimEmailPesananDiterima({
       to: dibuat.email,
       nama: dibuat.nama,
       produk: "Tiket",
@@ -414,7 +475,7 @@ export async function uploadBuktiTiket(data: FormData) {
   if (!tr || tr.jenisJual !== "ONLINE") return { success: false, message: "Pesanan tidak ditemukan" };
   if (tr.status !== "PENDING") return { success: false, message: "Pesanan ini sudah diproses panitia" };
 
-  const upload = await imageUploader(Buffer.from(await bukti!.arrayBuffer()));
+  const upload = await imageUploader(await bufferBukti(bukti!));
   if (upload.error || !upload.data?.url) {
     console.error("Upload bukti menyusul gagal:", upload.message);
     return { success: false, message: upload.message ?? "Gagal mengunggah bukti" };
@@ -515,6 +576,7 @@ export async function jualTiketOffline(data: FormData) {
     });
 
     revalidatePath("/admin/tiket");
+    revalidatePath("/admin/tiket/pos");
     revalidatePath("/admin/kas");
     return { success: true };
   } catch {
@@ -644,6 +706,7 @@ export async function verifikasiTiket(transaksiId: string) {
     }
 
     revalidatePath("/admin/tiket");
+    revalidatePath("/admin/tiket/pos");
     revalidatePath("/admin/kas");
     return { success: true };
   } catch {

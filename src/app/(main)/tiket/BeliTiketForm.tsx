@@ -40,7 +40,9 @@ export default function BeliTiketForm({
   pilihAwal: string | null;
 }) {
   // Tiket wajib hanya bisa dipilih akun tim, satu pesanan aktif per tim.
-  const terkunci = (t: Tiket) => t.khususTim && (!punyaTim || sudahDipesan.includes(t.id));
+  // Tiket OTS hanya dijual di loket — tampil sebagai info, tidak bisa dipilih.
+  const terkunci = (t: Tiket) =>
+    t.sisa <= 0 || t.khususOts || (t.khususTim && (!punyaTim || sudahDipesan.includes(t.id)));
   // ?pilih=<id> (dari dashboard tim): langsung terpilih kalau boleh dipilih.
   const awal = tikets.find((t) => t.id === pilihAwal && !terkunci(t)) ?? null;
   const [selected, setSelected] = useState<Tiket | null>(awal);
@@ -196,6 +198,11 @@ export default function BeliTiketForm({
                 Wajib tim peserta
               </div>
             )}
+            {t.khususOts && (
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-amber-800 bg-amber-100 rounded px-2 py-0.5 mb-2 inline-block">
+                OTS · di loket
+              </div>
+            )}
             <div className="font-bold text-lg mb-1">{namaTiket(t.jenis)}</div>
             <div className="text-primary-600 font-semibold text-xl">
               {formatRupiah(t.harga)}
@@ -205,15 +212,17 @@ export default function BeliTiketForm({
                 Bundling: +{formatRupiah(t.bundleHarga)} dapat {t.bundleIsi}
               </div>
             ) : null}
-            <div className="text-xs text-gray-400 mt-1">
-              Sisa: {t.sisa} tiket
+            <div className={`text-xs mt-1 ${t.sisa <= 0 ? "font-semibold text-red-600" : "text-gray-400"}`}>
+              {t.sisa <= 0 ? "Tiket habis" : `Sisa: ${t.sisa} tiket`}
             </div>
             {t.khususTim && (
               <div className="text-xs text-gray-600 mt-1">Wajib {t.jumlahPerTim} tiket per tim</div>
             )}
-            {dikunci && (
+            {dikunci && t.sisa > 0 && (
               <div className="text-xs text-gray-600 mt-2">
-                {dipesan
+                {t.khususOts
+                  ? "Dijual di loket pada hari acara, tidak bisa dibeli online."
+                  : dipesan
                   ? "Tim kamu sudah memesan tiket ini — cek status di dashboard tim."
                   : sudahLogin
                   ? "Hanya untuk akun yang sudah mendaftarkan tim."
@@ -436,16 +445,16 @@ export default function BeliTiketForm({
 
             <div className="flex flex-col gap-1">
               <label className="text-sm font-medium">
-                Bukti Pembayaran {metode === "TRANSFER" && <span className="text-red-500">*</span>}
+                Bukti Pembayaran <span className="text-red-500">*</span>
                 {metode === "QRIS" && (
-                  <span className="text-xs text-gray-400 font-normal ml-1">— opsional, admin cek dari riwayat QRIS</span>
+                  <span className="text-xs text-gray-500 font-normal ml-1">— screenshot bukti berhasil dari aplikasi pembayaran</span>
                 )}
               </label>
               <input
                 name="bukti"
                 type="file"
                 accept="image/*"
-                required={metode === "TRANSFER"}
+                required
                 className="border border-gray-200 py-3 px-3 rounded-xl file:bg-primary-500 file:text-white file:rounded-md file:border-none file:py-1 hover:cursor-pointer"
               />
             </div>

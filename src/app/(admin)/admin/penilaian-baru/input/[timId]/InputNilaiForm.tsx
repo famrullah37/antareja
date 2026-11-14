@@ -4,6 +4,7 @@ import { hapusPelanggaranTim, inputNilaiJuri, inputPelanggaranTim } from "@/acti
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
+import { usePeringatanKeluar } from "@/lib/usePeringatanKeluar";
 
 type SubKategori = {
   id: string;
@@ -26,9 +27,10 @@ type Pelanggaran = { id: string; kode: string; nama: string; poinPengurangan: nu
 type Tim = { id: string };
 type Existing = {
   id: string;
-  nilaiKotor: number;
+  // null untuk akun juri — total tim gabungan semua juri tidak ditampilkan ke juri.
+  nilaiKotor: number | null;
   totalPengurang: number;
-  nilaiAkhir: number;
+  nilaiAkhir: number | null;
   published: boolean;
   nilaiJuri: {
     subKategoriId: string;
@@ -46,6 +48,8 @@ type Existing = {
 } | null;
 
 type Skor = { nilai: number; catatan: string };
+
+const GAGAL_JARINGAN = "Koneksi terputus — nilai belum tersimpan, coba simpan lagi";
 
 // Aturan lomba: peserta yang tidak melakukan perintah = nilai 0 (sah), beda dengan
 // sub-kategori yang belum diisi (kosong). Kalau master kategori tidak memuat 0,
@@ -78,6 +82,7 @@ export default function InputNilaiForm({
   pelanggarans,
   juriKategoris,
   existing,
+  kategoriAwal,
 }: {
   tim: Tim;
   juriAktif: Juri | null;
@@ -89,6 +94,8 @@ export default function InputNilaiForm({
   pelanggarans: Pelanggaran[];
   juriKategoris: JuriKat[];
   existing: Existing;
+  // ?kategori= dari daftar tim — tab kategori yang dibuka pertama kali.
+  kategoriAwal?: string;
 }) {
   // Nilai lama milik juri INI saja — dulu dicari per sub-kategori tanpa juriId,
   // sehingga juri B bisa melihat (dan mengira) nilai juri A sebagai nilainya.
@@ -100,9 +107,14 @@ export default function InputNilaiForm({
   const pathname = usePathname();
   const terkunci = !!existing?.published;
 
-  const kategoriJuri = juriKategoris
-    .filter((jk) => jk.juriId === juriAktif?.id)
-    .map((jk) => jk.kategori);
+  // Unik tanpa membedakan huruf besar/kecil (penugasan "PBB" & "pbb" = satu kategori).
+  const kategoriJuri = Array.from(
+    new Map(
+      juriKategoris
+        .filter((jk) => jk.juriId === juriAktif?.id)
+        .map((jk) => [jk.kategori.toLowerCase(), jk.kategori] as const)
+    ).values()
+  );
   const kategoriKecil = kategoriJuri.map((k) => k.toLowerCase());
   const subSaya = subKategoris.filter((s) => kategoriKecil.includes(s.kategori.toLowerCase()));
 
@@ -121,7 +133,24 @@ export default function InputNilaiForm({
 
   const terisi = subSaya.filter((s) => nilaiTampil(s.id) !== undefined).length;
   const total = subSaya.reduce((sum, s) => sum + (nilaiTampil(s.id) ?? 0), 0);
+
+  // Juri dengan 2+ kategori: tab per kategori supaya tidak menggulir panjang dan
+  // progres tiap kategori terlihat. "SEMUA" = semua kategori ditumpuk.
+  const [tab, setTab] = useState<string>(
+    () => kategoriJuri.find((k) => k.toLowerCase() === kategoriAwal?.toLowerCase()) ?? "SEMUA"
+  );
+  const progresKategori = Object.entries(grouped).map(([kategori, subs]) => ({
+    kategori,
+    total: subs.length,
+    terisi: subs.filter((s) => nilaiTampil(s.id) !== undefined).length,
+    subtotal: subs.reduce((sum, s) => sum + (nilaiTampil(s.id) ?? 0), 0),
+  }));
+  // Ganti juri (mode staf) bisa membuat tab lama tidak ada → kembali ke "SEMUA".
+  const tabAktif = tab !== "SEMUA" && grouped[tab] ? tab : "SEMUA";
+  const groupedTampil = Object.entries(grouped).filter(([k]) => tabAktif === "SEMUA" || k === tabAktif);
   const adaPerubahan = Object.keys(scores).length > 0;
+  // Juri sering langsung pindah ke tim berikutnya — jangan sampai nilai belum tersimpan hilang.
+  usePeringatanKeluar(adaPerubahan, "Nilai belum disimpan. Tinggalkan halaman ini dan buang perubahan?");
 
   async function handleSubmit() {
     const entries = Object.entries(scores).map(([subKategoriId, v]) => ({
@@ -148,7 +177,10 @@ export default function InputNilaiForm({
     setLoading(true);
     const toastId = toast.loading("Menyimpan nilai...");
     // Juri yang dipilih hanya dipakai server untuk Sie Lomba/Admin; akun juri selalu dirinya sendiri.
-    const result = await inputNilaiJuri(tim.id, entries, juriAktif?.id);
+    const result = await inputNilaiJuri(tim.id, entries, juriAktif?.id).catch(() => ({
+      success: false,
+      message: GAGAL_JARINGAN,
+    }));
     setLoading(false);
     if (result.success) {
       toast.success("Nilai berhasil disimpan!", { id: toastId });
@@ -160,6 +192,8 @@ export default function InputNilaiForm({
 
   const [pelId, setPelId] = useState("");
   const [kejadian, setKejadian] = useState(1);
+  // Ketuk ganda di tablet bisa mencatat pelanggaran (pengurangan) dua kali.
+  const [sibukPel, setSibukPel] = useState(false);
 
   async function handleAddPelanggaran() {
     const pel = pelanggarans.find((p) => p.id === pelId);
@@ -167,10 +201,13 @@ export default function InputNilaiForm({
       toast.error("Pilih jenis pelanggaran");
       return;
     }
-    if (!confirm(`Tambah pelanggaran [${pel.kode}] ${pel.nama} × ${kejadian} (−${pel.poinPengurangan * kejadian} poin)?`))
+    if (sibukPel) return;
+    if (!confirm(`Tambah pelanggaran [${pel.kode}] ${pel.nama} × ${kejadian} (−${Math.abs(pel.poinPengurangan) * kejadian} poin)?`))
       return;
+    setSibukPel(true);
     const toastId = toast.loading("Menambah pelanggaran...");
-    const result = await inputPelanggaranTim(tim.id, pel.id, kejadian);
+    const result = await inputPelanggaranTim(tim.id, pel.id, kejadian).catch(() => ({ success: false, message: GAGAL_JARINGAN }));
+    setSibukPel(false);
     if (result.success) {
       toast.success("Pelanggaran ditambahkan", { id: toastId });
       setPelId("");
@@ -179,9 +216,11 @@ export default function InputNilaiForm({
   }
 
   async function handleHapusPelanggaran(id: string, label: string) {
-    if (!confirm(`Hapus pelanggaran ${label}?`)) return;
+    if (sibukPel || !confirm(`Hapus pelanggaran ${label}?`)) return;
+    setSibukPel(true);
     const toastId = toast.loading("Menghapus...");
-    const result = await hapusPelanggaranTim(id);
+    const result = await hapusPelanggaranTim(id).catch(() => ({ success: false, message: GAGAL_JARINGAN }));
+    setSibukPel(false);
     if (result.success) toast.success("Pelanggaran dihapus", { id: toastId });
     else toast.error(result.message ?? "Gagal menghapus", { id: toastId });
   }
@@ -242,7 +281,7 @@ export default function InputNilaiForm({
                 : "Belum ditugaskan ke kategori"}
           </div>
         </div>
-        {existing && (
+        {existing && existing.nilaiAkhir !== null && existing.nilaiKotor !== null ? (
           <div className="flex gap-6 ml-auto">
             <div className="text-center">
               <div className="text-2xl font-bold">{existing.nilaiKotor}</div>
@@ -257,6 +296,14 @@ export default function InputNilaiForm({
               <div className="text-xs text-gray-400">Nilai Akhir</div>
             </div>
           </div>
+        ) : (
+          // Akun juri: hanya jumlah nilai yang ia berikan di kategorinya sendiri.
+          juriAktif && (
+            <div className="ml-auto text-center text-primary-600">
+              <div className="text-2xl font-bold">{total}</div>
+              <div className="text-xs text-gray-400">Nilai Anda ({kategoriJuri.join(", ") || "-"})</div>
+            </div>
+          )
         )}
       </div>
 
@@ -266,8 +313,38 @@ export default function InputNilaiForm({
         </div>
       )}
 
+      {/* Tab kategori — hanya bila juri memegang lebih dari satu kategori. */}
+      {progresKategori.length > 1 && (
+        <div className="sticky -top-4 z-20 -mx-1 flex gap-2 overflow-x-auto whitespace-nowrap bg-slate-100/95 px-1 pb-2 pt-3 backdrop-blur sm:flex-wrap">
+          {[{ kategori: "SEMUA", terisi, total: subSaya.length }, ...progresKategori].map((p) => {
+            const aktif = tabAktif === p.kategori;
+            const lengkap = p.total > 0 && p.terisi === p.total;
+            return (
+              <button
+                key={p.kategori}
+                type="button"
+                onClick={() => setTab(p.kategori)}
+                className={`h-11 shrink-0 rounded-lg border-2 px-4 text-sm font-semibold ${
+                  aktif ? "border-primary-500 bg-primary-500 text-white" : "border-neutral-300 bg-white"
+                }`}
+              >
+                {p.kategori === "SEMUA" ? "Semua kategori" : p.kategori}{" "}
+                <span
+                  className={`ml-1 rounded px-1.5 py-0.5 text-xs ${
+                    aktif ? "bg-white/20" : lengkap ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-800"
+                  }`}
+                >
+                  {lengkap ? "✓ " : ""}
+                  {p.terisi}/{p.total}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       {/* Kartu per sub-kategori — tombol besar untuk layar sentuh */}
-      {Object.entries(grouped).map(([kategori, subs]) => {
+      {groupedTampil.map(([kategori, subs]) => {
         const mastersKategori = nilaiMasters
           .filter((m) => m.kategori.toLowerCase() === kategori.toLowerCase())
           .sort((a, b) => a.urutan - b.urutan);
@@ -276,7 +353,23 @@ export default function InputNilaiForm({
           : [...mastersKategori, BARIS_NOL];
         return (
           <section key={kategori} className="flex flex-col gap-3">
-            <h2 className="font-bold text-lg">Kategori {kategori}</h2>
+            {(() => {
+              const p = progresKategori.find((x) => x.kategori === kategori);
+              return (
+                <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-neutral-200 pb-1">
+                  <h2 className="font-bold text-lg">Kategori {kategori}</h2>
+                  {p && (
+                    <span className="text-sm text-gray-600">
+                      Terisi{" "}
+                      <b className={p.terisi === p.total ? "text-green-700" : "text-amber-700"}>
+                        {p.terisi}/{p.total}
+                      </b>{" "}
+                      · Subtotal <b className="text-black">{p.subtotal}</b>
+                    </span>
+                  )}
+                </div>
+              );
+            })()}
             <div className="grid xl:grid-cols-2 gap-3">
               {subs.map((sub, idx) => {
                 const dipilih = nilaiTampil(sub.id);
@@ -319,7 +412,7 @@ export default function InputNilaiForm({
                     <div className="flex flex-col gap-2">
                       {masters.map((m) => (
                         <div key={m.id} className="flex flex-wrap items-center gap-2">
-                          <span className="w-28 shrink-0 text-xs font-semibold" style={{ color: m.warna }}>
+                          <span className="w-full sm:w-28 shrink-0 text-xs font-semibold" style={{ color: m.warna }}>
                             {m.predikat.replace(/_/g, " ")}
                           </span>
                           {(m.nilai as number[]).map((n) => {
@@ -373,7 +466,7 @@ export default function InputNilaiForm({
                         <button
                           type="button"
                           onClick={() => setCatatanTerbuka((p) => ({ ...p, [sub.id]: true }))}
-                          className="self-start text-sm text-primary-500 font-medium py-1"
+                          className="self-start text-sm text-primary-500 font-medium py-2 pr-3"
                         >
                           + Catatan
                         </button>
@@ -408,7 +501,8 @@ export default function InputNilaiForm({
                     onClick={() =>
                       handleHapusPelanggaran(p.id, `[${p.pelanggaran.kode}] × ${p.jumlahKejadian}`)
                     }
-                    className="text-xs text-red-600 bg-red-50 hover:bg-red-100 rounded-lg px-3 py-2"
+                    disabled={sibukPel}
+                    className="disabled:opacity-50 text-xs text-red-600 bg-red-50 hover:bg-red-100 rounded-lg px-3 py-2"
                   >
                     Hapus
                   </button>
@@ -444,14 +538,15 @@ export default function InputNilaiForm({
                   min={1}
                   max={50}
                   value={kejadian}
-                  onChange={(e) => setKejadian(Math.max(1, parseInt(e.target.value) || 1))}
+                  onChange={(e) => setKejadian(Math.min(50, Math.max(1, parseInt(e.target.value) || 1)))}
                   className="border border-neutral-300 rounded-lg px-3 py-3 text-sm w-24"
                 />
               </div>
               <button
                 type="button"
                 onClick={handleAddPelanggaran}
-                className="bg-red-500 text-white px-5 py-3 rounded-lg text-sm font-semibold hover:bg-red-600 transition-colors"
+                disabled={sibukPel}
+                className="disabled:opacity-50 bg-red-500 text-white px-5 py-3 rounded-lg text-sm font-semibold hover:bg-red-600 transition-colors"
               >
                 Tambah Pelanggaran
               </button>
@@ -462,8 +557,8 @@ export default function InputNilaiForm({
 
       {/* Bar simpan — selalu terlihat saat menggulir di tablet */}
       {!terkunci && subSaya.length > 0 && (
-        <div className="fixed bottom-0 left-0 right-0 lg:left-80 z-30 bg-white/95 backdrop-blur border-t border-neutral-200 px-4 sm:px-8 py-3 flex items-center gap-4">
-          <div className="text-sm text-gray-600">
+        <div className="fixed bottom-0 left-0 right-0 lg:left-80 z-30 bg-white/95 backdrop-blur border-t border-neutral-200 px-3 sm:px-8 py-2 sm:py-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] flex items-center gap-3 sm:gap-4">
+          <div className="min-w-0 text-xs sm:text-sm text-gray-600">
             Terisi{" "}
             <b className={terisi === subSaya.length ? "text-green-600" : "text-black"}>
               {terisi}/{subSaya.length}
@@ -472,12 +567,17 @@ export default function InputNilaiForm({
               <span className="text-amber-700 font-semibold"> · {subSaya.length - terisi} belum dinilai</span>
             )}{" "}
             · Total <b className="text-black text-lg">{total}</b>
+            {progresKategori.length > 1 && (
+              <div className="text-xs text-gray-500">
+                {progresKategori.map((p) => `${p.kategori} ${p.terisi}/${p.total}`).join(" · ")}
+              </div>
+            )}
           </div>
           <button
             type="button"
             onClick={handleSubmit}
             disabled={loading || !adaPerubahan}
-            className="ml-auto bg-primary-500 text-white px-8 h-12 rounded-xl font-semibold hover:bg-primary-600 transition-colors disabled:opacity-50"
+            className="ml-auto shrink-0 bg-primary-500 text-white px-5 sm:px-8 h-12 rounded-xl font-semibold hover:bg-primary-600 transition-colors disabled:opacity-50"
           >
             {loading ? "Menyimpan..." : adaPerubahan ? "Simpan Nilai" : "Tersimpan"}
           </button>

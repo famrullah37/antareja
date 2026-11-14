@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 import { findTimByParam } from "@/queries/tim.query";
 import { findPresensiDPTim } from "@/queries/presensiDp.query";
 import { isUuid, timSlug } from "@/lib/timSlug";
-import { posisiPresensi } from "@/lib/presensiDp";
+import { posisiPresensi, statusAnggota } from "@/lib/presensiDp";
 import { notFound, redirect } from "next/navigation";
 import PresensiTim from "./components/PresensiTim";
 
@@ -29,7 +29,7 @@ export default async function PresensiDPTimPage({ params }: { params: { id: stri
             nisn: a.nisn,
             kelas: a.kelas,
             tanggalLahir: a.tanggal_lahir?.toISOString().slice(0, 10) ?? null,
-            sesuai: !!a.presensiDP,
+            status: statusAnggota(a.presensiDP),
             olehNama: a.presensiDP?.olehNama ?? null,
           }
         : null,
@@ -48,6 +48,14 @@ export default async function PresensiDPTimPage({ params }: { params: { id: stri
         confirmed: tim.confirmed,
         foto: tim.foto,
       }}
+      gugur={{
+        gugurAt: tim.gugurAt?.toISOString() ?? null,
+        gugurJenis: tim.gugurJenis,
+        gugurAlasan: tim.gugurAlasan,
+        gugurOleh: tim.gugurOleh,
+        gugurTanpaVote: tim.gugurTanpaVote,
+      }}
+      nilaiDipublish={!!tim.penilaianBaru?.published}
       presensi={
         tim.presensiDP
           ? {

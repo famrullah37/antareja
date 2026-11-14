@@ -111,7 +111,7 @@ export default function JuriKategoriSection({
     const result = await tugaskanJuriKategori(juriId, kategori);
     if (result.success)
       toast.success("Juri berhasil ditugaskan!", { id: toastId });
-    else toast.error("Gagal (sudah ditugaskan?)", { id: toastId });
+    else toast.error(result.message ?? "Gagal", { id: toastId });
   }
 
   return (

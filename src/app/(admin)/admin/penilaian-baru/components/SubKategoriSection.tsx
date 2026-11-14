@@ -44,7 +44,7 @@ export default function SubKategoriSection({
       setKategori("");
       setKode("");
     } else {
-      toast.error("Gagal (kode sudah ada?)", { id: toastId });
+      toast.error(result.message ?? "Gagal", { id: toastId });
     }
   }
 
@@ -52,7 +52,7 @@ export default function SubKategoriSection({
     const toastId = toast.loading("Menghapus...");
     const result = await removeSubKategori(id);
     if (result.success) toast.success("Dihapus", { id: toastId });
-    else toast.error("Gagal", { id: toastId });
+    else toast.error(result.message ?? "Gagal", { id: toastId });
   }
 
   return (

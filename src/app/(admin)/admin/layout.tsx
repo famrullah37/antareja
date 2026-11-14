@@ -96,7 +96,7 @@ export default function AdminLayout({
       </nav>
       <div
         id="main-content"
-        className="relative h-full w-full overflow-y-auto px-4 sm:ps-10 lg:ps-24 py-4 lg:ml-64 md:mt-[25px] lg:mt-0 mt-[55px]"
+        className="relative h-full w-full overflow-y-auto px-4 sm:ps-10 lg:ps-24 py-4 lg:ml-64 lg:mt-0 mt-[55px]"
       >
         <nav className="w-max rounded-lg bg-gray-200 p-2 font-sans text-sm capitalize md:p-3 hidden lg:block">
           <ol className="flex">

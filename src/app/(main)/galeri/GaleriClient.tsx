@@ -16,6 +16,8 @@ type FotoItem = {
   timId: string | null;
   albumId: string;
   album: { nama: string; tipe: string; harga: number };
+  // Album GRATIS atau foto ditandai gratis (lihat lib/galeri.ts).
+  gratis: boolean;
 };
 
 type TimItem = { id: string; nama: string; sekolah: string };
@@ -92,6 +94,8 @@ export default function GaleriClient({
     setKodeTerbit(r);
   }
 
+  const [mengirim, setMengirim] = useState(false);
+
   async function buatKodeBaru() {
     setReservingKode(true);
     setKodeUnik(null);
@@ -120,7 +124,7 @@ export default function GaleriClient({
   }
 
   // Harga per foto: tiap foto dikenai harga albumnya (sama dengan beliFoto di server).
-  const cartFotos = fotos.filter((f) => cart.has(f.id));
+  const cartFotos = fotos.filter((f) => cart.has(f.id) && !f.gratis);
   const totalHarga = cartFotos.reduce((s, f) => s + f.album.harga, 0);
 
   const totalBayar = kodeUnik ? totalHarga + parseInt(kodeUnik) : 0;
@@ -160,9 +164,12 @@ export default function GaleriClient({
   }, [metode, totalBayar]);
 
   async function handleCheckout(data: FormData) {
+    // Klik ganda dulu membuat 2 transaksi → 2 email & kuitansi, kas dobel.
+    if (mengirim) return;
+    setMengirim(true);
     data.set("fotoList", JSON.stringify(Array.from(cart)));
     const toastId = toast.loading("Memproses...");
-    const result = await beliFoto(data);
+    const result = await beliFoto(data).finally(() => setMengirim(false));
     if (result.success) {
       toast.success("Pembelian diterima!", { id: toastId, duration: 4000 });
       setTransaksiId(result.transaksiId ?? null);
@@ -288,7 +295,7 @@ export default function GaleriClient({
       </div>
 
       {/* Info */}
-      {filtered.some((f) => f.album.tipe !== "GRATIS") && (
+      {filtered.some((f) => !f.gratis) && (
         <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-sm text-blue-800 flex items-start gap-3">
           <span className="text-lg leading-none">💡</span>
           <span>Klik foto berbayar untuk menambahkan ke keranjang, lalu isi data dan unggah bukti transfer.</span>
@@ -331,7 +338,7 @@ export default function GaleriClient({
       {/* Grid Foto */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
         {filtered.map((foto) => {
-          const isGratis = foto.album.tipe === "GRATIS";
+          const isGratis = foto.gratis;
           const inCart = cart.has(foto.id);
           return (
             <div
@@ -559,26 +566,26 @@ export default function GaleriClient({
                 {/* Bukti */}
                 <div className="flex flex-col gap-1">
                   <label className="text-sm font-medium">
-                    Bukti Transfer {metode === "TRANSFER" && <span className="text-red-500">*</span>}
+                    Bukti Pembayaran <span className="text-red-500">*</span>
                     {metode === "QRIS" && (
-                      <span className="text-xs text-gray-400 font-normal ml-1">— opsional, admin cek dari riwayat QRIS</span>
-                    )}
+                  <span className="text-xs text-gray-500 font-normal ml-1">— screenshot bukti berhasil dari aplikasi pembayaran</span>
+                )}
                   </label>
                   <input
                     name="bukti"
                     type="file"
                     accept="image/*"
-                    required={metode === "TRANSFER"}
+                    required
                     className="border border-neutral-200 py-2 px-3 rounded-xl file:bg-primary-500 file:text-white file:rounded-md file:border-none file:py-1 file:px-3 text-sm"
                   />
                 </div>
 
                 <button
                   type="submit"
-                  disabled={reservingKode || !kodeUnik}
+                  disabled={reservingKode || !kodeUnik || mengirim}
                   className="bg-primary-500 text-white rounded-xl py-3 font-bold hover:bg-primary-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Kirim Pembelian{kodeUnik ? ` — ${formatRupiah(totalBayar)}` : ""}
+                  {mengirim ? "Mengirim..." : `Kirim Pembelian${kodeUnik ? ` — ${formatRupiah(totalBayar)}` : ""}`}
                 </button>
               </form>
             </div>

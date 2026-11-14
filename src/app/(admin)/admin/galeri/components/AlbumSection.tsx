@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import { createAlbumAdmin, deleteAlbumAdmin, publishAlbum, setFotograferAlbum, setTimAlbum } from "@/actions/Galeri";
+import Link from "next/link";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -32,11 +33,15 @@ export default function AlbumSection({
   fotografers,
   tims,
   isAdmin,
+  userId,
+  jumlahGratis,
 }: {
   albums: Album[];
   fotografers: Fotografer[];
   tims: TimOpsi[];
   isAdmin: boolean;
+  userId: string | null;
+  jumlahGratis: Record<string, number>;
 }) {
   const [cariTim, setCariTim] = useState("");
   const [timBaru, setTimBaru] = useState("");
@@ -74,15 +79,20 @@ export default function AlbumSection({
     const result = await publishAlbum(id, !current);
     if (result.success)
       toast.success(current ? "Album disembunyikan" : "Album dipublish!", { id: toastId });
-    else toast.error("Gagal", { id: toastId });
+    else toast.error(("message" in result && result.message) || "Gagal", { id: toastId });
   }
 
   async function handleDelete(id: string) {
-    if (!confirm("Hapus album beserta semua fotonya?")) return;
+    if (
+      !confirm(
+        "Hapus album beserta SEMUA fotonya? Tindakan ini tidak bisa dibatalkan.\n\nAlbum yang fotonya sudah dibeli tidak bisa dihapus — sembunyikan saja."
+      )
+    )
+      return;
     const toastId = toast.loading("Menghapus...");
     const result = await deleteAlbumAdmin(id);
     if (result.success) toast.success("Album dihapus", { id: toastId });
-    else toast.error("Gagal", { id: toastId });
+    else toast.error(result.message ?? "Gagal menghapus album", { id: toastId });
   }
 
   return (
@@ -206,11 +216,25 @@ export default function AlbumSection({
                     ))}
                   </select>
                   <div className="text-xs text-gray-400 flex items-center gap-1.5 flex-wrap mt-0.5">
-                    <span>{album._count.fotos} foto</span>
+                    <Link
+                      href={`/admin/galeri/foto?album=${album.id}`}
+                      className="text-primary-600 hover:underline font-medium"
+                      title="Lihat foto di album ini"
+                    >
+                      {album._count.fotos} foto →
+                    </Link>
+                    {album.tipe === "BERBAYAR" && (jumlahGratis[album.id] ?? 0) > 0 && (
+                      <span className="text-green-700 font-medium" title="Foto yang ditandai gratis di album berbayar">
+                        · {jumlahGratis[album.id]} gratis
+                      </span>
+                    )}
                     <span>·</span>
                     <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-semibold ${TIPE_COLORS[album.tipe] ?? "bg-neutral-100 text-neutral-600"}`}>
                       {album.tipe}
                     </span>
+                    {album.tipe === "BERBAYAR" && (jumlahGratis[album.id] ?? 0) > 0 && (
+                      <span className="px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-green-100 text-green-700">+ GRATIS</span>
+                    )}
                     {album.tipe === "BERBAYAR" && album.harga > 0 && (
                       <>
                         <span>·</span>
@@ -254,12 +278,14 @@ export default function AlbumSection({
                   >
                     {album.statusPublish ? "Sembunyikan" : "Publish"}
                   </button>
+                  {(isAdmin || album.fotograferId === userId) && (
                   <button
                     onClick={() => handleDelete(album.id)}
                     className="text-xs px-3 py-1 rounded-lg border border-red-200 text-red-500 hover:bg-red-50 transition-colors"
                   >
                     Hapus
                   </button>
+                  )}
                 </div>
               </div>
             ))

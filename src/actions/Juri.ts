@@ -5,8 +5,22 @@ import { imageUploader, validateUploadFile } from "./fileUploader";
 import { createJuri, deleteJuri, updateJuri } from "@/queries/juri.query";
 import { revalidatePath } from "next/cache";
 import prisma from "@/lib/prisma";
+import { jumlahNilaiJuriDiKategori } from "@/queries/penilaianBaru.query";
 
 // Samakan penugasan juri (JuriKategori) dengan checkbox kategori di form.
+// Kategori yang sudah dinilai juri ini tidak boleh dilepas (nilai yatim tetap
+// ikut total tim tapi tidak terlihat lagi) — kembalikan pesan, jangan diubah.
+async function cekLepasKategori(juriId: string, data: FormData) {
+  const kategori = new Set(data.getAll("kategori").map((k) => String(k).toLowerCase()));
+  const lama = await prisma.juriKategori.findMany({ where: { juriId }, select: { kategori: true } });
+  for (const jk of lama) {
+    if (kategori.has(jk.kategori.toLowerCase())) continue;
+    const n = await jumlahNilaiJuriDiKategori(juriId, jk.kategori);
+    if (n > 0) return `Juri ini sudah memberi ${n} nilai di kategori ${jk.kategori} — kategori itu tidak bisa dilepas`;
+  }
+  return null;
+}
+
 async function syncJuriKategori(juriId: string, data: FormData) {
   const kategori = Array.from(new Set(data.getAll("kategori").map(String).filter(Boolean)));
   await prisma.$transaction([
@@ -49,6 +63,8 @@ export async function updateJuriForm(data: FormData, id: string) {
   const email = data.get("email") as string;
   const no_hp = data.get("no_hp") as string;
   const foto = data.get("foto") as File;
+  const tolakLepas = await cekLepasKategori(id, data);
+  if (tolakLepas) return { success: false, message: tolakLepas };
   try {
     const updateData: Record<string, string> = {};
     if (nama) updateData.nama = nama;
@@ -76,11 +92,14 @@ export async function updateJuriForm(data: FormData, id: string) {
 
 export async function deleteJuriForm(id: string) {
   await requireAdmin();
+  const dinilai = await prisma.nilaiJuri.count({ where: { juriId: id } });
+  if (dinilai > 0)
+    return { success: false, message: `Juri ini sudah memberi ${dinilai} nilai — tidak bisa dihapus (nilainya ikut total tim)` };
   try {
     await deleteJuri({ id });
     revalidatePath("/", "layout");
     return { success: true };
   } catch {
-    return { success: false };
+    return { success: false, message: "Gagal menghapus juri" };
   }
 }

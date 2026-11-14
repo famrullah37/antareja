@@ -1,6 +1,7 @@
 export const dynamic = "force-dynamic";
 
 import { findAlbums, findFotos } from "@/queries/galeri.query";
+import { fotoGratis } from "@/lib/galeri";
 import { findKonfigTiket } from "@/queries/tiket.query";
 import { siteConfig } from "@/config/site";
 import GaleriClient from "./GaleriClient";
@@ -44,12 +45,13 @@ export default async function GaleriPage({ searchParams }: { searchParams?: { ti
   // dibuka lewat /galeri/download/[id] setelah pembayaran diverifikasi.
   const fotosAman = fotos.map((f) => ({
     ...f,
-    pathAsli: f.album.tipe === "GRATIS" ? f.pathAsli : "",
+    gratis: fotoGratis(f),
+    pathAsli: fotoGratis(f) ? f.pathAsli : "",
   }));
 
   const totalFoto = fotos.length;
   const totalAlbum = albums.length;
-  const fotoGratis = fotos.filter((f) => f.album.tipe === "GRATIS").length;
+  const jumlahFotoGratis = fotos.filter((f) => fotoGratis(f)).length;
 
   return (
     <div className="min-h-screen">
@@ -78,7 +80,7 @@ export default async function GaleriPage({ searchParams }: { searchParams?: { ti
             </div>
             <div className="w-px bg-white/20" />
             <div className="flex flex-col">
-              <span className="text-2xl font-bold">{fotoGratis}</span>
+              <span className="text-2xl font-bold">{jumlahFotoGratis}</span>
               <span className="text-white/70 text-xs">Foto Gratis</span>
             </div>
           </div>

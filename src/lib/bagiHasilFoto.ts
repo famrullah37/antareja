@@ -2,6 +2,7 @@ import "server-only";
 import prisma from "@/lib/prisma";
 import { getKonfigUmum } from "@/queries/konfigUmum.query";
 import { hargaJualFoto } from "@/lib/kuitansiPenjualan";
+import type { PemilikFoto } from "@/lib/galeri";
 
 // Bagi hasil penjualan foto premium (hanya transaksi VERIFIED):
 // - Kas mencatat nominal yang dibayar = harga jual + kode unik.
@@ -10,7 +11,9 @@ import { hargaJualFoto } from "@/lib/kuitansiPenjualan";
 // - Pemilik foto = Foto.fotograferId (yang upload / dipilih admin); kosong =
 //   fotografer album. Satu album/tim bisa berisi foto banyak fotografer.
 // Pemilik diambil dari data SEKARANG, supaya admin bisa menetapkan/membetulkan
-// fotografer setelah penjualan terjadi.
+// fotografer setelah penjualan terjadi. Kalau foto/album/akun sudah terhapus,
+// dipakai snapshot TransaksiFoto.pemilikFoto saat beli — riwayat pendapatan
+// fotografer tidak hilang karena penghapusan.
 
 export type BarisAlbum = { albumId: string; nama: string; harga: number };
 
@@ -44,7 +47,7 @@ export async function hitungBagiHasilFoto() {
   const [transaksis, albums, konfig] = await Promise.all([
     prisma.transaksiFoto.findMany({
       where: { status: "VERIFIED" },
-      select: { id: true, harga: true, kodeUnik: true, fotoList: true, rincianAlbum: true, persenFotografer: true },
+      select: { id: true, harga: true, kodeUnik: true, fotoList: true, rincianAlbum: true, persenFotografer: true, pemilikFoto: true },
     }),
     prisma.album.findMany({ select: { id: true, nama: true, harga: true, fotograferId: true } }),
     getKonfigUmum(),
@@ -57,6 +60,11 @@ export async function hitungBagiHasilFoto() {
     ? await prisma.foto.findMany({ where: { id: { in: semuaFotoId } }, select: { id: true, albumId: true, fotograferId: true } })
     : [];
   const fotoMap = new Map(fotos.map((f) => [f.id, f]));
+  // Nama fotografer dari snapshot — cadangan bila akunnya sudah dihapus.
+  const namaSnapshot = new Map<string, string>();
+  const snapshotDari = (t: { pemilikFoto: unknown }) => (Array.isArray(t.pemilikFoto) ? (t.pemilikFoto as PemilikFoto[]) : []);
+  for (const t of transaksis)
+    for (const p of snapshotDari(t)) if (p.fotograferId && p.fotograferNama) namaSnapshot.set(p.fotograferId, p.fotograferNama);
 
   // key = fotograferId|albumId
   const perGrup = new Map<string, RingkasAlbum>();
@@ -68,7 +76,20 @@ export async function hitungBagiHasilFoto() {
     totalKas += t.harga;
     totalPenjualan += hargaJual;
     const persen = t.persenFotografer ?? konfig.persenFotografer;
-    const fotoAda = daftarFoto(t).map((id) => fotoMap.get(id)).filter(Boolean) as (typeof fotos)[number][];
+    // Foto yang masih ada → data sekarang; foto terhapus → snapshot saat beli.
+    const snapshot = new Map(snapshotDari(t).map((p) => [p.fotoId, p]));
+    const fotoAda = daftarFoto(t)
+      .map((id) => {
+        const live = fotoMap.get(id);
+        const p = snapshot.get(id);
+        // Foto masih ada tapi pemiliknya kosong (mis. akun fotografer dihapus →
+        // fotograferId di-SetNull) → pakai pemilik dari snapshot.
+        if (live && !(live.fotograferId ?? albumMap.get(live.albumId)?.fotograferId) && p?.fotograferId)
+          return { ...live, fotograferId: p.fotograferId };
+        if (live) return live;
+        return p ? { id: p.fotoId, albumId: p.albumId, fotograferId: p.fotograferId } : undefined;
+      })
+      .filter(Boolean) as (typeof fotos)[number][];
 
     // Rincian per album: snapshot saat beli; transaksi lama dibentuk dari harga album sekarang.
     let rincian: BarisAlbum[];
@@ -97,7 +118,7 @@ export async function hitungBagiHasilFoto() {
     }
 
     // Harga tiap album dibagi rata ke foto-fotonya yang dibeli, lalu dikelompokkan
-    // per pemilik foto. Foto yang sudah dihapus → ikut fotografer album.
+    // per pemilik foto. Foto yang sudah dihapus memakai snapshot pemiliknya.
     const grupTransaksi = new Map<string, { fotograferId: string | null; albumId: string; nama: string; jumlahFoto: number; harga: number }>();
     for (const r of rincian) {
       const fotoAlbum = fotoAda.filter((f) => f.albumId === r.albumId);
@@ -145,7 +166,9 @@ export async function hitungBagiHasilFoto() {
     const key = a.fotograferId ?? "";
     const f = perFotografer.get(key) ?? {
       fotograferId: a.fotograferId,
-      nama: a.fotograferId ? namaFotografer.get(a.fotograferId) ?? "Akun terhapus" : "Belum ditentukan",
+      nama: a.fotograferId
+        ? namaFotografer.get(a.fotograferId) ?? (namaSnapshot.has(a.fotograferId) ? `${namaSnapshot.get(a.fotograferId)} (akun terhapus)` : "Akun terhapus")
+        : "Belum ditentukan",
       transaksi: 0,
       penjualan: 0,
       bagianFotografer: 0,

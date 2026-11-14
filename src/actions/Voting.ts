@@ -14,8 +14,12 @@ import { sendMailTo } from "@/lib/mailer";
 import { notifPembayaranMasuk } from "@/lib/emailPembayaran";
 import { markVotingVerified } from "@/lib/votingVerifikasi";
 import { cekTokenKode, terbitkanTokenKode } from "@/lib/kodeUnikToken";
+import { buildVotingWorkbook } from "@/lib/exportVoting";
 import {
+  findDantonMap,
+  findKonfigVoting,
   findTransaksiVoting,
+  findVotingTallyMap,
   getKategoriList,
   updateTransaksiVoting,
   upsertKonfigVoting,
@@ -136,6 +140,14 @@ export async function getDynamicQrisVoting(amount: number) {
 
 // ─── Publik: Kirim Dukungan (Vote Berbayar) ──────────────────────────────────
 
+// Kode unik pembayaran vote: 0–499 (permintaan panitia), ditambahkan ke nominal transfer.
+// Transaksi diproses otomatis hanya bila ada bukti DAN nominal masuk tepat
+// sama dengan totalBayar (harga × jumlah + kode unik); selain itu diproses
+// manual oleh admin — lihat autoVerifikasiVotingByNominal.
+const KODE_VOTE_MIN = 0;
+const KODE_VOTE_MAX = 499;
+const RENTANG_KODE_VOTE = KODE_VOTE_MAX - KODE_VOTE_MIN + 1;
+
 // Memesan nomor urut (kode unik) pembayaran secara atomik, dipanggil saat user
 // memilih tim — sebelum mengisi form & mengunggah bukti transfer QRIS.
 export async function reserveKodeVoting() {
@@ -146,11 +158,21 @@ export async function reserveKodeVoting() {
     if (!konfig) return { success: false, message: "Voting dukungan belum/tidak dibuka" };
     const status = await cekJendelaVoting(konfig);
     if (!status.open) return { success: false, message: status.message };
-    const updated = await prisma.konfigVoting.update({
-      where: { id: "singleton" },
-      data: { counterUrut: { increment: 1 } },
-    });
-    const kodeUnik = String(updated.counterUrut).padStart(3, "0");
+    // Kode unik berputar di 0–499 (KODE_VOTE_MIN..MAX) dari counter berurutan;
+    // kode yang masih dipakai transaksi PENDING dilewati supaya nominal transfer
+    // yang sedang menunggu verifikasi tidak kembar.
+    let kodeUnik: string | null = null;
+    for (let i = 0; i < RENTANG_KODE_VOTE && !kodeUnik; i++) {
+      const updated = await prisma.konfigVoting.update({
+        where: { id: "singleton" },
+        data: { counterUrut: { increment: 1 } },
+      });
+      const calon = String(KODE_VOTE_MIN + ((updated.counterUrut - 1) % RENTANG_KODE_VOTE));
+      const dipakai = await prisma.transaksiVoting.findFirst({ where: { kodeUnik: calon, status: "PENDING" }, select: { id: true } });
+      if (!dipakai) kodeUnik = calon;
+    }
+    if (!kodeUnik)
+      return { success: false, message: "Antrean pembayaran sedang penuh, coba lagi beberapa menit lagi" };
     return { success: true, kodeUnik, hargaSatuan: konfig.nominalVote, ...terbitkanTokenKode(kodeUnik) };
   } catch (e) {
     console.error("reserveKodeVoting error:", e);
@@ -183,14 +205,18 @@ export async function submitVote(data: FormData) {
   }
   const kategori = kategoriRaw;
 
-  // Dukungan selalu dibayar via QRIS (lihat komentar KonfigVoting) — bukti
-  // jadi opsional karena nominal sudah unik lewat kodeUnik, admin cocokkan
-  // manual dari riwayat QRIS/mutasi rekening.
-  const buktiAda = bukti && bukti.size > 0;
-  if (buktiAda) {
-    const fileCheck = await validateUploadFile(bukti as File);
-    if (!fileCheck.valid) return { success: false, message: fileCheck.message };
+  // Bukti WAJIB (aturan panitia: yang diproses hanya yang ada bukti). Bayar
+  // selalu via QRIS, dan semua aplikasi pembayaran menyimpan riwayat transaksi,
+  // jadi pendukung selalu bisa screenshot dari sana.
+  const buktiAda = !!bukti && bukti.size > 0;
+  if (!buktiAda) {
+    return {
+      success: false,
+      message: "Bukti pembayaran wajib diunggah — bisa screenshot dari riwayat transaksi di aplikasi pembayaranmu",
+    };
   }
+  const fileCheck = await validateUploadFile(bukti as File);
+  if (!fileCheck.valid) return { success: false, message: fileCheck.message };
   if (!kodeUnik || !/^\d+$/.test(kodeUnik)) {
     return { success: false, message: "Kode pembayaran tidak valid, silakan ulangi dari pemilihan tim" };
   }
@@ -205,12 +231,15 @@ export async function submitVote(data: FormData) {
   // Pastikan kodeUnik benar-benar pernah di-reserve (bukan dikarang klien) dan
   // belum dipakai transaksi lain — mencegah dua transaksi bertabrakan nominal
   // transfernya, yang akan membingungkan admin saat rekonsiliasi manual.
-  const konfigCheck = await prisma.konfigVoting.findUnique({ where: { id: "singleton" } });
-  if (!konfigCheck || parseInt(kodeUnik) < 1 || parseInt(kodeUnik) > konfigCheck.counterUrut) {
+  // Asal kode sudah dijamin token bertanda tangan (cekTokenKode di atas); di sini
+  // cukup rentang 0–499. Kode berputar, jadi yang dicek hanya transaksi PENDING
+  // (yang VERIFIED sudah selesai dicocokkan admin, kodenya boleh dipakai lagi).
+  const kodeAngka = parseInt(kodeUnik);
+  if (kodeAngka < KODE_VOTE_MIN || kodeAngka > KODE_VOTE_MAX) {
     return { success: false, message: "Kode pembayaran tidak valid, silakan ulangi dari pemilihan tim" };
   }
   const kodeDipakai = await prisma.transaksiVoting.findFirst({
-    where: { kodeUnik, status: { in: ["PENDING", "VERIFIED"] } },
+    where: { kodeUnik, status: "PENDING" },
   });
   if (kodeDipakai) {
     return { success: false, message: "Kode pembayaran sudah terpakai, silakan ulangi dari pemilihan tim untuk mendapat kode baru" };
@@ -223,7 +252,7 @@ export async function submitVote(data: FormData) {
     if (!status.open) return { success: false, message: status.message };
 
     const tim = await prisma.tim.findUnique({ where: { id: timId } });
-    if (!tim || !tim.confirmed) return { success: false, message: "Tim tidak ditemukan" };
+    if (!tim || !tim.confirmed || tim.gugurTanpaVote) return { success: false, message: "Tim tidak ditemukan" };
 
     let buktiUrl: string | undefined;
     if (buktiAda) {
@@ -286,6 +315,110 @@ export async function verifikasiVoting(transaksiId: string) {
   }
 }
 
+// ─── Admin: Pencocokan Nominal (semi-otomatis) ───────────────────────────────
+//
+// Admin menyalin daftar nominal masuk dari riwayat QRIS di aplikasi merchant,
+// sistem mencocokkan ke transaksi PENDING yang nominalnya TEPAT sama. Sesuai
+// aturan panitia, hanya transaksi yang ada bukti yang boleh diverifikasi lewat
+// jalur ini; yang cocok tapi tanpa bukti ditampilkan terpisah untuk manual.
+
+// "Rp 10.123", "10123", "10.123,00" → 10123. Format Indonesia: titik = ribuan,
+// koma = desimal (sen dibuang).
+function parseNominal(token: string): number | null {
+  let t = token.replace(/rp\.?/gi, "").trim();
+  if (!t) return null;
+  t = t.replace(/,\d{1,2}$/, "");
+  const digit = t.replace(/\D/g, "");
+  if (!digit) return null;
+  const n = parseInt(digit, 10);
+  return Number.isSafeInteger(n) && n > 0 ? n : null;
+}
+
+export type HasilCocokVoting = {
+  cocok: {
+    nominal: number;
+    id: string;
+    nama: string;
+    tim: string;
+    kategori: string;
+    jumlahVote: number;
+    kodeUnik: string;
+    bukti: string;
+  }[];
+  tanpaBukti: { nominal: number; nama: string; tim: string; kodeUnik: string }[];
+  tidakCocok: number[];
+};
+
+export async function cocokkanNominalVoting(
+  teks: string
+): Promise<{ success: true; hasil: HasilCocokVoting } | { success: false; message: string }> {
+  await requireAdminOrBendahara();
+  // Satu nominal per baris (atau dipisah titik koma / tab). Koma TIDAK dipakai
+  // sebagai pemisah karena di format Indonesia koma adalah desimal.
+  const nominals = (teks || "")
+    .split(/[\n;\t]+/)
+    .map(parseNominal)
+    .filter((n): n is number => n !== null);
+  if (nominals.length === 0) return { success: false, message: "Tidak ada nominal yang terbaca" };
+  if (nominals.length > 1000) return { success: false, message: "Maksimal 1.000 nominal sekali cocok" };
+
+  const kandidat = await prisma.transaksiVoting.findMany({
+    where: { status: "PENDING", totalBayar: { in: Array.from(new Set(nominals)) } },
+    orderBy: { createdAt: "asc" },
+    include: { tim: { select: { nama_tim: true } } },
+  });
+
+  // Satu nominal masuk = satu transaksi. Kalau nominal yang sama muncul dua
+  // kali di riwayat, dua transaksi (tertua dulu) ikut dicocokkan.
+  const terpakai = new Set<string>();
+  const hasil: HasilCocokVoting = { cocok: [], tanpaBukti: [], tidakCocok: [] };
+  for (const nominal of nominals) {
+    const tr = kandidat.find((k) => k.totalBayar === nominal && !terpakai.has(k.id));
+    if (!tr) {
+      hasil.tidakCocok.push(nominal);
+      continue;
+    }
+    terpakai.add(tr.id);
+    if (tr.bukti) {
+      hasil.cocok.push({
+        nominal,
+        id: tr.id,
+        nama: tr.nama,
+        tim: tr.tim.nama_tim,
+        kategori: tr.kategori,
+        jumlahVote: tr.jumlahVote,
+        kodeUnik: tr.kodeUnik,
+        bukti: tr.bukti,
+      });
+    } else {
+      hasil.tanpaBukti.push({ nominal, nama: tr.nama, tim: tr.tim.nama_tim, kodeUnik: tr.kodeUnik });
+    }
+  }
+  return { success: true, hasil };
+}
+
+export async function verifikasiVotingMassal(ids: string[]) {
+  await requireAdminOrBendahara();
+  if (!Array.isArray(ids) || ids.length === 0) return { success: false, message: "Tidak ada transaksi dipilih" };
+  if (ids.length > 1000) return { success: false, message: "Maksimal 1.000 transaksi sekali verifikasi" };
+  // Cek ulang di server: hanya PENDING yang ada bukti (aturan panitia).
+  const layak = await prisma.transaksiVoting.findMany({
+    where: { id: { in: ids }, status: "PENDING", bukti: { not: null } },
+    select: { id: true },
+  });
+  let berhasil = 0;
+  for (const { id } of layak) {
+    try {
+      const r = await markVotingVerified(id);
+      if (r.success) berhasil++;
+    } catch (e) {
+      console.error("verifikasiVotingMassal error:", id, e);
+    }
+  }
+  revalidatePath("/admin/voting");
+  return { success: true, berhasil, gagal: ids.length - berhasil };
+}
+
 export async function rejectVoting(transaksiId: string) {
   await requireAdminOrBendahara();
   try {
@@ -301,5 +434,48 @@ export async function rejectVoting(transaksiId: string) {
     return { success: true };
   } catch {
     return { success: false };
+  }
+}
+
+// Export Excel detail voting: ringkasan, rekap per tim tiap kategori, dan
+// seluruh transaksi (data pendukung didekripsi otomatis oleh Prisma).
+// jenjang kosong = semua jenjang; diisi = hanya tim & transaksi jenjang itu.
+export async function exportDataVoting(jenjang?: string) {
+  try {
+    await requireAdminOrBendahara();
+  } catch {
+    return { success: false, message: "Forbidden" };
+  }
+  const JENJANG = ["SD", "SMP", "SMA", "PURNA"] as const;
+  const filterJenjang = JENJANG.find((j) => j === jenjang);
+  if (jenjang && !filterJenjang) return { success: false, message: "Jenjang tidak valid" };
+  try {
+    const [konfig, tims, transaksis, tallyAll, dantonMap] = await Promise.all([
+      findKonfigVoting(),
+      prisma.tim.findMany({
+        where: { confirmed: true, gugurTanpaVote: false, ...(filterJenjang && { jenjang: filterJenjang }) },
+        select: { id: true, nama_tim: true, asal_sekolah: true, jenjang: true, noUrut: true, pelatih: true, totalVote: true },
+      }),
+      prisma.transaksiVoting.findMany({
+        where: filterJenjang ? { tim: { jenjang: filterJenjang } } : undefined,
+        include: { tim: { select: { nama_tim: true, asal_sekolah: true, jenjang: true } } },
+        orderBy: { createdAt: "asc" },
+      }),
+      findVotingTallyMap(),
+      findDantonMap(),
+    ]);
+    const timIds = new Set([...tims.map((t) => t.id), ...transaksis.map((t) => t.timId)]);
+    const tallyMap = filterJenjang
+      ? Object.fromEntries(Object.entries(tallyAll).filter(([id]) => timIds.has(id)))
+      : tallyAll;
+    const tanggal = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Jakarta" });
+    return {
+      success: true,
+      base64: buildVotingWorkbook(tims, transaksis, getKategoriList(konfig), tallyMap, dantonMap),
+      filename: `Rekap-Voting-${filterJenjang ?? "Semua"}-${tanggal}.xlsx`,
+    };
+  } catch (e) {
+    console.error("exportDataVoting error:", e);
+    return { success: false, message: "Gagal membuat file Excel" };
   }
 }

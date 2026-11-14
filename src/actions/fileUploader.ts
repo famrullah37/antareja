@@ -44,6 +44,27 @@ export async function validateUploadFile(
 // foto profil sebelum diupload — dipanggil eksplisit di pemanggil (bukan di
 // dalam imageUploader) karena fungsi itu juga dipakai untuk upload non-foto
 // (PDF kuitansi, juklak, dll) yang tidak bisa diproses sharp.
+// Bukti pembayaran (screenshot/foto HP, sering 3–8MB) dikecilkan sebelum
+// diunggah — upload ukuran penuh membuat checkout menunggu >10 detik. Batas
+// 1200×2400 supaya screenshot HP yang tinggi tetap terbaca teks nominalnya.
+// PDF / file non-gambar dikembalikan apa adanya.
+export async function bufferBukti(file: File): Promise<Buffer> {
+  const buffer = Buffer.from(await file.arrayBuffer());
+  if (!file.type.startsWith("image/") || file.type === "image/gif") return buffer;
+  try {
+    const kecil = await sharp(buffer)
+      .rotate()
+      .resize({ width: 1200, height: 2400, fit: "inside", withoutEnlargement: true })
+      .jpeg({ quality: 80 })
+      .toBuffer();
+    // Screenshot PNG sederhana kadang sudah kecil — jangan malah membesar.
+    return kecil.length < buffer.length ? kecil : buffer;
+  } catch (e) {
+    console.error("Gagal kompres bukti, pakai file asli:", e);
+    return buffer;
+  }
+}
+
 export async function compressPhoto(buffer: Buffer): Promise<Buffer> {
   try {
     return await sharp(buffer)

@@ -20,7 +20,7 @@ export default function WatermarkFotoLama({ jumlah }: { jumlah: number }) {
     try {
       const r = await buatWatermarkFotoLama();
       setSisa(r.sisa);
-      if (r.success) toast.success(`${r.berhasil} foto diberi watermark · sisa ${r.sisa}`, { id: toastId });
+      if (r.success) toast.success(`${r.berhasil} foto diperbarui · sisa ${r.sisa}`, { id: toastId });
       else toast.error(`${r.berhasil} berhasil, ${r.message}`, { id: toastId, duration: 8000 });
       router.refresh();
     } catch {
@@ -33,10 +33,10 @@ export default function WatermarkFotoLama({ jumlah }: { jumlah: number }) {
   return (
     <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 flex flex-wrap items-center justify-between gap-4">
       <div className="text-sm text-amber-900">
-        <p className="font-semibold">{sisa} foto belum punya preview ber-watermark</p>
+        <p className="font-semibold">{sisa} foto perlu diperbarui watermark-nya</p>
         <p>
-          Preview foto ini di album berbayar masih sama dengan file aslinya. Proses dikerjakan 10 foto per klik — klik
-          lagi sampai habis.
+          Preview foto ini belum ber-watermark atau masih memakai watermark lama yang tipis. Proses dikerjakan 10 foto
+          per klik — klik lagi sampai habis. File asli tidak berubah.
         </p>
       </div>
       <button
@@ -45,7 +45,7 @@ export default function WatermarkFotoLama({ jumlah }: { jumlah: number }) {
         disabled={loading}
         className="bg-amber-600 text-white px-5 py-2.5 rounded-xl text-sm font-semibold hover:bg-amber-700 disabled:opacity-60"
       >
-        {loading ? "Memproses..." : "Buat Watermark"}
+        {loading ? "Memproses..." : "Perbarui Watermark"}
       </button>
     </div>
   );

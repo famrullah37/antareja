@@ -11,7 +11,7 @@ const ROLES: { value: StaffRole; label: string; color: string }[] = [
   { value: "SIE_ACARA", label: "Sie Acara", color: "bg-indigo-100 text-indigo-700 border-indigo-300" },
   { value: "SIE_HUMAS", label: "Sie Humas", color: "bg-teal-100 text-teal-700 border-teal-300" },
   { value: "FOTOGRAFER", label: "Fotografer", color: "bg-orange-100 text-orange-700 border-orange-300" },
-  { value: "TIKET", label: "Petugas Tiket", color: "bg-cyan-100 text-cyan-700 border-cyan-300" },
+  { value: "TIKET", label: "Petugas Tiket & Kasir", color: "bg-cyan-100 text-cyan-700 border-cyan-300" },
   { value: "BENDAHARA", label: "Bendahara", color: "bg-yellow-100 text-yellow-700 border-yellow-300" },
 ];
 

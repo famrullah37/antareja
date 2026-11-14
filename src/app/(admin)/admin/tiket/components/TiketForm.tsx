@@ -12,7 +12,7 @@ export default function TiketForm() {
     if (result.success) {
       toast.success("Tiket berhasil ditambahkan!", { id: toastId });
     } else {
-      toast.error("Gagal menambahkan tiket", { id: toastId });
+      toast.error(result.message ?? "Gagal menambahkan tiket", { id: toastId });
     }
   }
 
@@ -51,7 +51,7 @@ export default function TiketForm() {
           <input type="checkbox" name="khususTim" className="mt-1" />
           <span>
             <span className="font-medium">Tiket wajib tim</span>
-            <span className="block text-xs text-neutral-500">
+            <span className="block text-xs text-gray-500">
               Hanya bisa dibeli online oleh akun tim yang sedang login, satu kali per tim, dengan jumlah di bawah.
             </span>
           </span>
@@ -65,13 +65,22 @@ export default function TiketForm() {
             defaultValue={1}
             className="border border-neutral-200 rounded-lg px-2 py-1 text-sm w-20"
           />
-          <span className="text-xs text-neutral-500">tiket (hanya untuk tiket wajib tim)</span>
+          <span className="text-xs text-gray-500">tiket (hanya untuk tiket wajib tim)</span>
+        </label>
+        <label className="flex items-start gap-2 text-sm cursor-pointer">
+          <input type="checkbox" name="khususOts" className="mt-1" />
+          <span>
+            <span className="font-medium">Tiket OTS (on the spot)</span>
+            <span className="block text-xs text-gray-500">
+              Hanya dijual di loket lewat POS Tiket dengan kuota sendiri. Tampil di web sebagai info, tanpa tombol beli.
+            </span>
+          </span>
         </label>
       </div>
       <div className="border-t border-neutral-100 pt-4 flex flex-col gap-3">
         <div>
           <p className="font-medium text-sm">Bundling (opsional)</p>
-          <p className="text-xs text-neutral-500">
+          <p className="text-xs text-gray-500">
             Contoh: tambah Rp5.000 dapat &quot;2 Air Minum&quot;. Kosongkan jika tidak ada bundling.
           </p>
         </div>

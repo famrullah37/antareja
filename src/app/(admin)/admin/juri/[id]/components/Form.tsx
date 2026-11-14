@@ -110,7 +110,7 @@ export default function JuriForm({
         <div className="flex flex-col gap-2">
           <label className="text-[16px]">Kategori yang Dinilai</label>
           {kategoris.length === 0 ? (
-            <p className="text-sm text-neutral-400">
+            <p className="text-sm text-gray-400">
               Belum ada kategori lomba. Tambahkan dulu di menu Penilaian.
             </p>
           ) : (

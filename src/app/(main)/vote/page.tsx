@@ -7,6 +7,7 @@ import {
   getKategoriList,
 } from "@/queries/voting.query";
 import { findKonfigTiket } from "@/queries/tiket.query";
+import { getKonfigUmum } from "@/queries/konfigUmum.query";
 import { cekJendelaVoting } from "@/actions/Voting";
 import VoteForm from "./VoteForm";
 import VotingCountdownBanner from "./VotingCountdownBanner";
@@ -17,6 +18,9 @@ import { siteConfig } from "@/config/site";
 import type { Metadata } from "next";
 
 type VoteSearchParams = { tim?: string; kategori?: string };
+
+// Berapa menit sebelum voting ditutup papan peringkat & jumlah suara disembunyikan.
+const PERINGKAT_DITUTUP_MENIT = 10;
 
 const METADATA_UMUM: Metadata = {
   title: { absolute: "Vote Tim Favorit LPKBB Antareja 2026 | Lomba Paskibra SMK Telkom Malang" },
@@ -78,13 +82,22 @@ export async function generateMetadata({ searchParams }: { searchParams: VoteSea
 }
 
 export default async function VotePage({ searchParams }: { searchParams: VoteSearchParams }) {
-  const [tims, konfigVoting, dantonMap, tallyMap, konfigTiket] = await Promise.all([
+  const [tims, konfigVoting, dantonMap, tallyMap, konfigTiket, konfigUmum] = await Promise.all([
     findTimsForVoting(),
     findKonfigVoting(),
     findDantonMap(),
     findVotingTallyMap(),
     findKonfigTiket(),
+    getKonfigUmum(),
   ]);
+  // Tab jenjang di /vote hanya untuk jenjang yang aktif (toggle "Jenjang Aktif"
+  // di Pengaturan). Tim di jenjang nonaktif tetap muncul di "Semua Jenjang".
+  const jenjangAktif = [
+    konfigUmum.sdAktif && "SD",
+    konfigUmum.smpAktif && "SMP",
+    konfigUmum.smaAktif && "SMA",
+    konfigUmum.purnaAktif && "PURNA",
+  ].filter((j): j is string => !!j);
   const kategoriList = getKategoriList(konfigVoting);
   // QRIS voting sengaja ikut punya Tiket/Galeri Foto Premium (satu sumber),
   // lihat komentar di schema.prisma model KonfigTiket.
@@ -94,6 +107,17 @@ export default async function VotePage({ searchParams }: { searchParams: VoteSea
   // (reserveKodeVoting/submitVote) — supaya banner yang ditampilkan tidak
   // pernah beda dari status yang sesungguhnya ditegakkan.
   const status = await cekJendelaVoting(konfig);
+
+  // Peringkat ditutup 10 menit terakhir sebelum voting tutup: angka suara &
+  // urutan tidak dikirim ke browser sama sekali (bukan cuma disembunyikan
+  // tampilannya), tim diurutkan menurut nama. Voting tetap bisa dilakukan.
+  const freezeAt = konfig?.tutupPada
+    ? new Date(konfig.tutupPada.getTime() - PERINGKAT_DITUTUP_MENIT * 60_000)
+    : null;
+  const peringkatDitutup = status.open && !!freezeAt && new Date() >= freezeAt;
+  const timsTampil = peringkatDitutup
+    ? tims.map((t) => ({ ...t, totalVote: 0 })).sort((a, b) => a.nama_tim.localeCompare(b.nama_tim))
+    : tims;
 
   return (
     <>
@@ -119,13 +143,16 @@ export default async function VotePage({ searchParams }: { searchParams: VoteSea
             <VotingCountdownBanner target={konfig.tutupPada} label="Voting ditutup dalam" tone="tutup" />
           )}
           <VoteForm
-            tims={tims}
+            tims={timsTampil}
             konfig={konfig}
             kategoriList={kategoriList}
             dantonMap={dantonMap}
-            tallyMap={tallyMap}
+            tallyMap={peringkatDitutup ? {} : tallyMap}
+            peringkatDitutup={peringkatDitutup}
+            freezeAt={freezeAt?.toISOString() ?? null}
             linkTimId={searchParams.tim ?? null}
             linkKategori={searchParams.kategori ?? null}
+            jenjangAktif={jenjangAktif}
           />
         </div>
       )}

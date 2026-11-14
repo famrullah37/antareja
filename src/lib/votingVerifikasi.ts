@@ -96,14 +96,24 @@ export async function markVotingVerified(transaksiId: string) {
 // Pakai kodeUnik (harga × jumlah + kode unik 3 digit) sebagai kunci
 // pencocokan — nominal transfer sengaja dibikin presisi unik per transaksi
 // PENDING, jadi cocok 1:1 tanpa perlu tahu siapa pengirimnya.
+//
+// Aturan panitia: yang diproses otomatis HANYA transaksi yang punya bukti
+// pembayaran DAN nominalnya tepat sama (harga × jumlah + kode unik 0–499).
+// Nominal tidak cocok, atau cocok tapi tanpa bukti → tetap PENDING dan
+// diproses manual oleh admin di /admin/voting.
 export async function autoVerifikasiVotingByNominal(nominal: number) {
   try {
-    const transaksi = await prisma.transaksiVoting.findFirst({
+    const kandidat = await prisma.transaksiVoting.findMany({
       where: { totalBayar: nominal, status: "PENDING" },
       orderBy: { createdAt: "asc" },
+      select: { id: true, bukti: true },
     });
+    if (kandidat.length === 0) {
+      return { success: false, message: `Tidak ada dukungan PENDING dengan nominal Rp${nominal} — proses manual` };
+    }
+    const transaksi = kandidat.find((t) => !!t.bukti);
     if (!transaksi) {
-      return { success: false, message: `Tidak ada dukungan PENDING dengan nominal Rp${nominal}` };
+      return { success: false, message: `Dukungan Rp${nominal} belum ada bukti pembayaran — proses manual` };
     }
     return await markVotingVerified(transaksi.id);
   } catch (e) {

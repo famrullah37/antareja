@@ -1,6 +1,6 @@
 import { H2 } from "@/app/components/global/Text";
 import SectionWrapper from "@/app/components/global/Wrapper";
-import { sesiTerbuka, type ItemMakanan } from "@/lib/makanan";
+import { sesiTerbuka, tanpaHargaBeliMakanan, type ItemMakanan } from "@/lib/makanan";
 import { findPesananMakananByTim, findSesiMakanTim } from "@/queries/makanan.query";
 import { findKonfigTiket } from "@/queries/tiket.query";
 import FormMakanan from "./parts/FormMakanan";
@@ -56,7 +56,7 @@ export default async function MakananSection({
               id: p.id,
               sesiNama: p.sesi.nama,
               sesiWaktu: p.sesi.waktu.toISOString(),
-              items: p.items as ItemMakanan[],
+              items: tanpaHargaBeliMakanan(p.items as ItemMakanan[]), // harga beli khusus panitia
               totalBayar: p.totalBayar,
               kodeUnik: p.kodeUnik,
               catatan: p.catatan,

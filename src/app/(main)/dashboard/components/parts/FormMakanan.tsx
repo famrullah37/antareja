@@ -278,13 +278,14 @@ function FormPesan({ sesi, qrisUrl, onSelesai }: { sesi: Sesi[]; qrisUrl: string
       {adaIsi && (
         <div className="flex flex-col gap-1">
           <label className="text-sm font-medium">
-            Bukti Pembayaran{" "}
-            <span className="text-xs text-gray-400 font-normal">— opsional, panitia mencocokkan dari riwayat QRIS</span>
+            Bukti Pembayaran <span className="text-red-500">*</span>{" "}
+            <span className="text-xs text-gray-500 font-normal">— screenshot bukti berhasil dari aplikasi pembayaran</span>
           </label>
           <input
             name="bukti"
             type="file"
             accept="image/*"
+            required
             className="border border-neutral-200 py-2.5 px-3 rounded-xl text-sm file:bg-primary-500 file:text-white file:rounded-md file:border-none file:py-1 file:px-3 hover:cursor-pointer"
           />
         </div>

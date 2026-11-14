@@ -14,7 +14,8 @@ export default async function DownloadPage({ params }: { params: { id: string } 
   if (!transaksi) return notFound();
 
   const fotoIds = transaksi.fotoList as string[];
-  // Link unduhan berlaku sampai expiredAt (30 hari sejak transaksi, lihat beliFoto).
+  // Link unduhan berlaku sampai expiredAt (30 hari sejak diverifikasi, bisa
+  // diperpanjang admin — lihat verifikasiFoto & perpanjangUnduhFoto).
   const kedaluwarsa = !!transaksi.expiredAt && transaksi.expiredAt.getTime() < Date.now();
   const fotos =
     transaksi.status === "VERIFIED" && !kedaluwarsa

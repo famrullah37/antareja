@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { deleteTimForm } from "@/actions/Tim"; 
 import { timSlug } from "@/lib/timSlug";
 import { useSession } from "next-auth/react";
+import { labelGugur } from "@/lib/gugurTim";
 
 export default function TimTable({ data }: { data: TimWithRelations[] }) {
   const [loader, setLoader] = useState(true);
@@ -53,6 +54,21 @@ export default function TimTable({ data }: { data: TimWithRelations[] }) {
         );
       },
       selector: (row: TimWithRelations) => row.anggotas.length,
+      sortable: true,
+    },
+    {
+      name: "Status",
+      cell: (row: TimWithRelations) =>
+        row.gugurAt ? (
+          <span className="rounded-full border border-red-300 bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-800">
+            {labelGugur(row.gugurJenis)}
+          </span>
+        ) : row.confirmed ? (
+          <span className="text-xs text-green-700">Ikut lomba</span>
+        ) : (
+          <span className="text-xs text-yellow-700">Belum konfirmasi</span>
+        ),
+      selector: (row: TimWithRelations) => (row.gugurAt ? 2 : row.confirmed ? 0 : 1),
       sortable: true,
     },
     {

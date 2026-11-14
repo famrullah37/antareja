@@ -140,7 +140,7 @@ export default function TimTable({ data }: { data: User[] }) {
                     <option value="SIE_ACARA">SIE_ACARA</option>
                     <option value="SIE_HUMAS">SIE_HUMAS</option>
                     <option value="JURI">JURI</option>
-                    <option value="TIKET">TIKET</option>
+                    <option value="TIKET">TIKET & KASIR</option>
                     <option value="BENDAHARA">BENDAHARA</option>
                     <option value="FOTOGRAFER">FOTOGRAFER</option>
                   </select>

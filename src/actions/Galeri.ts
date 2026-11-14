@@ -16,10 +16,12 @@ import {
 import { incrementCounterUrutFoto } from "@/queries/tiket.query";
 import { catatLog } from "@/lib/activityLog";
 import { getKonfigUmum } from "@/queries/konfigUmum.query";
-import { imageUploader, validateUploadFile } from "./fileUploader";
-import { addWatermark } from "@/lib/watermark";
+import { imageUploader, validateUploadFile, bufferBukti } from "./fileUploader";
+import { addWatermark, VERSI_WATERMARK } from "@/lib/watermark";
+import { batasUnduhDari, fotoGratis, MAKS_FOTO_PER_UPLOAD, MASA_UNDUH_HARI, type PemilikFoto } from "@/lib/galeri";
 import { sendMailTo } from "@/lib/mailer";
 import prisma from "@/lib/prisma";
+import { siteConfig } from "@/config/site";
 import { toDownloadUrl } from "@/lib/downloadUrl";
 import { escapeHtml } from "@/lib/escapeHtml";
 import { buatKuitansiFoto } from "@/lib/kuitansiPenjualan";
@@ -84,6 +86,10 @@ export async function createAlbumAdmin(data: FormData) {
   const deskripsi = data.get("deskripsi") as string;
   const tipe = (data.get("tipe") as string) || "BERBAYAR";
   const harga = parseInt((data.get("harga") as string) || "0");
+  if (!(nama ?? "").trim()) return { success: false, message: "Nama album wajib diisi" };
+  if (tipe !== "BERBAYAR" && tipe !== "GRATIS") return { success: false, message: "Tipe album tidak valid" };
+  if (!Number.isInteger(harga) || harga < 0 || harga > 10_000_000) return { success: false, message: "Harga tidak valid" };
+  if (tipe === "BERBAYAR" && harga <= 0) return { success: false, message: "Album berbayar wajib punya harga per foto" };
   // Fotografer yang membuat album otomatis jadi pemiliknya; admin memilih.
   const fotograferId = user.role === "FOTOGRAFER" ? user.id : (data.get("fotograferId") as string) || null;
   if (!(await fotograferValid(fotograferId))) return { success: false };
@@ -177,9 +183,15 @@ export async function setBiayaAdminPenarikan(biaya: number) {
   }
 }
 
+// Admin, atau fotografer pemilik album (dulu fotografer mana pun bisa
+// menyembunyikan/mempublish album fotografer lain).
 export async function publishAlbum(albumId: string, publish: boolean) {
-  await requireAdminOrFotografer();
+  const user = await requireAdminOrFotografer();
   try {
+    if (user.role !== "ADMIN") {
+      const album = await prisma.album.findUnique({ where: { id: albumId }, select: { fotograferId: true } });
+      if (album?.fotograferId !== user.id) return { success: false, message: "Hanya bisa mengubah album milik Anda" };
+    }
     await updateAlbum({ id: albumId }, { statusPublish: publish });
     revalidatePath("/admin/galeri");
     revalidatePath("/galeri");
@@ -187,16 +199,50 @@ export async function publishAlbum(albumId: string, publish: boolean) {
   } catch { return { success: false }; }
 }
 
+// Hapus album = hapus semua fotonya. Dijaga ketat:
+// - fotografer hanya album miliknya, dan hanya kalau semua foto di dalamnya
+//   juga miliknya (foto fotografer lain tidak ikut terhapus diam-diam);
+// - siapa pun (termasuk admin) tidak bisa menghapus album yang punya foto
+//   sudah dibeli / sedang dipesan — halaman unduhan pembeli butuh fotonya.
 export async function deleteAlbumAdmin(albumId: string) {
-  await requireAdminOrFotografer();
+  const user = await requireAdminOrFotografer();
   try {
+    const album = await prisma.album.findUnique({
+      where: { id: albumId },
+      select: { fotograferId: true, fotos: { select: { id: true, fotograferId: true } } },
+    });
+    if (!album) return { success: false, message: "Album tidak ditemukan" };
+
+    if (user.role !== "ADMIN") {
+      if (album.fotograferId !== user.id) return { success: false, message: "Anda hanya bisa menghapus album milik sendiri" };
+      const fotoOrangLain = album.fotos.filter((f) => f.fotograferId && f.fotograferId !== user.id).length;
+      if (fotoOrangLain > 0)
+        return { success: false, message: `Album berisi ${fotoOrangLain} foto fotografer lain — hubungi admin` };
+    }
+
+    const ids = album.fotos.map((f) => f.id);
+    if (ids.length > 0) {
+      const transaksi = await prisma.transaksiFoto.findMany({
+        where: { status: { in: ["PENDING", "VERIFIED"] } },
+        select: { fotoList: true },
+      });
+      const terpakai = new Set(transaksi.flatMap((t) => (Array.isArray(t.fotoList) ? (t.fotoList as string[]) : [])));
+      const terjual = ids.filter((id) => terpakai.has(id)).length;
+      if (terjual > 0)
+        return {
+          success: false,
+          message: `${terjual} foto di album ini sudah dibeli/dipesan, jadi album tidak bisa dihapus. Sembunyikan album saja, atau hapus foto yang belum terjual satu per satu.`,
+        };
+    }
+
     await deleteAlbum({ id: albumId });
+    await catatLog("HAPUS_ALBUM", `${albumId} (${ids.length} foto)`);
     revalidatePath("/admin/galeri");
     revalidatePath("/galeri");
     return { success: true };
   } catch (e) {
     console.error("deleteAlbumAdmin error:", e);
-    return { success: false };
+    return { success: false, message: "Gagal menghapus album" };
   }
 }
 
@@ -205,7 +251,10 @@ export async function deleteAlbumAdmin(albumId: string) {
 export async function uploadFoto(data: FormData) {
   const user = await requireAdminOrFotografer();
   const albumId = data.get("albumId") as string;
-  const files = data.getAll("fotos") as File[];
+  const files = (data.getAll("fotos") as File[]).filter((f) => f && f.size > 0);
+  if (files.length === 0) return { success: false, uploaded: 0, failed: 0, failedReasons: ["Pilih minimal 1 foto"] };
+  if (files.length > MAKS_FOTO_PER_UPLOAD)
+    return { success: false, uploaded: 0, failed: files.length, failedReasons: [`Maksimal ${MAKS_FOTO_PER_UPLOAD} foto per upload`] };
   // Tim dipilih dari daftar tim terdaftar (bukan diketik) supaya foto pasti
   // terhubung ke tim yang benar; tagTim diisi nama tim sebagai teks tampilan.
   // Album yang sudah terhubung ke tim menang: semua fotonya milik tim album.
@@ -216,6 +265,8 @@ export async function uploadFoto(data: FormData) {
     : null;
   if (timIdInput && !tim) return { success: false, uploaded: 0, failed: files.length, failedReasons: ["Tim tidak ditemukan"] };
   const tagTim = tim?.nama_tim;
+  // Tandai foto gratis (hanya berarti di album berbayar).
+  const gratis = data.get("gratis") === "on";
   // Fotografer yang upload otomatis jadi pemilik fotonya (bagi hasil per foto);
   // admin boleh memilih — kosong = ikut fotografer album.
   const fotograferId = user.role === "FOTOGRAFER" ? user.id : (data.get("fotograferId") as string) || null;
@@ -241,9 +292,11 @@ export async function uploadFoto(data: FormData) {
         album: { connect: { id: albumId } },
         pathAsli: uploaded.data.url,
         pathWatermark: uploadedWatermark.data?.url ?? uploaded.data.url,
+        watermarkVersi: uploadedWatermark.data?.url ? VERSI_WATERMARK : 0,
         tagTim: tagTim || undefined,
         timId: tim?.id,
         statusPublish: true,
+        gratis,
         ...(fotograferId ? { fotografer: { connect: { id: fotograferId } } } : {}),
       });
     })
@@ -257,13 +310,99 @@ export async function uploadFoto(data: FormData) {
   return { success: true, uploaded: files.length - failedReasons.length, failed: failedReasons.length, failedReasons };
 }
 
-export async function deleteFotoAdmin(fotoId: string) {
-  await requireAdminOrFotografer();
+// Fotografer hanya boleh menghapus fotonya sendiri (fotograferId = dia, atau
+// foto tanpa fotografer di album miliknya); admin boleh semua.
+// Hapus banyak foto sekaligus (mode centang di Foto Ter-upload). Aturan sama
+// dengan hapus satuan: fotografer hanya fotonya sendiri, foto yang sudah
+// dibeli / sedang dipesan dilewati. Mengembalikan ringkasan.
+export async function deleteFotoMassal(fotoIds: string[]) {
+  const user = await requireAdminOrFotografer();
+  if (!Array.isArray(fotoIds) || fotoIds.length === 0) return { success: false, message: "Belum ada foto dipilih" };
+  if (fotoIds.length > 500) return { success: false, message: "Maksimal 500 foto sekali hapus" };
+  const ids = Array.from(new Set(fotoIds.filter((x) => typeof x === "string")));
   try {
+    const fotos = await prisma.foto.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, fotograferId: true, album: { select: { fotograferId: true } } },
+    });
+    const milik = user.role === "ADMIN" ? fotos : fotos.filter((f) => (f.fotograferId ?? f.album.fotograferId) === user.id);
+    const bukanMilik = fotos.length - milik.length;
+
+    const transaksi = await prisma.transaksiFoto.findMany({
+      where: { status: { in: ["PENDING", "VERIFIED"] } },
+      select: { fotoList: true },
+    });
+    const terpakai = new Set(transaksi.flatMap((t) => (Array.isArray(t.fotoList) ? (t.fotoList as string[]) : [])));
+    const bolehHapus = milik.filter((f) => !terpakai.has(f.id)).map((f) => f.id);
+    const terjual = milik.length - bolehHapus.length;
+
+    if (bolehHapus.length > 0) {
+      await prisma.foto.deleteMany({ where: { id: { in: bolehHapus } } });
+      await catatLog("HAPUS_FOTO_MASSAL", `${bolehHapus.length} foto`);
+      revalidatePath("/admin/galeri");
+      revalidatePath("/admin/galeri/foto");
+      revalidatePath("/galeri");
+    }
+    return { success: true, dihapus: bolehHapus.length, dilewatiTerjual: terjual, dilewatiBukanMilik: bukanMilik };
+  } catch (e) {
+    console.error("deleteFotoMassal error:", e);
+    return { success: false, message: "Gagal menghapus foto" };
+  }
+}
+
+export async function deleteFotoAdmin(fotoId: string) {
+  const user = await requireAdminOrFotografer();
+  try {
+    if (user.role !== "ADMIN") {
+      const foto = await prisma.foto.findUnique({
+        where: { id: fotoId },
+        select: { fotograferId: true, album: { select: { fotograferId: true } } },
+      });
+      const pemilik = foto?.fotograferId ?? foto?.album.fotograferId;
+      if (!foto || pemilik !== user.id) return { success: false, message: "Anda hanya bisa menghapus foto milik sendiri" };
+    }
+    // Foto yang sudah dibeli / sedang dalam pesanan tidak boleh dihapus —
+    // halaman unduhan pembeli mengambil foto dari tabel ini (lewat fotoList).
+    const dipakai = await prisma.transaksiFoto.count({
+      where: { status: { in: ["PENDING", "VERIFIED"] }, fotoList: { array_contains: [fotoId] } },
+    });
+    if (dipakai > 0)
+      return { success: false, message: "Foto ini sudah dibeli atau sedang dipesan, jadi tidak bisa dihapus" };
     await deleteFoto({ id: fotoId });
     revalidatePath("/admin/galeri");
+    revalidatePath("/admin/galeri/foto");
+    revalidatePath("/galeri");
     return { success: true };
-  } catch { return { success: false }; }
+  } catch { return { success: false, message: "Gagal menghapus foto" }; }
+}
+
+// Ubah foto jadi gratis / berbayar (di album berbayar). Admin, atau fotografer
+// pemilik foto. Foto yang sedang dipesan (PENDING) tidak bisa dijadikan gratis
+// supaya nominal pesanan tetap sesuai.
+export async function setGratisFoto(fotoId: string, gratis: boolean) {
+  const user = await requireAdminOrFotografer();
+  try {
+    const foto = await prisma.foto.findUnique({
+      where: { id: fotoId },
+      select: { fotograferId: true, album: { select: { fotograferId: true, tipe: true } } },
+    });
+    if (!foto) return { success: false, message: "Foto tidak ditemukan" };
+    if (user.role !== "ADMIN" && (foto.fotograferId ?? foto.album.fotograferId) !== user.id)
+      return { success: false, message: "Anda hanya bisa mengubah foto milik sendiri" };
+    if (foto.album.tipe === "GRATIS") return { success: false, message: "Album ini sudah gratis seluruhnya" };
+    if (gratis) {
+      const dipesan = await prisma.transaksiFoto.count({
+        where: { status: "PENDING", fotoList: { array_contains: [fotoId] } },
+      });
+      if (dipesan > 0) return { success: false, message: "Foto ini sedang dalam pesanan yang belum diverifikasi" };
+    }
+    await prisma.foto.update({ where: { id: fotoId }, data: { gratis } });
+    revalidatePath("/admin/galeri/foto");
+    revalidatePath("/galeri");
+    return { success: true };
+  } catch {
+    return { success: false, message: "Gagal mengubah foto" };
+  }
 }
 
 // ─── User: Beli Foto ──────────────────────────────────────────────────────────
@@ -271,12 +410,29 @@ export async function deleteFotoAdmin(fotoId: string) {
 // Cadangkan kode unik 3 digit secara atomik (counter di KonfigTiket, sama
 // pola dengan reserveKodeVoting/reserveKodePendaftaran/reserveKodeTiket) —
 // dipanggil dari GaleriClient begitu checkout dibuka.
+// Kode unik foto berputar di KODE_FOTO_MIN..MAX (500–699, tidak bentrok dengan kode vote 0–499) dari counter
+// berurutan; kode yang masih dipakai transaksi PENDING dilewati supaya nominal
+// transfer yang sedang menunggu verifikasi tidak kembar (pola sama dengan vote).
+const KODE_FOTO_MIN = 500;
+const KODE_FOTO_MAX = 699;
+const RENTANG_KODE_FOTO = KODE_FOTO_MAX - KODE_FOTO_MIN + 1;
+
 export async function reserveKodeFoto() {
   const dibatasi = await batasiAksi("kode", 120, 10 * 60 * 1000);
   if (dibatasi) return { success: false, message: dibatasi };
   try {
-    const updated = await incrementCounterUrutFoto();
-    const kodeUnik = String(updated.counterUrutFoto % 1000).padStart(3, "0");
+    let kodeUnik: string | null = null;
+    for (let i = 0; i < RENTANG_KODE_FOTO && !kodeUnik; i++) {
+      const updated = await incrementCounterUrutFoto();
+      const calon = String(KODE_FOTO_MIN + ((updated.counterUrutFoto - 1) % RENTANG_KODE_FOTO));
+      const dipakai = await prisma.transaksiFoto.findFirst({
+        where: { kodeUnik: calon, status: "PENDING" },
+        select: { id: true },
+      });
+      if (!dipakai) kodeUnik = calon;
+    }
+    if (!kodeUnik)
+      return { success: false, message: "Antrean pembayaran sedang penuh, coba lagi beberapa menit lagi" };
     return { success: true, kodeUnik, ...terbitkanTokenKode(kodeUnik) };
   } catch (e) {
     console.error("reserveKodeFoto error:", e);
@@ -297,13 +453,16 @@ export async function beliFoto(data: FormData) {
   const metodePembayaran = (data.get("metodePembayaran") as string) || "TRANSFER";
   const kodeUnik = data.get("kodeUnik") as string | null;
 
-  // Bukti wajib untuk transfer manual (admin tidak punya cara lain
-  // memverifikasi) — untuk QRIS opsional karena nominal sudah unik lewat
-  // kodeUnik, admin cocokkan manual dari riwayat QRIS/mutasi rekening.
-  if (metodePembayaran !== "QRIS" && (!bukti || bukti.size === 0)) {
-    return { success: false, message: "Bukti pembayaran wajib diunggah" };
+  // Bukti WAJIB untuk Transfer maupun QRIS (aturan panitia).
+  if (!bukti || bukti.size === 0) {
+    return { success: false, message: "Bukti pembayaran wajib diunggah — untuk QRIS, screenshot bukti berhasil dari aplikasi pembayaran" };
   }
-  if (!kodeUnik || !/^\d{3}$/.test(kodeUnik)) {
+  if (
+    !kodeUnik ||
+    !/^\d{3}$/.test(kodeUnik) ||
+    parseInt(kodeUnik) < KODE_FOTO_MIN ||
+    parseInt(kodeUnik) > KODE_FOTO_MAX
+  ) {
     return { success: false, message: "Kode pembayaran tidak valid, silakan ulangi checkout" };
   }
   if (metodePembayaran === "QRIS") {
@@ -322,10 +481,20 @@ export async function beliFoto(data: FormData) {
     // fotoList inilah yang nanti dibuka di halaman unduhan setelah verifikasi.
     const fotos = await prisma.foto.findMany({
       where: { id: { in: fotoList }, statusPublish: true, album: { statusPublish: true } },
-      select: { albumId: true, album: { select: { nama: true, harga: true } } },
+      select: {
+        id: true,
+        albumId: true,
+        gratis: true,
+        fotograferId: true,
+        fotografer: { select: { nama: true } },
+        album: { select: { nama: true, harga: true, tipe: true, fotograferId: true, fotografer: { select: { nama: true } } } },
+      },
     });
     if (fotos.length !== fotoList.length)
       return { success: false, message: "Ada foto yang tidak tersedia, muat ulang halaman" };
+    // Foto gratis tidak dijual — bisa diunduh langsung dari galeri.
+    if (fotos.some((f) => fotoGratis(f)))
+      return { success: false, message: "Ada foto gratis di keranjang — foto gratis bisa diunduh langsung, hapus dari keranjang" };
     // Harga per foto: tiap foto dikenai harga albumnya. Snapshot per album
     // (harga = harga satuan × jumlah foto) untuk kuitansi & bagi hasil fotografer
     // (lib/bagiHasilFoto.ts) — tidak ikut berubah kalau harga album diubah nanti.
@@ -337,16 +506,27 @@ export async function beliFoto(data: FormData) {
       perAlbum.set(f.albumId, r);
     }
     const rincianAlbum = Array.from(perAlbum.values());
+    // Pemilik efektif tiap foto saat beli (foto → fotografer foto, kosong →
+    // fotografer album). Cadangan bagi hasil bila foto/album/akun terhapus.
+    const pemilikFoto: PemilikFoto[] = fotos.map((f) => ({
+      fotoId: f.id,
+      albumId: f.albumId,
+      fotograferId: f.fotograferId ?? f.album.fotograferId ?? null,
+      fotograferNama: f.fotograferId ? f.fotografer?.nama ?? null : f.album.fotografer?.nama ?? null,
+    }));
     // Nominal akhir = total harga foto + kode unik — kalau tidak ditambahkan,
     // dua pembelian yang sama tercatat dengan nominal identik di laporan kas
     // (lihat juga totalBayar di Voting.ts/registrationForm.ts).
     const harga = rincianAlbum.reduce((sum, r) => sum + r.harga, 0) + parseInt(kodeUnik);
-    const expiredAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+    // Masa unduh baru dimulai saat diverifikasi (lihat verifikasiFoto).
+    const expiredAt = null;
 
-    // Cegah dua transaksi memakai kodeUnik yang sama — nominal transfer harus
-    // presisi unik supaya admin gampang cocokkan mutasi/QRIS.
+    // Cegah dua transaksi PENDING memakai kodeUnik yang sama — nominal transfer
+    // harus presisi unik selama menunggu dicocokkan. Yang sudah VERIFIED tidak
+    // dihitung: rentang kode cuma 200, kalau ikut dihitung kode cepat habis.
+    // Cek awal (murah) sebelum upload bukti; dicek ulang secara atomik di bawah.
     const dipakai = await prisma.transaksiFoto.findFirst({
-      where: { kodeUnik, status: { in: ["PENDING", "VERIFIED"] } },
+      where: { kodeUnik, status: "PENDING" },
     });
     if (dipakai) return { success: false, message: "Kode unik sudah terpakai, silakan coba lagi" };
 
@@ -354,15 +534,22 @@ export async function beliFoto(data: FormData) {
     if (bukti && bukti.size > 0) {
       const fileCheck = await validateUploadFile(bukti);
       if (!fileCheck.valid) return { success: false, message: fileCheck.message };
-      const upload = await imageUploader(Buffer.from(await bukti.arrayBuffer()));
+      const upload = await imageUploader(await bufferBukti(bukti));
       if (!upload.data?.url) return { success: false, message: "Upload bukti gagal" };
       buktiUrl = upload.data.url;
     }
 
-    const transaksi = await createTransaksiFoto({
+    // Kunci per kode unik: dua kiriman bersamaan (klik ganda) dengan kode yang
+    // sama tidak bisa sama-sama lolos — dulu jadi 2 transaksi, 2 email & kas dobel.
+    const transaksi = await prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${"foto:" + kodeUnik}))::text`;
+      const bentrok = await tx.transaksiFoto.findFirst({ where: { kodeUnik, status: "PENDING" }, select: { id: true } });
+      if (bentrok) throw new Error("KODE_DIPAKAI");
+      return tx.transaksiFoto.create({ data: {
       fotoList,
       harga,
       rincianAlbum,
+      pemilikFoto,
       ...(buktiUrl ? { bukti: buktiUrl } : {}),
       status: "PENDING",
       expiredAt,
@@ -371,7 +558,8 @@ export async function beliFoto(data: FormData) {
       namaPembeli: namaPembeli || null,
       email: email || null,
       ...(userId ? { user: { connect: { id: userId } } } : {}),
-    } as any);
+    } as any });
+    });
     notifPembayaranMasuk({
       jenis: "Foto",
       pathAdmin: "/admin/galeri/transaksi",
@@ -384,7 +572,8 @@ export async function beliFoto(data: FormData) {
       detail: `${fotoList.length} foto`,
     });
     if (email) {
-      await kirimEmailPesananDiterima({
+      // Tidak ditunggu: SMTP 2–5 detik tidak perlu menahan pembeli.
+      void kirimEmailPesananDiterima({
         to: email,
         nama: namaPembeli || "Pembeli",
         produk: "Foto",
@@ -394,7 +583,12 @@ export async function beliFoto(data: FormData) {
     }
     revalidatePath("/galeri");
     return { success: true, kodeUnik, transaksiId: (transaksi as any).id };
-  } catch { return { success: false }; }
+  } catch (e) {
+    if (e instanceof Error && e.message === "KODE_DIPAKAI")
+      return { success: false, message: "Pembelian ini sudah terkirim (kode unik sudah terpakai). Cek email Anda." };
+    console.error("beliFoto error:", e);
+    return { success: false };
+  }
 }
 
 // ─── Admin: Verifikasi Pembelian Foto ─────────────────────────────────────────
@@ -414,7 +608,7 @@ export async function verifikasiFoto(transaksiId: string) {
     // cek-lalu-update biasa lolos dua kali bila tombol terkirim ganda (kas dobel).
     const klaim = await prisma.transaksiFoto.updateMany({
       where: { id: transaksiId, status: "PENDING" },  // hanya PENDING: transaksi DITOLAK tidak bisa diverifikasi ulang (kode unik-nya mungkin sudah dipakai transaksi lain)
-      data: { status: "VERIFIED", persenFotografer: (await getKonfigUmum()).persenFotografer },
+      data: { status: "VERIFIED", persenFotografer: (await getKonfigUmum()).persenFotografer, expiredAt: batasUnduhDari() },
     });
     if (klaim.count === 0) return { success: false, message: "Transaksi foto sudah diproses (diverifikasi/ditolak) sebelumnya" };
     const t = transaksi as any;
@@ -424,36 +618,85 @@ export async function verifikasiFoto(transaksiId: string) {
     await prisma.kasTransaksi.create({
       data: { tipe: "PEMASUKAN", keterangan: `Foto${pembeliInfo}${kodeInfo}`, jumlah: transaksi.harga, kategori: "FOTO", sumber: "FOTO", referensiId: transaksiId },
     });
-    const userEmail = t.email as string | null;
-    const namaPembeli = (t.namaPembeli as string | null) ?? "Pembeli";
-    if (userEmail) {
-      try {
-        const fotoIds = transaksi.fotoList as string[];
-        const fotos = await prisma.foto.findMany({ where: { id: { in: fotoIds } }, select: { id: true, pathAsli: true, tagTim: true } });
-        const baseUrl = (process.env.NEXTAUTH_URL ?? "").replace(/\/$/, "");
-        const downloadPageUrl = `${baseUrl}/galeri/download/${transaksiId}`;
-        const fotoLinks = fotos.map((f, i) =>
-          `<li style="margin-bottom:8px"><a href="${toDownloadUrl(f.pathAsli, f.tagTim ?? `Foto-${i + 1}`)}" download style="background:#F70048;color:#fff;padding:6px 14px;border-radius:6px;text-decoration:none;font-weight:bold;font-size:13px;display:inline-block">⬇ Unduh Foto ${i + 1}${f.tagTim ? ` — ${f.tagTim}` : ""}</a></li>`
-        ).join("");
-        const kuitansi = await buatKuitansiFoto(transaksiId).catch((e) => {
-          console.error("Gagal membuat kuitansi foto:", e);
-          return null;
-        });
-        await sendMailTo({
-          to: userEmail,
-          ...(kuitansi
-            ? { fileAttachments: [{ filename: kuitansi.filename, content: kuitansi.pdf, contentType: "application/pdf" }] }
-            : {}),
-          subject: `✅ Foto LPKBB Antareja 2026 — Siap Diunduh`,
-          html: `<div style="font-family:sans-serif;max-width:520px;margin:auto"><h2 style="color:#F70048">Foto Anda Siap Diunduh!</h2><p>Halo <b>${escapeHtml(namaPembeli)}</b>,</p><p>Pembayaran Anda telah diverifikasi. Silakan unduh foto Anda:</p>${blokRingkasanPembayaran(ringkasanFoto({ harga: transaksi.harga, kodeUnik: t.kodeUnik ?? null, fotoList: transaksi.fotoList, metodePembayaran: t.metodePembayaran, createdAt: transaksi.createdAt }), "Lunas")}${kuitansi ? `<p>Kuitansi pembayaran terlampir (No. <b>${kuitansi.nomor}</b>).</p>` : ""}<div style="margin:16px 0"><a href="${downloadPageUrl}" style="background:#F70048;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;display:inline-block">🔗 Buka Halaman Unduhan</a></div><ul style="padding-left:0;list-style:none">${fotoLinks}</ul><p style="font-size:12px;color:#aaa">LPKBB Antareja 2026 — SMK Telkom Malang</p></div>`,
-        });
-      } catch { /* email failure is non-fatal */ }
-    }
+    const kirim = await kirimEmailFotoSiap(transaksiId);
     revalidatePath("/admin/galeri");
     revalidatePath("/admin/galeri/transaksi");
     revalidatePath("/admin/kas");
-    return { success: true };
+    return { success: true, emailTerkirim: kirim.ok, message: kirim.ok ? undefined : kirim.alasan };
   } catch { return { success: false }; }
+}
+
+// Email "Foto Siap Diunduh" + kuitansi. Tujuan = email di form, atau email akun
+// pembeli bila form kosong (transaksi lama) — dulu transaksi tanpa email form
+// tidak pernah dikirimi link. Kegagalan dilaporkan, tidak ditelan diam-diam.
+async function kirimEmailFotoSiap(transaksiId: string): Promise<{ ok: boolean; alasan?: string }> {
+  const transaksi = await prisma.transaksiFoto.findUnique({
+    where: { id: transaksiId },
+    include: { user: { select: { email: true, nama: true } } },
+  });
+  if (!transaksi || transaksi.status !== "VERIFIED") return { ok: false, alasan: "Transaksi belum terverifikasi" };
+  const t = transaksi as any;
+  const email = ((t.email as string | null) || transaksi.user?.email || "").trim();
+  if (!email) return { ok: false, alasan: "Pembeli tidak punya email — kirim link unduhan lewat WA (tombol Salin link)" };
+  const namaPembeli = (t.namaPembeli as string | null) ?? transaksi.user?.nama ?? "Pembeli";
+  try {
+    const fotoIds = transaksi.fotoList as string[];
+    const fotos = await prisma.foto.findMany({ where: { id: { in: fotoIds } }, select: { id: true, pathAsli: true, tagTim: true } });
+    // Cadangan alamat situs: NEXTAUTH_URL kosong = link relatif yang tidak bisa diklik di email.
+    const baseUrl = (process.env.NEXTAUTH_URL || siteConfig.url).replace(/\/$/, "");
+    const downloadPageUrl = `${baseUrl}/galeri/download/${transaksiId}`;
+    const fotoLinks = fotos.map((f, i) =>
+      `<li style="margin-bottom:8px"><a href="${toDownloadUrl(f.pathAsli, f.tagTim ?? `Foto-${i + 1}`)}" download style="background:#F70048;color:#fff;padding:6px 14px;border-radius:6px;text-decoration:none;font-weight:bold;font-size:13px;display:inline-block">⬇ Unduh Foto ${i + 1}${f.tagTim ? ` — ${f.tagTim}` : ""}</a></li>`
+    ).join("");
+    const kuitansi = await buatKuitansiFoto(transaksiId).catch((e) => {
+      console.error("Gagal membuat kuitansi foto:", e);
+      return null;
+    });
+    await sendMailTo({
+      to: email,
+      ...(kuitansi
+        ? { fileAttachments: [{ filename: kuitansi.filename, content: kuitansi.pdf, contentType: "application/pdf" }] }
+        : {}),
+      // Kode transaksi di judul: tanpa ini semua email foto berjudul sama, Gmail
+      // menggabungkannya dalam satu utas & melipat isi yang mirip di balik "•••"
+      // — link unduhan (dulu di bawah) ikut tersembunyi.
+      subject: `✅ Foto LPKBB Antareja 2026 — Siap Diunduh${t.kodeUnik ? ` #${t.kodeUnik}` : ""}`,
+      // Tombol & link unduhan di ATAS, sebelum rincian pembayaran.
+      html: `<div style="font-family:sans-serif;max-width:520px;margin:auto"><h2 style="color:#F70048">Foto Anda Siap Diunduh!</h2><p>Halo <b>${escapeHtml(namaPembeli)}</b>,</p><p>Pembayaran Anda telah diverifikasi. Silakan unduh foto Anda:</p><div style="margin:16px 0"><a href="${downloadPageUrl}" style="background:#F70048;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;display:inline-block">🔗 Buka Halaman Unduhan</a></div><ul style="padding-left:0;list-style:none">${fotoLinks}</ul>${transaksi.expiredAt ? `<p style="background:#fff7ed;border-radius:8px;padding:10px 12px;font-size:13px;color:#9a3412">Link unduhan berlaku sampai <b>${transaksi.expiredAt.toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Jakarta" })}</b>. Segera unduh &amp; simpan foto Anda.</p>` : ""}<p style="font-size:13px;color:#555">Tombol tidak bisa diklik? Salin link ini ke browser:<br><a href="${downloadPageUrl}" style="color:#F70048;word-break:break-all">${downloadPageUrl}</a></p>${blokRingkasanPembayaran(ringkasanFoto({ harga: transaksi.harga, kodeUnik: t.kodeUnik ?? null, fotoList: transaksi.fotoList, metodePembayaran: t.metodePembayaran, createdAt: transaksi.createdAt }), "Lunas")}${kuitansi ? `<p>Kuitansi pembayaran terlampir (No. <b>${kuitansi.nomor}</b>).</p>` : ""}<p style="font-size:12px;color:#aaa">LPKBB Antareja 2026 — SMK Telkom Malang</p></div>`,
+    });
+    return { ok: true };
+  } catch (e) {
+    console.error("kirimEmailFotoSiap error:", e);
+    return { ok: false, alasan: "Email gagal terkirim — coba Kirim ulang, atau kirim link lewat WA" };
+  }
+}
+
+// Admin: perpanjang masa unduh MASA_UNDUH_HARI hari — dihitung dari batas lama
+// bila masih berlaku, atau dari hari ini bila sudah kedaluwarsa.
+export async function perpanjangUnduhFoto(transaksiId: string) {
+  await requireAdminOrBendahara();
+  try {
+    const t = await prisma.transaksiFoto.findUnique({ where: { id: transaksiId }, select: { status: true, expiredAt: true } });
+    if (!t || t.status !== "VERIFIED") return { success: false, message: "Hanya pembelian yang sudah diverifikasi" };
+    const mulai = t.expiredAt && t.expiredAt.getTime() > Date.now() ? t.expiredAt : new Date();
+    const baru = batasUnduhDari(mulai);
+    await prisma.transaksiFoto.update({ where: { id: transaksiId }, data: { expiredAt: baru } });
+    await catatLog("PERPANJANG_UNDUH_FOTO", `${transaksiId} → ${baru.toISOString().slice(0, 10)}`);
+    revalidatePath("/admin/galeri");
+    revalidatePath("/admin/galeri/transaksi");
+    revalidatePath(`/galeri/download/${transaksiId}`);
+    return { success: true, berlakuSampai: baru.toISOString(), hari: MASA_UNDUH_HARI };
+  } catch {
+    return { success: false, message: "Gagal memperpanjang" };
+  }
+}
+
+// Admin: kirim ulang email link unduhan (mis. pembeli bilang belum menerima).
+export async function kirimUlangEmailFoto(transaksiId: string) {
+  await requireAdminOrBendahara();
+  const r = await kirimEmailFotoSiap(transaksiId);
+  if (r.ok) await catatLog("KIRIM_ULANG_EMAIL_FOTO", transaksiId);
+  return r.ok ? { success: true } : { success: false, message: r.alasan };
 }
 
 // Unduh kuitansi PDF pembelian foto terverifikasi — nomor sama tiap unduh.
@@ -479,7 +722,7 @@ const BATCH_WATERMARK = 10;
 
 export async function hitungFotoTanpaWatermark() {
   await requireAdminOrFotografer();
-  const rows = await prisma.$queryRaw<{ n: bigint }[]>`SELECT COUNT(*)::bigint AS n FROM "Foto" WHERE "pathWatermark" = "pathAsli"`;
+  const rows = await prisma.$queryRaw<{ n: bigint }[]>`SELECT COUNT(*)::bigint AS n FROM "Foto" WHERE "pathWatermark" = "pathAsli" OR "watermarkVersi" < ${VERSI_WATERMARK}`;
   return Number(rows[0]?.n ?? 0);
 }
 
@@ -503,7 +746,7 @@ async function unduhFoto(url: string): Promise<Buffer> {
 export async function buatWatermarkFotoLama() {
   await requireAdminOrFotografer();
   const fotos = await prisma.$queryRaw<{ id: string; pathAsli: string }[]>`
-    SELECT id, "pathAsli" FROM "Foto" WHERE "pathWatermark" = "pathAsli" ORDER BY "createdAt" LIMIT ${BATCH_WATERMARK}`;
+    SELECT id, "pathAsli" FROM "Foto" WHERE "pathWatermark" = "pathAsli" OR "watermarkVersi" < ${VERSI_WATERMARK} ORDER BY "createdAt" LIMIT ${BATCH_WATERMARK}`;
   let berhasil = 0;
   const gagal: string[] = [];
   for (const f of fotos) {
@@ -514,7 +757,7 @@ export async function buatWatermarkFotoLama() {
       if (wm === asli) throw new Error("watermark gagal dibuat");
       const up = await imageUploader(wm);
       if (!up.data?.url) throw new Error(up.message || "upload gagal");
-      await prisma.foto.update({ where: { id: f.id }, data: { pathWatermark: up.data.url } });
+      await prisma.foto.update({ where: { id: f.id }, data: { pathWatermark: up.data.url, watermarkVersi: VERSI_WATERMARK } });
       berhasil++;
     } catch (e) {
       gagal.push(e instanceof Error ? e.message : "error");

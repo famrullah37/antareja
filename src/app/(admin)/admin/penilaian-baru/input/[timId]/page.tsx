@@ -12,13 +12,15 @@ import {
 import { notFound, redirect } from "next/navigation";
 import InputNilaiForm from "./InputNilaiForm";
 import MasukanSuaraJuri from "./MasukanSuaraJuri";
+import Link from "next/link";
+import { labelGugur } from "@/lib/gugurTim";
 
 export default async function InputNilaiPage({
   params,
   searchParams,
 }: {
   params: { timId: string };
-  searchParams?: { juri?: string };
+  searchParams?: { juri?: string; kategori?: string };
 }) {
   const timParam = await findTimByNoUrutParam(params.timId);
   if (!timParam) return notFound();
@@ -68,16 +70,59 @@ export default async function InputNilaiPage({
 
   if (!tim) return notFound();
 
-  const penilaian = await findPenilaianBaru({ timId: timParam.id });
+  // Tim mundur / tidak hadir tidak dinilai (server juga menolak, lib/gugurTim.ts).
+  if (!tim.confirmed || tim.gugurAt) {
+    return (
+      <div className="max-w-4xl mx-auto py-6 flex flex-col gap-4">
+        <h1 className="text-2xl font-bold">
+          {tim.noUrut != null ? `${tim.jenjang}-${String(tim.noUrut).padStart(2, "0")}` : "Belum ada No. Urut"}
+        </h1>
+        <div className="bg-red-50 border border-red-200 text-red-800 rounded-xl p-5 text-sm">
+          {tim.gugurAt
+            ? `Tim ini ditandai "${labelGugur(tim.gugurJenis)}" — tidak dinilai.`
+            : "Pembayaran tim ini belum terkonfirmasi — tidak dinilai."}{" "}
+          <Link href="/admin/penilaian-baru/input" className="underline font-semibold">
+            Kembali ke daftar tim
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (isJuri && juriAktif && juriKategoris.length === 0) {
+    return (
+      <div className="max-w-4xl mx-auto py-6">
+        <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 rounded-xl p-5 text-sm">
+          Akun juri ini belum ditugaskan ke kategori mana pun, jadi belum bisa menilai. Minta Sie Lomba menugaskan
+          kategori di Konfigurasi Penilaian.{" "}
+          <Link href="/admin/penilaian-baru/input" className="underline font-semibold">
+            Kembali
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  const [penilaian, presensi] = await Promise.all([
+    findPenilaianBaru({ timId: timParam.id }),
+    // Registrasi ulang di DP: hanya jumlah (tanpa nama anggota) — tampil juga ke juri.
+    prisma.presensiDP.findUnique({
+      where: { timId: timParam.id },
+      select: { anggota: { select: { tidakHadir: true } } },
+    }),
+  ]);
+  const anggotaTidakHadir = presensi?.anggota.filter((a) => a.tidakHadir).length ?? 0;
   const suaraSaya = penilaian?.masukanSuara.find((m) => m.juriId === juriAktif?.id);
 
   // Props komponen klien ikut terkirim ke browser (terbaca di page source), jadi
   // hanya kirim yang dibutuhkan: tanpa nama/sekolah tim, tanpa nilai juri lain.
+  // Juri hanya menilai kategorinya sendiri: total tim (gabungan semua juri & kategori)
+  // tidak dikirim ke akun juri — props ini terbaca di page source.
   const existing = penilaian && {
     id: penilaian.id,
-    nilaiKotor: penilaian.nilaiKotor,
+    nilaiKotor: isJuri ? null : penilaian.nilaiKotor,
     totalPengurang: penilaian.totalPengurang,
-    nilaiAkhir: penilaian.nilaiAkhir,
+    nilaiAkhir: isJuri ? null : penilaian.nilaiAkhir,
     published: penilaian.published,
     nilaiJuri: penilaian.nilaiJuri
       .filter((n) => n.juriId === juriAktif?.id)
@@ -108,6 +153,17 @@ export default async function InputNilaiPage({
         <p className="text-gray-500">
           {isJuri ? `Jenjang ${tim.jenjang}` : `${tim.asal_sekolah} — ${tim.jenjang}`}
         </p>
+        <div className="mt-2 flex flex-wrap gap-2 text-xs font-semibold">
+          {!presensi ? (
+            <span className="rounded-full bg-neutral-100 px-2.5 py-1 text-neutral-600">Tim belum registrasi di DP</span>
+          ) : anggotaTidakHadir > 0 ? (
+            <span className="rounded-full bg-orange-100 px-2.5 py-1 text-orange-800">
+              Tim hadir · {anggotaTidakHadir} anggota tidak hadir
+            </span>
+          ) : (
+            <span className="rounded-full bg-green-100 px-2.5 py-1 text-green-800">Tim hadir di DP</span>
+          )}
+        </div>
       </div>
       {juriAktif && (
         <MasukanSuaraJuri
@@ -133,6 +189,7 @@ export default async function InputNilaiPage({
         pelanggarans={pelanggarans}
         juriKategoris={juriKategoris}
         existing={existing}
+        kategoriAwal={searchParams?.kategori}
       />
     </div>
   );

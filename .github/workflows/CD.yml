@@ -13,6 +13,13 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Riwayat penuh supaya jumlah commit (nomor versi) bisa dihitung.
+          fetch-depth: 0
+
+      - name: Hitung nomor versi
+        id: versi
+        run: echo "count=$(git rev-list --count HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
@@ -30,6 +37,7 @@ jobs:
           build-args: |
             DATABASE_URL=${{ secrets.DATABASE_URL }}
             GIT_SHA=${{ github.sha }}
+            GIT_COUNT=${{ steps.versi.outputs.count }}
 
   deploy:
     needs: build-and-push

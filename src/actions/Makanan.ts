@@ -8,7 +8,7 @@ import { batasiAksi } from "@/lib/rateLimit";
 import { parseWibDatetimeLocal } from "@/lib/datetime";
 import { labelItemsMakanan, MAKS_PORSI_PER_MENU, sesiTerbuka, type ItemMakanan } from "@/lib/makanan";
 import { getKonfigUmum, upsertKonfigUmum } from "@/queries/konfigUmum.query";
-import { imageUploader, validateUploadFile } from "./fileUploader";
+import { imageUploader, validateUploadFile, bufferBukti } from "./fileUploader";
 import { notifPembayaranMasuk } from "@/lib/emailPembayaran";
 import { cekTokenKode, terbitkanTokenKode } from "@/lib/kodeUnikToken";
 
@@ -29,6 +29,44 @@ async function requireKeuangan() {
 function segarkan() {
   revalidatePath("/admin/makanan");
   revalidatePath("/dashboard");
+}
+
+// Harga beli disalin ke pesanan saat pesan, jadi pesanan yang dibuat sebelum
+// harga beli diisi tetap kosong. Aksi ini HANYA mengisi item yang masih kosong
+// dengan harga beli menu sekarang — item yang sudah punya harga beli tidak diubah.
+export async function isiHargaBeliPesananLamaMakanan() {
+  await requireKeuangan();
+  try {
+    const menu = await prisma.menuMakanan.findMany({ select: { id: true, hargaBeli: true } });
+    const hargaBeliMenu = new Map(menu.filter((m) => m.hargaBeli != null).map((m) => [m.id, m.hargaBeli!]));
+    const pesanan = await prisma.pesananMakanan.findMany({ select: { id: true, items: true } });
+
+    let barangTerisi = 0;
+    let pesananDiubah = 0;
+    for (const p of pesanan) {
+      let berubah = false;
+      const baru = (p.items as ItemMakanan[]).map((i) => {
+        if (i.hargaBeli != null) return i;
+        const hb = hargaBeliMenu.get(i.menuId);
+        if (hb == null) return i;
+        berubah = true;
+        barangTerisi += i.jumlah;
+        return { ...i, hargaBeli: hb };
+      });
+      if (berubah) {
+        await prisma.pesananMakanan.update({ where: { id: p.id }, data: { items: baru } });
+        pesananDiubah++;
+      }
+    }
+
+    if (pesananDiubah > 0)
+      await catatLog("ISI_HARGA_BELI_PESANAN_MAKANAN", `${barangTerisi} porsi di ${pesananDiubah} pesanan`);
+    segarkan();
+    return { success: true, barangTerisi, pesananDiubah };
+  } catch (e) {
+    console.error("isiHargaBeliPesananLamaMakanan error:", e);
+    return { success: false, message: "Gagal mengisi harga beli pesanan lama" };
+  }
 }
 
 function teks(data: FormData, key: string, maks: number) {
@@ -106,16 +144,23 @@ export async function simpanMenuMakanan(data: FormData): Promise<Hasil> {
   const nama = teks(data, "nama", 100);
   const deskripsi = teks(data, "deskripsi", 300) || null;
   const harga = parseInt((data.get("harga") as string) || "0", 10);
+  const hargaBeliRaw = ((data.get("hargaBeli") as string) || "").trim();
+  const hargaBeli = hargaBeliRaw === "" ? null : parseInt(hargaBeliRaw, 10);
   const urutan = parseInt((data.get("urutan") as string) || "0", 10) || 0;
 
   if (!nama) return { success: false, message: "Nama menu wajib diisi" };
-  if (!Number.isInteger(harga) || harga <= 0 || harga > 10_000_000) return { success: false, message: "Harga tidak valid" };
+  if (!Number.isInteger(harga) || harga <= 0 || harga > 10_000_000) return { success: false, message: "Harga jual tidak valid" };
+  if (hargaBeli !== null && (!Number.isInteger(hargaBeli) || hargaBeli < 0 || hargaBeli > 10_000_000))
+    return { success: false, message: "Harga beli tidak valid" };
 
   try {
-    const isi = { nama, deskripsi, harga, urutan };
+    const isi = { nama, deskripsi, harga, hargaBeli, urutan };
     if (id) await prisma.menuMakanan.update({ where: { id }, data: isi });
     else await prisma.menuMakanan.create({ data: { ...isi, sesiId } });
-    await catatLog(id ? "UBAH_MENU_MAKAN" : "TAMBAH_MENU_MAKAN", `${nama} — Rp${harga}`);
+    await catatLog(
+      id ? "UBAH_MENU_MAKAN" : "TAMBAH_MENU_MAKAN",
+      `${nama} — jual Rp${harga}, beli ${hargaBeli == null ? "-" : `Rp${hargaBeli}`}`
+    );
     segarkan();
     return { success: true };
   } catch (e) {
@@ -295,20 +340,21 @@ export async function pesanMakanan(data: FormData): Promise<Hasil> {
     if (!Number.isInteger(jumlah) || jumlah < 1 || jumlah > MAKS_PORSI_PER_MENU)
       return { success: false, message: `Jumlah ${menu.nama} harus 1–${MAKS_PORSI_PER_MENU}` };
     if (items.some((i) => i.menuId === menu.id)) return { success: false, message: "Data pesanan tidak valid" };
-    items.push({ menuId: menu.id, nama: menu.nama, harga: menu.harga, jumlah });
+    items.push({ menuId: menu.id, nama: menu.nama, harga: menu.harga, hargaBeli: menu.hargaBeli, jumlah });
   }
   if (items.length === 0) return { success: false, message: "Pilih minimal 1 menu" };
 
   const subtotal = items.reduce((s, i) => s + i.harga * i.jumlah, 0);
   const totalBayar = subtotal + parseInt(kodeUnik, 10);
 
-  // Bayar lewat QRIS dinamis (nominal = subtotal + kode unik), jadi bendahara
-  // mencocokkan nominal di riwayat QRIS — screenshot bukti hanya opsional.
+  // Bayar lewat QRIS dinamis (nominal = subtotal + kode unik). Bukti WAJIB
+  // (aturan panitia) — bendahara memverifikasi dari bukti + riwayat QRIS.
+  if (!bukti || bukti.size === 0) return { success: false, message: "Bukti pembayaran wajib diunggah — untuk QRIS, screenshot bukti berhasil dari aplikasi pembayaran" };
   let buktiUrl: string | null = null;
   if (bukti && bukti.size > 0) {
     const cek = await validateUploadFile(bukti);
     if (!cek.valid) return { success: false, message: cek.message };
-    const upload = await imageUploader(Buffer.from(await bukti.arrayBuffer()));
+    const upload = await imageUploader(await bufferBukti(bukti));
     if (upload.error) return { success: false, message: upload.message };
     buktiUrl = upload.data!.url;
   }

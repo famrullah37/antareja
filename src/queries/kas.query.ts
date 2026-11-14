@@ -1,7 +1,69 @@
 import prisma from "@/lib/prisma";
 import { totalBayarTiket } from "@/lib/tiket";
+import { hitungModalMerch, type ItemPesanan } from "@/lib/merchandise";
+import { hitungLabaMakanan, type ItemMakanan } from "@/lib/makanan";
+import { hitungLaba, type ItemPOS } from "@/lib/posProduk";
+import { hitungBagiHasilFoto } from "@/lib/bagiHasilFoto";
+
+export type PendapatanUsaha = {
+  nama: string;
+  masuk: number; // uang yang benar-benar diterima (lunas / tidak dibatalkan)
+  modal: number; // harga beli × jumlah (snapshot saat transaksi)
+  bersih: number; // masuk − modal
+  tanpaHargaBeli: number; // jumlah barang/porsi yang harga belinya kosong
+  // Penjelasan kolom biaya bila bukan harga beli (mis. bagi hasil fotografer).
+  keteranganBiaya?: string;
+};
+
+// Pendapatan bersih panitia per unit usaha. Modal dari snapshot harga beli;
+// barang tanpa harga beli dihitung modal 0 (ditandai). Galeri Foto: biaya =
+// bagian fotografer (bagi hasil), sisanya + kode unik = panitia.
+export async function getPendapatanUsaha(): Promise<PendapatanUsaha[]> {
+  const lunas = { status: { in: ["VERIFIED", "DIAMBIL"] } };
+  const [merch, makanan, pos, foto] = await Promise.all([
+    prisma.pesananMerch.findMany({
+      where: { status: { in: ["VERIFIED", "DIAMBIL", "DIKIRIM"] } },
+      select: { items: true, totalBayar: true, ongkir: true },
+    }),
+    prisma.pesananMakanan.findMany({ where: lunas, select: { items: true, totalBayar: true } }),
+    prisma.transaksiPOS.findMany({ where: { status: "SELESAI" }, select: { items: true, total: true } }),
+    hitungBagiHasilFoto(),
+  ]);
+  const baris = (nama: string, masuk: number, modal: number, tanpaHargaBeli: number) => ({
+    nama, masuk, modal, bersih: masuk - modal, tanpaHargaBeli,
+  });
+
+  let mMasuk = 0, mModal = 0, mTanpa = 0;
+  for (const p of merch) {
+    const h = hitungModalMerch(p.items as ItemPesanan[]);
+    // Ongkir diteruskan ke kurir — tidak dihitung sebagai uang masuk usaha.
+    mMasuk += p.totalBayar - (p.ongkir ?? 0); mModal += h.modal; mTanpa += h.barangTanpaHargaBeli;
+  }
+  let kMasuk = 0, kModal = 0, kTanpa = 0;
+  for (const p of makanan) {
+    const items = p.items as ItemMakanan[];
+    kMasuk += p.totalBayar; kModal += hitungLabaMakanan(items).modal;
+    kTanpa += items.filter((i) => i.hargaBeli == null).reduce((s, i) => s + i.jumlah, 0);
+  }
+  let pMasuk = 0, pModal = 0, pTanpa = 0;
+  for (const t of pos) {
+    const items = t.items as ItemPOS[];
+    pMasuk += t.total; pModal += hitungLaba(items).modal;
+    pTanpa += items.filter((i) => i.hargaBeli == null).reduce((s, i) => s + i.jumlah, 0);
+  }
+  return [
+    baris("Merchandise (PO)", mMasuk, mModal, mTanpa),
+    baris("Pemesanan Makanan", kMasuk, kModal, kTanpa),
+    baris("POS Produk", pMasuk, pModal, pTanpa),
+    {
+      ...baris("Galeri Foto", foto.totalKas, foto.totalFotografer, 0),
+      keteranganBiaya: `bagi hasil fotografer ${foto.persenFotografer}%`,
+    },
+  ];
+}
 
 export async function getLaporanKas() {
+  const pendapatanUsahaP = getPendapatanUsaha();
   const [transaksiTikets, transaksiFotos, kasTransaksis, timsConfirmed] =
     await Promise.all([
       prisma.transaksiTiket.findMany({
@@ -76,6 +138,17 @@ export async function getLaporanKas() {
   const totalMerchVerified = kasTransaksis
     .filter((k) => k.tipe === "PEMASUKAN" && k.sumber === "MERCHANDISE")
     .reduce((s, k) => s + k.jumlah, 0);
+  // Bazar: pemasukan (sewa stand/bagi hasil tenant) & pengeluaran (tenda,
+  // listrik, dll) dicatat manual dengan kategori BAZAR.
+  const bazarMasuk = kasTransaksis
+    .filter((k) => k.tipe === "PEMASUKAN" && k.kategori === "BAZAR")
+    .reduce((s, k) => s + k.jumlah, 0);
+  const bazarKeluar = kasTransaksis
+    .filter((k) => k.tipe === "PENGELUARAN" && k.kategori === "BAZAR")
+    .reduce((s, k) => s + k.jumlah, 0);
+  const totalPosProduk = kasTransaksis
+    .filter((k) => k.tipe === "PEMASUKAN" && k.sumber === "POS_PRODUK")
+    .reduce((s, k) => s + k.jumlah, 0);
   const totalMakananVerified = kasTransaksis
     .filter((k) => k.tipe === "PEMASUKAN" && k.sumber === "MAKANAN")
     .reduce((s, k) => s + k.jumlah, 0);
@@ -87,6 +160,9 @@ export async function getLaporanKas() {
     totalPendaftaranVerified,
     totalMerchVerified,
     totalMakananVerified,
+    totalPosProduk,
+    bazarMasuk,
+    bazarKeluar,
     totalPendapatan: totalPemasukan,
     totalPengeluaran,
     saldo: totalPemasukan - totalPengeluaran,
@@ -98,5 +174,6 @@ export async function getLaporanKas() {
     transaksiTikets,
     transaksiFotos,
     kasTransaksis,
+    pendapatanUsaha: await pendapatanUsahaP,
   };
 }

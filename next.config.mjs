@@ -1,6 +1,14 @@
 import { readFileSync } from "node:fs";
 
-const { version } = JSON.parse(readFileSync(new URL("./package.json", import.meta.url), "utf8"));
+const { version: versiPaket } = JSON.parse(readFileSync(new URL("./package.json", import.meta.url), "utf8"));
+
+// Versi naik otomatis tiap deploy: MAYOR.MINOR dari package.json + jumlah commit
+// sebagai angka terakhir (mis. v1.0.227). GIT_COUNT dikirim sebagai build-arg
+// oleh deploy.sh / GitHub Actions (folder .git tidak ikut ke Docker build).
+// Tanpa GIT_COUNT (build lokal) dipakai versi package.json apa adanya.
+const [mayor = "1", minor = "0"] = versiPaket.split(".");
+const jumlahCommit = (process.env.GIT_COUNT || "").trim();
+const version = /^\d+$/.test(jumlahCommit) ? `${mayor}.${minor}.${jumlahCommit}` : versiPaket;
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
@@ -47,7 +55,10 @@ const nextConfig = {
       { key: "X-Content-Type-Options", value: "nosniff" },
       { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
       { key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" },
-      { key: "Permissions-Policy", value: "camera=(self), microphone=(), geolocation=()" },
+      // microphone=(self): rekam Masukan Suara juri (penilaian-baru/input). Dulu
+      // microphone=() memblokir mikrofon di seluruh situs — browser langsung
+      // menolak tanpa menampilkan pop-up izin.
+      { key: "Permissions-Policy", value: "camera=(self), microphone=(self), geolocation=()" },
     ];
     return [
       { source: "/:path*", headers: security },

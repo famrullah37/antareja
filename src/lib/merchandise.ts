@@ -3,9 +3,24 @@ export type ItemPesanan = {
   merchId: string;
   nama: string;
   ukuran: string | null;
-  harga: number;
+  harga: number; // harga jual
+  // Harga beli/produksi saat pesan (snapshot). null/undefined = belum diisi
+  // atau pesanan lama. Khusus panitia.
+  hargaBeli?: number | null;
   jumlah: number;
 };
+
+// Modal (bayar vendor) dari item pesanan. Item tanpa harga beli tidak ikut
+// dihitung; jumlah barangnya dicatat di barangTanpaHargaBeli.
+export function hitungModalMerch(items: ItemPesanan[]) {
+  let modal = 0;
+  let barangTanpaHargaBeli = 0;
+  for (const i of items) {
+    if (i.hargaBeli == null) barangTanpaHargaBeli += i.jumlah;
+    else modal += i.hargaBeli * i.jumlah;
+  }
+  return { modal, barangTanpaHargaBeli };
+}
 
 // "S, M ,L" → ["S", "M", "L"]; kosong = produk tanpa pilihan ukuran.
 export function daftarUkuran(ukuran: string | null | undefined): string[] {

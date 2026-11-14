@@ -70,27 +70,33 @@ type KategoriLomba = { id: string; nama: string };
 
 const JENJANG_ORDER = ["SD", "SMP", "SMA", "PURNA"];
 
-type Kelengkapan = { kosong: number; diharapkan: number; detail: string };
+type Kelengkapan = { kosong: number; diharapkan: number; detail: string; yatim: number };
 
 export default function RankingSection({
   penilaians,
   kategoris,
   kelengkapan,
   timBelumDinilai,
+  timGugur = [],
 }: {
   penilaians: PenilaianBaruItem[];
   kategoris: KategoriLomba[];
   // Per timId: jumlah nilai juri yang belum diisi (kosong ≠ 0) — lib/kelengkapanNilai.ts.
   kelengkapan: Record<string, Kelengkapan>;
-  timBelumDinilai: { timId: string; label: string }[];
+  timBelumDinilai: { timId: string; jenjang: string; label: string }[];
+  // Tim mundur / tidak hadir — tidak masuk rekap & juara (lib/gugurTim.ts).
+  timGugur?: { timId: string; label: string; status: string }[];
 }) {
+  // Cegah klik ganda tombol publish / sembunyikan.
+  const [sibuk, setSibuk] = useState(false);
   const belumLengkap = penilaians.filter((p) => (kelengkapan[p.timId]?.kosong ?? 0) > 0);
+  const adaYatim = penilaians.filter((p) => (kelengkapan[p.timId]?.yatim ?? 0) > 0);
 
   // Publish/sembunyikan semua tim satu jenjang sekaligus (momen pengumuman).
   async function handlePublishJenjang(jenjang: string, publish: boolean, daftar: (PenilaianBaruItem & { nilaiPBB: number })[]) {
     if (publish) {
       const kosong = daftar.filter((p) => (kelengkapan[p.timId]?.kosong ?? 0) > 0);
-      const belumDinilai = timBelumDinilai.filter((t) => t.label.startsWith(`${jenjang}-`));
+      const belumDinilai = timBelumDinilai.filter((t) => t.jenjang === jenjang);
       const adaSeri = daftar.some((_, i) => statusSeri(daftar, i).seri);
       const peringatan = [
         kosong.length ? `• ${kosong.length} tim nilainya masih ada yang KOSONG` : "",
@@ -105,8 +111,11 @@ export default function RankingSection({
     } else if (!confirm(`Sembunyikan nilai semua tim jenjang ${jenjang}? Tim tidak lagi bisa melihat hasilnya.`)) {
       return;
     }
+    if (sibuk) return;
+    setSibuk(true);
     const toastId = toast.loading(publish ? `Mempublish nilai ${jenjang}...` : `Menyembunyikan nilai ${jenjang}...`);
-    const r = await publishNilaiJenjang(jenjang, publish);
+    const r = await publishNilaiJenjang(jenjang, publish).catch(() => ({ success: false, count: 0 }));
+    setSibuk(false);
     if (r.success)
       toast.success(`${r.count} tim ${jenjang} ${publish ? "dipublish" : "disembunyikan"}`, { id: toastId });
     else toast.error("Gagal", { id: toastId });
@@ -124,11 +133,17 @@ export default function RankingSection({
       )
     )
       return;
+    if (sibuk) return;
+    setSibuk(true);
     const toastId = toast.loading(current ? "Menyembunyikan..." : "Mempublish...");
-    const result = await publishNilaiBaru(id, !current);
+    const result: { success: boolean; message?: string } = await publishNilaiBaru(id, !current).catch(() => ({
+      success: false,
+      message: "Koneksi terputus, coba lagi",
+    }));
+    setSibuk(false);
     if (result.success)
       toast.success(current ? "Nilai disembunyikan" : "Nilai dipublish!", { id: toastId });
-    else toast.error("Gagal", { id: toastId });
+    else toast.error(result.message ?? "Gagal", { id: toastId });
   }
 
   // Kolom kategori lomba: dari master, ditambah kategori yang muncul di data
@@ -178,11 +193,46 @@ export default function RankingSection({
     </div>
   );
 
+  // Nilai dari penugasan juri yang sudah dihapus/dipindah — tetap masuk total.
+  const infoYatim = adaYatim.length > 0 && (
+    <div className="bg-red-50 border border-red-300 text-red-900 rounded-xl p-4 text-sm mb-4">
+      <p className="font-semibold">
+        ⚠ Ada nilai dari juri yang tidak lagi ditugaskan di kategorinya ({adaYatim.length} tim) — nilai itu TETAP
+        masuk total. Kembalikan penugasan juri tersebut, atau minta admin teknis menghapus nilainya.
+      </p>
+      <ul className="list-disc ml-5">
+        {adaYatim.map((p) => (
+          <li key={p.id}>
+            {p.tim.jenjang} · {p.tim.nama_tim} — {kelengkapan[p.timId].yatim} nilai
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+
+  const infoGugur = timGugur.length > 0 && (
+    <div className="bg-red-50 border border-red-200 text-red-900 rounded-xl p-4 text-sm mb-4">
+      <p className="font-semibold">
+        Tidak ikut lomba ({timGugur.length} tim) — tidak dinilai, tidak masuk rekap & juara. Ubah statusnya di menu
+        Tim / Presensi DP.
+      </p>
+      <ul className="list-disc ml-5">
+        {timGugur.map((t) => (
+          <li key={t.timId}>
+            {t.label} — <b>{t.status}</b>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+
   if (penilaians.length === 0) {
     return (
       <section>
         <h2 className="text-xl font-semibold mb-3">Rekap Nilai</h2>
         {peringatan}
+        {infoYatim}
+        {infoGugur}
         <p className="text-gray-400 text-sm">Belum ada data penilaian.</p>
       </section>
     );
@@ -195,6 +245,8 @@ export default function RankingSection({
         <TombolHitungUlang />
       </div>
       {peringatan}
+      {infoYatim}
+      {infoGugur}
       {JENJANG_ORDER.map((jenjang) => {
         // Nilai sama → PBB lebih tinggi di atas (juklak), lihat lib/rankingNilai.ts.
         const grouped = penilaians
@@ -216,7 +268,8 @@ export default function RankingSection({
               {grouped.some((p) => !p.published) && (
                 <button
                   onClick={() => handlePublishJenjang(jenjang, true, grouped)}
-                  className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-primary-500 text-white hover:bg-primary-600"
+                  disabled={sibuk}
+                  className="disabled:opacity-50 px-3 py-1.5 rounded-lg text-xs font-semibold bg-primary-500 text-white hover:bg-primary-600"
                 >
                   Publish semua {jenjang}
                 </button>
@@ -224,7 +277,8 @@ export default function RankingSection({
               {grouped.some((p) => p.published) && (
                 <button
                   onClick={() => handlePublishJenjang(jenjang, false, grouped)}
-                  className="px-3 py-1.5 rounded-lg text-xs font-medium border border-neutral-300 hover:bg-neutral-50"
+                  disabled={sibuk}
+                  className="disabled:opacity-50 px-3 py-1.5 rounded-lg text-xs font-medium border border-neutral-300 hover:bg-neutral-50"
                 >
                   Sembunyikan semua {jenjang}
                 </button>
@@ -311,6 +365,7 @@ export default function RankingSection({
                       <td className="px-4 py-3 text-center">
                         <button
                           onClick={() => handlePublish(p.id, p.published)}
+                  disabled={sibuk}
                           className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
                             p.published
                               ? "bg-neutral-100 text-neutral-600 hover:bg-neutral-200"

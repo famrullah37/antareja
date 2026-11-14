@@ -40,8 +40,18 @@ export default async function TiketPage({ searchParams }: { searchParams?: { pil
         })
       ).map((t) => t.tiketId)
     : [];
+  // Sisa yang ditampilkan = sisa − pesanan PENDING (sisa di DB baru dipotong saat
+  // verifikasi) — sama dengan cek stok di beliTiket, supaya tiket yang sudah habis
+  // oleh pesanan yang menunggu verifikasi tampil habis.
+  const tertahan = await prisma.transaksiTiket.groupBy({
+    by: ["tiketId"],
+    where: { status: "PENDING" },
+    _sum: { jumlah: true },
+  });
+  const tertahanPer = new Map(tertahan.map((t) => [t.tiketId, t._sum.jumlah ?? 0]));
+  const tiketTersedia = tikets.map((t) => ({ ...t, sisa: Math.max(0, t.sisa - (tertahanPer.get(t.id) ?? 0)) }));
   // Akun tim: tiket wajib di depan supaya langsung terlihat.
-  const tiketUrut = punyaTim ? [...tikets].sort((a, b) => Number(b.khususTim) - Number(a.khususTim)) : tikets;
+  const tiketUrut = punyaTim ? [...tiketTersedia].sort((a, b) => Number(b.khususTim) - Number(a.khususTim)) : tiketTersedia;
   // ?pilih=<id> dari tombol "Beli Tiket Wajib" di dashboard: tiket langsung terpilih
   // (form tetap menolak kalau tiket itu tidak boleh dipilih akun ini).
   const pilihAwal = searchParams?.pilih ?? null;

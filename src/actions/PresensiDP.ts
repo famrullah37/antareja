@@ -5,7 +5,7 @@ import { Posisi } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { getServerSession } from "@/lib/next-auth";
 import { catatLog } from "@/lib/activityLog";
-import { posisiPresensi } from "@/lib/presensiDp";
+import { posisiPresensi, type StatusAnggota } from "@/lib/presensiDp";
 
 type Hasil = { success: boolean; message?: string };
 
@@ -24,38 +24,68 @@ function segarkan() {
 async function timTerkonfirmasi(timId: string) {
   return prisma.tim.findFirst({
     where: { id: timId, confirmed: true },
-    select: { id: true, nama_tim: true, tipe_tim: true },
+    select: { id: true, nama_tim: true, tipe_tim: true, gugurAt: true },
   });
 }
 
-// Centang/hapus centang "sesuai" satu anggota. Centang pertama = tim tercatat hadir di DP.
-export async function setSesuaiAnggota(timId: string, anggotaId: string, sesuai: boolean): Promise<Hasil> {
+// Registrasi kehadiran TIM di DP — langkah tersendiri, dilakukan panitia saat tim
+// melapor datang. Kehadiran ANGGOTA baru bisa dicek setelah tim registrasi.
+// Lawannya: tim tidak hadir/mundur = status gugur (actions/StatusTim.ts).
+export async function registrasiTim(timId: string): Promise<Hasil> {
   const oleh = await requireStaf();
+  if (typeof timId !== "string" || !timId) return { success: false, message: "Tim tidak ditemukan" };
   const tim = await timTerkonfirmasi(timId);
   if (!tim) return { success: false, message: "Tim tidak ditemukan atau pembayaran belum terkonfirmasi" };
-  const anggota = await prisma.anggota.findFirst({ where: { id: anggotaId, timId }, select: { posisi: true } });
+  if (tim.gugurAt) return { success: false, message: "Tim ditandai mundur / tidak hadir — batalkan statusnya dulu" };
+  try {
+    const sudah = await prisma.presensiDP.findUnique({ where: { timId }, select: { id: true } });
+    if (sudah) return { success: true };
+    await prisma.presensiDP.create({ data: { timId, olehNama: oleh } });
+    await catatLog("PRESENSI_DP_REGISTRASI_TIM", tim.nama_tim);
+    segarkan();
+    return { success: true };
+  } catch (e: any) {
+    if (e?.code === "P2002") return { success: true }; // dua petugas menekan bersamaan
+    console.error("registrasiTim error:", e);
+    return { success: false, message: "Gagal mencatat registrasi tim" };
+  }
+}
+
+// Status satu anggota (Danton/pasukan) saat registrasi ulang di DP:
+//  "SESUAI"      = hadir & sesuai foto/data pendaftaran;
+//  "TIDAK_HADIR" = anggota ini tidak datang — tim TETAP ikut lomba (beda dengan
+//                  tim tidak hadir, yang ditandai lewat status gugur tim);
+//  null          = hapus tanda (kembali "belum dicek").
+// Hanya setelah tim registrasi (registrasiTim) — kehadiran tim & anggota dibedakan.
+export async function setStatusAnggota(timId: string, anggotaId: string, status: StatusAnggota): Promise<Hasil> {
+  const oleh = await requireStaf();
+  if (status !== null && status !== "SESUAI" && status !== "TIDAK_HADIR")
+    return { success: false, message: "Status tidak valid" };
+  const tim = await timTerkonfirmasi(timId);
+  if (!tim) return { success: false, message: "Tim tidak ditemukan atau pembayaran belum terkonfirmasi" };
+  if (tim.gugurAt) return { success: false, message: "Tim ditandai mundur / tidak hadir — batalkan statusnya dulu" };
+  const anggota = await prisma.anggota.findFirst({ where: { id: anggotaId, timId }, select: { posisi: true, nama: true } });
   if (!anggota || !posisiPresensi(tim.tipe_tim).includes(anggota.posisi))
     return { success: false, message: "Anggota tidak ditemukan di tim ini" };
 
   try {
-    if (!sesuai) {
+    if (status === null) {
       await prisma.presensiAnggota.deleteMany({ where: { anggotaId } });
     } else {
-      const presensi = await prisma.presensiDP.upsert({
-        where: { timId },
-        create: { timId, olehNama: oleh },
-        update: {},
-      });
+      const tidakHadir = status === "TIDAK_HADIR";
+      const presensi = await prisma.presensiDP.findUnique({ where: { timId }, select: { id: true } });
+      if (!presensi) return { success: false, message: "Registrasi kehadiran tim dulu, baru cek anggotanya" };
       await prisma.presensiAnggota.upsert({
         where: { anggotaId },
-        create: { presensiId: presensi.id, anggotaId, olehNama: oleh },
-        update: {},
+        create: { presensiId: presensi.id, anggotaId, olehNama: oleh, tidakHadir },
+        update: { tidakHadir, olehNama: oleh },
       });
+      if (tidakHadir) await catatLog("PRESENSI_DP_ANGGOTA_TIDAK_HADIR", `${tim.nama_tim}: ${anggota.posisi} ${anggota.nama}`);
     }
     segarkan();
     return { success: true };
   } catch (e) {
-    console.error("setSesuaiAnggota error:", e);
+    console.error("setStatusAnggota error:", e);
     return { success: false, message: "Gagal menyimpan presensi" };
   }
 }
@@ -65,13 +95,11 @@ export async function centangSemuaSesuai(timId: string): Promise<Hasil> {
   const oleh = await requireStaf();
   const tim = await timTerkonfirmasi(timId);
   if (!tim) return { success: false, message: "Tim tidak ditemukan atau pembayaran belum terkonfirmasi" };
+  if (tim.gugurAt) return { success: false, message: "Tim ditandai mundur / tidak hadir — batalkan statusnya dulu" };
   try {
     const n = await prisma.$transaction(async (tx) => {
-      const presensi = await tx.presensiDP.upsert({
-        where: { timId },
-        create: { timId, olehNama: oleh },
-        update: {},
-      });
+      const presensi = await tx.presensiDP.findUnique({ where: { timId }, select: { id: true } });
+      if (!presensi) return null;
       const belum = await tx.anggota.findMany({
         where: { timId, posisi: { in: posisiPresensi(tim.tipe_tim) as Posisi[] }, presensiDP: null },
         select: { id: true },
@@ -82,6 +110,7 @@ export async function centangSemuaSesuai(timId: string): Promise<Hasil> {
       });
       return belum.length;
     });
+    if (n === null) return { success: false, message: "Registrasi kehadiran tim dulu, baru cek anggotanya" };
     await catatLog("PRESENSI_DP_CENTANG_SEMUA", `${tim.nama_tim}: ${n} anggota`);
     segarkan();
     return { success: true };
@@ -91,7 +120,7 @@ export async function centangSemuaSesuai(timId: string): Promise<Hasil> {
   }
 }
 
-// Koreksi salah tim: hapus presensi tim beserta semua centangnya (kembali "Belum hadir").
+// Koreksi salah tim: batalkan registrasi tim beserta semua status anggotanya (kembali "Belum registrasi").
 export async function resetPresensiDP(timId: string): Promise<Hasil> {
   await requireStaf();
   try {

@@ -38,7 +38,7 @@ export default function PelanggaranSection({
       toast.success("Pelanggaran ditambahkan!", { id: toastId });
       setKode(generateKode(kategori, pelanggarans));
     } else {
-      toast.error("Gagal (kode sudah ada?)", { id: toastId });
+      toast.error(result.message ?? "Gagal", { id: toastId });
     }
   }
 
@@ -46,7 +46,7 @@ export default function PelanggaranSection({
     const toastId = toast.loading("Menghapus...");
     const result = await removePelanggaran(id);
     if (result.success) toast.success("Dihapus", { id: toastId });
-    else toast.error("Gagal", { id: toastId });
+    else toast.error(result.message ?? "Gagal", { id: toastId });
   }
 
   return (

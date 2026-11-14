@@ -1,4 +1,5 @@
 import prisma from "@/lib/prisma";
+import { TIM_IKUT_LOMBA } from "@/lib/gugurTim";
 import { Prisma } from "@prisma/client";
 
 // ─── Nilai Diskrit Master ─────────────────────────────────────────────────────
@@ -81,11 +82,14 @@ export async function deleteJuriKategori(id: string) {
 
 // ─── PenilaianBaru ────────────────────────────────────────────────────────────
 
+// Hanya tim yang ikut lomba (terkonfirmasi & tidak mundur/tidak hadir): konfirmasi
+// bisa dibatalkan / tim bisa gugur setelah sempat dinilai, dan tim itu tidak boleh
+// ikut rekap, ranking, juara, maupun pengumuman.
 export async function findPenilaianBarus(
   where?: Prisma.PenilaianBaruWhereInput
 ) {
   return prisma.penilaianBaru.findMany({
-    where,
+    where: { AND: [where ?? {}, { tim: TIM_IKUT_LOMBA }] },
     include: {
       tim: true,
       nilaiJuri: { include: { juri: true, subKategori: true } },
@@ -127,29 +131,53 @@ export async function upsertPenilaianBaru(timId: string) {
 // (sebelum nilai juri lain masuk) tertulis terakhir, sehingga nilaiAkhir tersimpan
 // lebih rendah dari seharusnya walau NilaiJuri-nya benar. Dengan kunci, penghitungan
 // berjalan bergantian dan yang terakhir selalu membaca semua nilai yang sudah tersimpan.
+export type TxPenilaian = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
+
+// Batas antre kunci dinaikkan dari bawaan Prisma (2 dtk/5 dtk): saat banyak juri
+// menyimpan tim yang sama, transaksi berikutnya menunggu giliran, bukan gagal.
+const OPSI_TX = { maxWait: 10_000, timeout: 20_000 };
+
+async function hitungTotalDalamTx(tx: TxPenilaian, penilaianId: string) {
+  const nilai = await tx.nilaiJuri.aggregate({ where: { penilaianId }, _sum: { nilaiDipilih: true } });
+  const pengurang = await tx.pelanggaranTim.aggregate({ where: { penilaianId }, _sum: { totalPengurang: true } });
+  const nilaiKotor = nilai._sum.nilaiDipilih ?? 0;
+  const totalPengurang = pengurang._sum.totalPengurang ?? 0;
+  const nilaiAkhir = Math.max(0, nilaiKotor - totalPengurang);
+  return tx.penilaianBaru.update({
+    where: { id: penilaianId },
+    data: { nilaiKotor, totalPengurang, nilaiAkhir },
+  });
+}
+
+// Ubah nilai/pelanggaran SEKALIGUS hitung ulang total dalam SATU transaksi, dengan
+// baris PenilaianBaru dikunci (FOR UPDATE):
+//  - perubahan & total selalu konsisten — dulu nilai juri tersimpan di transaksi
+//    terpisah, sehingga kalau hitung ulang gagal, total tertinggal (basi);
+//  - status publish dicek ulang SETELAH kunci didapat — "Publish semua" menunggu
+//    simpanan yang sedang berjalan selesai, dan simpanan yang datang setelah publish
+//    ditolak, jadi nilai tidak bisa berubah diam-diam setelah diumumkan.
+export class NilaiSudahDipublish extends Error {}
+
+export async function ubahPenilaianTerkunci(penilaianId: string, ubah: (tx: TxPenilaian) => Promise<unknown>) {
+  return prisma.$transaction(async (tx) => {
+    const baris = await tx.$queryRaw<{ published: boolean }[]>`
+      SELECT published FROM "PenilaianBaru" WHERE id = ${penilaianId} FOR UPDATE`;
+    if (baris.length === 0) throw new Error("Penilaian tidak ditemukan");
+    if (baris[0].published) throw new NilaiSudahDipublish();
+    await ubah(tx);
+    return hitungTotalDalamTx(tx, penilaianId);
+  }, OPSI_TX);
+}
+
+// Hitung ulang total saja (tombol "Hitung ulang semua nilai"). Tidak menolak nilai
+// yang sudah dipublish: ini hanya menyamakan total dengan nilai yang tersimpan.
 export async function recalcPenilaianBaru(penilaianId: string) {
   return prisma.$transaction(async (tx) => {
     const kunci = await tx.$queryRaw<{ id: string }[]>`
       SELECT id FROM "PenilaianBaru" WHERE id = ${penilaianId} FOR UPDATE`;
     if (kunci.length === 0) return null;
-
-    const nilai = await tx.nilaiJuri.aggregate({
-      where: { penilaianId },
-      _sum: { nilaiDipilih: true },
-    });
-    const pengurang = await tx.pelanggaranTim.aggregate({
-      where: { penilaianId },
-      _sum: { totalPengurang: true },
-    });
-    const nilaiKotor = nilai._sum.nilaiDipilih ?? 0;
-    const totalPengurang = pengurang._sum.totalPengurang ?? 0;
-    const nilaiAkhir = Math.max(0, nilaiKotor - totalPengurang);
-
-    return tx.penilaianBaru.update({
-      where: { id: penilaianId },
-      data: { nilaiKotor, totalPengurang, nilaiAkhir },
-    });
-  });
+    return hitungTotalDalamTx(tx, penilaianId);
+  }, OPSI_TX);
 }
 
 // ─── NilaiJuri ────────────────────────────────────────────────────────────────
@@ -235,4 +263,13 @@ export async function createPelanggaranTim(
 
 export async function deletePelanggaranTim(id: string) {
   return prisma.pelanggaranTim.delete({ where: { id } });
+}
+
+// Juri sudah memberi nilai di kategori ini? Dipakai untuk menolak perubahan
+// penugasan: nilainya tetap ikut total tim, tapi tidak lagi terlihat di form &
+// peringatan "nilai kosong" (nilai yatim) — total tim bisa menggelembung diam-diam.
+export async function jumlahNilaiJuriDiKategori(juriId: string, kategori: string) {
+  return prisma.nilaiJuri.count({
+    where: { juriId, subKategori: { kategori: { equals: kategori, mode: "insensitive" } } },
+  });
 }

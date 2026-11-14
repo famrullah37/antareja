@@ -85,6 +85,14 @@ model Tim {
   has_maskot      Boolean           @default(false)
   totalVote       Int               @default(0)
   noUrut          Int?
+  // Tim gugur (lib/gugurTim.ts): mengundurkan diri / tidak hadir — ditandai
+  // panitia, tidak dinilai, tidak ikut rekap & juara, tanpa sertifikat.
+  // gugurTanpaVote: mundur sebelum voting dibuka & belum punya vote → keluar dari voting.
+  gugurAt         DateTime?
+  gugurJenis      String?
+  gugurAlasan     String?
+  gugurOleh       String?
+  gugurTanpaVote  Boolean           @default(false)
   // Ruangan basecamp tim saat acara — hanya ditentukan panitia (ADMIN/SIE_ACARA)
   // di /admin/basecamp, dibatasi Ruangan.kapasitas. Tampil di dashboard tim.
   ruanganId       String?
@@ -383,6 +391,10 @@ model Tiket {
   // Tiket wajib tim peserta: hanya bisa dibeli online oleh akun yang punya tim
   // (dicek di actions/Tiket.ts beliTiket). false = tiket penonton umum.
   khususTim   Boolean          @default(false)
+  // Tiket OTS (on the spot): hanya dijual di loket lewat POS Tiket
+  // (jualTiketOffline), kuota sendiri. Tampil di web sebagai info tanpa tombol
+  // beli; beliTiket menolaknya. Tidak boleh bersamaan dengan khususTim.
+  khususOts   Boolean          @default(false)
   // Jumlah tiket yang wajib dibeli tiap tim (hanya berlaku kalau khususTim).
   // Diatur admin; tim tidak bisa mengubah, dan hanya boleh satu pesanan aktif.
   jumlahPerTim Int             @default(1)
@@ -540,6 +552,12 @@ model Foto {
   // migrasi idempotent (lihat db/sql/0046); tagTim tetap teks tampilannya.
   timId         String?
   statusPublish Boolean  @default(false)
+  // Foto gratis di album berbayar (bisa diunduh tanpa beli). Album bertipe
+  // GRATIS tetap membuat semua fotonya gratis — lihat lib/galeri.ts fotoGratis().
+  gratis        Boolean  @default(false)
+  // Versi gaya watermark pada pathWatermark (lib/watermark.ts VERSI_WATERMARK).
+  // Lebih kecil dari versi sekarang → ditawarkan untuk diproses ulang.
+  watermarkVersi Int     @default(1)
   createdAt     DateTime @default(now())
   // Fotografer foto ini (penerima bagi hasil); kosong = ikut fotografer album.
   fotograferId  String?
@@ -570,6 +588,10 @@ model TransaksiFoto {
   kuitansiTanggal  DateTime?
   // Snapshot saat beli: [{albumId, nama, harga}] — dasar bagi hasil fotografer.
   rincianAlbum     Json?
+  // Snapshot pemilik tiap foto saat beli: [{fotoId, albumId, fotograferId,
+  // fotograferNama}] — dipakai bagi hasil bila foto/album/akun sudah terhapus,
+  // supaya riwayat pendapatan fotografer tidak hilang.
+  pemilikFoto      Json?
   // Snapshot KonfigUmum.persenFotografer saat diverifikasi.
   persenFotografer Int?
   createdAt        DateTime  @default(now())
@@ -592,7 +614,11 @@ model Merchandise {
   id        String   @id @default(uuid())
   nama      String
   deskripsi String?
+  // Harga jual ke pemesan.
   harga     Int
+  // Harga beli/produksi dari vendor per barang — untuk hitung laba. null =
+  // belum diisi. Khusus panitia, JANGAN dikirim ke halaman publik.
+  hargaBeli Int?
   // Bisa lebih dari satu (depan/belakang/detail) — foto pertama = sampul.
   fotos     String[] @default([])
   // Pilihan ukuran dipisah koma, mis. "S,M,L,XL". Kosong = tanpa ukuran.
@@ -600,6 +626,19 @@ model Merchandise {
   aktif     Boolean  @default(true)
   urutan    Int      @default(0)
   createdAt DateTime @default(now())
+  stokReady StokMerch[]
+}
+
+// Stok ready (barang jadi) untuk dijual setelah PO ditutup. Per produk & ukuran;
+// ukuran "" = produk tanpa pilihan ukuran.
+model StokMerch {
+  id      String      @id @default(uuid())
+  merchId String
+  ukuran  String      @default("")
+  stok    Int         @default(0)
+  merch   Merchandise @relation(fields: [merchId], references: [id], onDelete: Cascade)
+
+  @@unique([merchId, ukuran])
 }
 
 model KonfigMerch {
@@ -610,6 +649,8 @@ model KonfigMerch {
   // Info pengambilan/estimasi jadi, ditampilkan di halaman & email.
   infoPengambilan String?
   counterUrut     Int       @default(0)
+  // Jual ready stock (dari StokMerch) saat PO tidak terbuka.
+  readyAktif      Boolean   @default(false)
 }
 
 model PesananMerch {
@@ -622,16 +663,91 @@ model PesananMerch {
   // master bisa berubah, nominal yang sudah dibayar tidak boleh ikut berubah.
   items            Json
   subtotal         Int
+  // "" selama MENUNGGU_ONGKIR (kode baru diterbitkan saat siap dibayar).
   kodeUnik         String
   totalBayar       Int
   metodePembayaran String    @default("TRANSFER")
   bukti            String?
-  // PENDING | VERIFIED | REJECTED | DIAMBIL
+  // PO: PENDING | VERIFIED | REJECTED | DIAMBIL
+  // READY: MENUNGGU_ONGKIR | MENUNGGU_BAYAR | PENDING | VERIFIED | DIKIRIM |
+  //        DIAMBIL | REJECTED | BATAL  (REJECTED/BATAL mengembalikan stok)
   status           String    @default("PENDING")
   catatanAdmin     String?
   diambilAt        DateTime?
   createdAt        DateTime  @default(now())
+  // PO | READY (ready stock setelah PO ditutup)
+  jenis            String    @default("PO")
+  // READY: KIRIM | AMBIL
+  pengiriman       String?
+  alamat           String?
+  // Ongkir dikonfirmasi admin; ikut di totalBayar, diteruskan ke kurir.
+  ongkir           Int?
+  // Batas bayar setelah siap dibayar — lewat → BATAL & stok kembali.
+  batasBayar       DateTime?
+  kurir            String?
+  resi             String?
+  dikirimAt        DateTime?
+  // Token link halaman pesanan untuk pembeli (tanpa login).
+  aksesToken       String?   @unique
   user             User?     @relation(fields: [userId], references: [id])
+
+  @@index([status])
+}
+
+// ─── POS Produk (penjualan langsung di stand) ────────────────────────────────
+
+// Katalog terpisah dari Merchandise PO: barang yang dijual langsung di lokasi
+// (atribut, snack, minuman, dll). Stok disimpan per varian/ukuran.
+model ProdukPOS {
+  id        String            @id @default(uuid())
+  nama      String
+  // Harga jual ke pembeli.
+  harga     Int
+  // Harga beli/modal per barang — untuk hitung laba. null = belum diisi.
+  // Hanya untuk Admin/Bendahara, tidak dikirim ke halaman kasir.
+  hargaBeli Int?
+  foto      String?
+  aktif     Boolean           @default(true)
+  urutan    Int               @default(0)
+  createdAt DateTime          @default(now())
+  varian    VarianProdukPOS[]
+}
+
+model VarianProdukPOS {
+  id       String    @id @default(uuid())
+  produkId String
+  // Ukuran/varian, mis. "L". "" = produk tanpa ukuran (hanya satu varian).
+  nama     String    @default("")
+  stok     Int       @default(0)
+  urutan   Int       @default(0)
+  produk   ProdukPOS @relation(fields: [produkId], references: [id], onDelete: Cascade)
+
+  @@unique([produkId, nama])
+}
+
+// Tanpa FK ke User/Produk: kasir & barang di-snapshot supaya riwayat tetap utuh
+// walau user dihapus pasca kegiatan atau produk diubah/dihapus.
+model TransaksiPOS {
+  id               String    @id @default(uuid())
+  nomor            Int       @unique @default(autoincrement())
+  // Snapshot: [{produkId, varianId, nama, varian, harga, jumlah}]
+  items            Json
+  total            Int
+  // CASH | QRIS
+  metodePembayaran String
+  uangDiterima     Int?
+  namaPembeli      String?
+  catatan          String?
+  kasirId          String?
+  kasirNama        String
+  // SELESAI | BATAL
+  status           String    @default("SELESAI")
+  batalAt          DateTime?
+  batalAlasan      String?
+  batalOleh        String?
+  createdAt        DateTime  @default(now())
+
+  @@index([createdAt])
 }
 
 // Penghitung pembatas laju (rate limit) & percobaan login gagal — di database,
@@ -962,7 +1078,11 @@ model MenuMakanan {
   sesiId    String
   nama      String
   deskripsi String?
+  // Harga jual ke tim.
   harga     Int
+  // Harga beli dari katering per porsi — untuk hitung laba. null = belum diisi.
+  // Hanya untuk panitia, tidak dikirim ke dashboard tim.
+  hargaBeli Int?
   aktif     Boolean   @default(true)
   urutan    Int       @default(0)
   createdAt DateTime  @default(now())
@@ -1013,6 +1133,9 @@ model PresensiAnggota {
   id         String     @id @default(uuid())
   presensiId String
   anggotaId  String     @unique
+  // false = hadir & sesuai data; true = anggota TIDAK HADIR (tim tetap lomba).
+  // Beda dengan tim tidak hadir (Tim.gugurAt, lib/gugurTim.ts).
+  tidakHadir Boolean    @default(false)
   olehNama   String
   createdAt  DateTime   @default(now())
   presensi   PresensiDP @relation(fields: [presensiId], references: [id], onDelete: Cascade)

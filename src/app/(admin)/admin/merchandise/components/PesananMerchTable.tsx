@@ -1,6 +1,13 @@
 "use client";
 
-import { tandaiDiambilMerch, tolakPesananMerch, verifikasiPesananMerch } from "@/actions/Merchandise";
+import {
+  batalPesananMerchReady,
+  konfirmasiOngkirMerch,
+  tandaiDiambilMerch,
+  tandaiDikirimMerch,
+  tolakPesananMerch,
+  verifikasiPesananMerch,
+} from "@/actions/Merchandise";
 import type { ItemPesanan } from "@/lib/merchandise";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -18,9 +25,21 @@ type Pesanan = {
   status: string;
   diambilAt: Date | null;
   createdAt: Date;
+  jenis: string;
+  pengiriman: string | null;
+  alamat: string | null;
+  ongkir: number | null;
+  batasBayar: Date | null;
+  kurir: string | null;
+  resi: string | null;
+  catatanAdmin: string | null;
 };
 
 const statusBadge: Record<string, string> = {
+  MENUNGGU_ONGKIR: "bg-orange-100 text-orange-700",
+  MENUNGGU_BAYAR: "bg-amber-100 text-amber-700",
+  DIKIRIM: "bg-indigo-100 text-indigo-700",
+  BATAL: "bg-neutral-200 text-neutral-600",
   PENDING: "bg-yellow-100 text-yellow-700",
   VERIFIED: "bg-green-100 text-green-700",
   REJECTED: "bg-red-100 text-red-700",
@@ -28,7 +47,11 @@ const statusBadge: Record<string, string> = {
 };
 
 const statusLabel: Record<string, string> = {
-  PENDING: "Menunggu",
+  MENUNGGU_ONGKIR: "Perlu Ongkir",
+  MENUNGGU_BAYAR: "Menunggu Bayar",
+  DIKIRIM: "Dikirim",
+  BATAL: "Batal",
+  PENDING: "Cek Bukti",
   VERIFIED: "Lunas",
   REJECTED: "Ditolak",
   DIAMBIL: "Sudah Diambil",
@@ -37,13 +60,74 @@ const statusLabel: Record<string, string> = {
 function linkWA(p: Pesanan) {
   const msg = [
     `Halo *${p.nama}*,`,
-    `Pre-order merchandise LPKBB Antareja 2026 (kode *#${p.kodeUnik}*) sudah kami terima:`,
+    `${p.jenis === "READY" ? "Pesanan" : "Pre-order"} merchandise LPKBB Antareja 2026 (kode *#${p.kodeUnik}*) sudah kami terima:`,
+    ...(p.resi ? [`Dikirim via ${p.kurir}, resi *${p.resi}*`] : []),
     ...p.items.map((i) => `• ${i.nama}${i.ukuran ? ` (${i.ukuran})` : ""} × ${i.jumlah}`),
     ``,
     `Terima kasih! — Panitia LPKBB Antareja 2026`,
   ].join("\n");
   const no = p.noHp.replace(/^0/, "62").replace(/\D/g, "");
   return `https://wa.me/${no}?text=${encodeURIComponent(msg)}`;
+}
+
+async function jalankan(p: Promise<{ success: boolean; message?: string }>, ok: string) {
+  const toastId = toast.loading("Memproses...");
+  const r = await p;
+  if (r.success) toast.success(ok, { id: toastId });
+  else toast.error(r.message ?? "Gagal", { id: toastId });
+  return r.success;
+}
+
+// Ongkir dikonfirmasi → kode unik terbit, pembeli dapat email total & batas bayar.
+function FormOngkir({ id }: { id: string }) {
+  const [ongkir, setOngkir] = useState("");
+  const [busy, setBusy] = useState(false);
+  return (
+    <div className="flex gap-1.5">
+      <input
+        type="number"
+        min={0}
+        value={ongkir}
+        onChange={(e) => setOngkir(e.target.value)}
+        placeholder="Ongkir Rp"
+        className="border border-neutral-300 rounded-lg px-2 py-1 text-xs w-24"
+      />
+      <button
+        disabled={busy || ongkir === ""}
+        onClick={async () => {
+          setBusy(true);
+          await jalankan(konfirmasiOngkirMerch(id, parseInt(ongkir)), "Ongkir dikirim ke pembeli");
+          setBusy(false);
+        }}
+        className="bg-orange-500 text-white px-3 py-1 rounded-lg hover:bg-orange-600 disabled:opacity-50"
+      >
+        Konfirmasi
+      </button>
+    </div>
+  );
+}
+
+function FormResi({ id }: { id: string }) {
+  const [kurir, setKurir] = useState("");
+  const [resi, setResi] = useState("");
+  const [busy, setBusy] = useState(false);
+  return (
+    <div className="flex flex-col gap-1.5">
+      <input value={kurir} onChange={(e) => setKurir(e.target.value)} placeholder="Kurir (JNE, J&T, ...)" className="border border-neutral-300 rounded-lg px-2 py-1 text-xs" />
+      <input value={resi} onChange={(e) => setResi(e.target.value)} placeholder="Nomor resi" className="border border-neutral-300 rounded-lg px-2 py-1 text-xs" />
+      <button
+        disabled={busy || !kurir.trim() || !resi.trim()}
+        onClick={async () => {
+          setBusy(true);
+          await jalankan(tandaiDikirimMerch(id, kurir, resi), "Ditandai dikirim, resi dikirim ke pembeli");
+          setBusy(false);
+        }}
+        className="bg-indigo-500 text-white px-3 py-1 rounded-lg hover:bg-indigo-600 disabled:opacity-50"
+      >
+        Tandai Dikirim
+      </button>
+    </div>
+  );
 }
 
 export default function PesananMerchTable({ pesanan }: { pesanan: Pesanan[] }) {
@@ -69,7 +153,7 @@ export default function PesananMerchTable({ pesanan }: { pesanan: Pesanan[] }) {
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap gap-2 items-center">
-        {["SEMUA", "PENDING", "VERIFIED", "DIAMBIL", "REJECTED"].map((s) => (
+        {["SEMUA", "MENUNGGU_ONGKIR", "MENUNGGU_BAYAR", "PENDING", "VERIFIED", "DIKIRIM", "DIAMBIL", "REJECTED", "BATAL"].map((s) => (
           <button
             key={s}
             onClick={() => setFilter(s)}
@@ -112,8 +196,16 @@ export default function PesananMerchTable({ pesanan }: { pesanan: Pesanan[] }) {
                     <div className="font-medium">{p.nama}</div>
                     <div className="text-gray-400 text-xs">{p.email}</div>
                     <div className="text-gray-400 text-xs">{p.noHp}</div>
+                    {p.alamat && <div className="text-xs text-gray-600 mt-1 whitespace-pre-line max-w-[220px]">Alamat: {p.alamat}</div>}
                   </td>
-                  <td className="px-4 py-3 text-xs">
+                  <td className="px-4 py-3 text-xs max-w-[260px]">
+                    <span
+                      className={`inline-block mb-1 px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                        p.jenis === "READY" ? "bg-teal-100 text-teal-700" : "bg-neutral-100 text-neutral-600"
+                      }`}
+                    >
+                      {p.jenis === "READY" ? `READY · ${p.pengiriman === "KIRIM" ? "KIRIM" : "AMBIL"}` : "PO"}
+                    </span>
                     {p.items.map((i, idx) => (
                       <div key={idx}>
                         {i.nama}
@@ -121,14 +213,37 @@ export default function PesananMerchTable({ pesanan }: { pesanan: Pesanan[] }) {
                       </div>
                     ))}
                   </td>
-                  <td className="px-4 py-3 whitespace-nowrap">Rp{p.totalBayar.toLocaleString("id-ID")}</td>
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    Rp{p.totalBayar.toLocaleString("id-ID")}
+                    {p.ongkir != null && <div className="text-xs text-gray-500">ongkir Rp{p.ongkir.toLocaleString("id-ID")}</div>}
+                  </td>
                   <td className="px-4 py-3">
-                    <span className="font-mono font-bold text-primary-600 tracking-widest">{p.kodeUnik}</span>
+                    <span className="font-mono font-bold text-primary-600 tracking-widest">{p.kodeUnik || "-"}</span>
                   </td>
                   <td className="px-4 py-3">
                     <span className={`px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap ${statusBadge[p.status] ?? ""}`}>
                       {statusLabel[p.status] ?? p.status}
                     </span>
+                    {p.status === "MENUNGGU_BAYAR" && p.batasBayar && (
+                      <div className="text-xs text-gray-500 mt-1">
+                        s/d{" "}
+                        {new Date(p.batasBayar).toLocaleString("id-ID", {
+                          day: "2-digit",
+                          month: "short",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                          timeZone: "Asia/Jakarta",
+                        })}
+                      </div>
+                    )}
+                    {p.resi && (
+                      <div className="text-xs text-gray-500 mt-1">
+                        {p.kurir} · <span className="font-mono">{p.resi}</span>
+                      </div>
+                    )}
+                    {p.catatanAdmin && (p.status === "BATAL" || p.status === "REJECTED") && (
+                      <div className="text-xs text-gray-500 mt-1">{p.catatanAdmin}</div>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-xs">
                     {p.bukti ? (
@@ -159,7 +274,21 @@ export default function PesananMerchTable({ pesanan }: { pesanan: Pesanan[] }) {
                           </button>
                         </div>
                       )}
-                      {p.status === "VERIFIED" && (
+                      {p.status === "MENUNGGU_ONGKIR" && <FormOngkir id={p.id} />}
+                      {(p.status === "MENUNGGU_ONGKIR" || p.status === "MENUNGGU_BAYAR") && (
+                        <button
+                          onClick={() => {
+                            const alasan = prompt("Alasan pembatalan (stok dikembalikan, pembeli diberi tahu lewat email):");
+                            if (alasan === null) return;
+                            aksi((id) => batalPesananMerchReady(id, alasan), p.id, "Pesanan dibatalkan");
+                          }}
+                          className="bg-neutral-100 text-neutral-700 px-3 py-1 rounded-lg hover:bg-neutral-200"
+                        >
+                          Batalkan
+                        </button>
+                      )}
+                      {p.status === "VERIFIED" && p.pengiriman === "KIRIM" && <FormResi id={p.id} />}
+                      {p.status === "VERIFIED" && p.pengiriman !== "KIRIM" && (
                         <button
                           onClick={() => aksi(tandaiDiambilMerch, p.id, "Ditandai sudah diambil")}
                           className="bg-blue-500 text-white px-3 py-1 rounded-lg hover:bg-blue-600"
@@ -167,7 +296,7 @@ export default function PesananMerchTable({ pesanan }: { pesanan: Pesanan[] }) {
                           Tandai Diambil
                         </button>
                       )}
-                      {(p.status === "VERIFIED" || p.status === "DIAMBIL") && p.noHp && (
+                      {(p.status === "VERIFIED" || p.status === "DIAMBIL" || p.status === "DIKIRIM") && p.noHp && (
                         <a
                           href={linkWA(p)}
                           target="_blank"
