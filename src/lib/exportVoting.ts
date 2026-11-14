@@ -55,10 +55,22 @@ function waktuWib(d: Date) {
 export function buildVotingWorkbook(
   tims: TimVoting[],
   transaksis: TransaksiVotingExport[],
-  kategoriList: KategoriVoting[],
+  kategoriAktif: KategoriVoting[],
   tallyMap: Record<string, Record<string, number>>,
   dantonMap: Record<string, string>
 ): string {
+  // Kategori yang sudah dihapus/diganti key-nya di pengaturan tetap ikut
+  // direkap kalau masih punya transaksi/tally — supaya tidak ada suara hilang.
+  const kategoriList = [...kategoriAktif];
+  const keyLain = new Set([
+    ...transaksis.map((t) => t.kategori),
+    ...Object.values(tallyMap).flatMap((m) => Object.keys(m)),
+  ]);
+  for (const key of keyLain) {
+    if (!kategoriList.some((k) => k.key === key)) {
+      kategoriList.push({ key, label: `${key} (kategori lama)`, unit: "TIM" });
+    }
+  }
   const labelKategori = (key: string) => kategoriList.find((k) => k.key === key)?.label ?? key;
   const wb = XLSX.utils.book_new();
 
