@@ -19,6 +19,9 @@ import type { Metadata } from "next";
 
 type VoteSearchParams = { tim?: string; kategori?: string };
 
+// Berapa menit sebelum voting ditutup papan peringkat & jumlah suara disembunyikan.
+const PERINGKAT_DITUTUP_MENIT = 10;
+
 const METADATA_UMUM: Metadata = {
   title: { absolute: "Vote Tim Favorit LPKBB Antareja 2026 | Lomba Paskibra SMK Telkom Malang" },
   description:
@@ -105,6 +108,17 @@ export default async function VotePage({ searchParams }: { searchParams: VoteSea
   // pernah beda dari status yang sesungguhnya ditegakkan.
   const status = await cekJendelaVoting(konfig);
 
+  // Peringkat ditutup 10 menit terakhir sebelum voting tutup: angka suara &
+  // urutan tidak dikirim ke browser sama sekali (bukan cuma disembunyikan
+  // tampilannya), tim diurutkan menurut nama. Voting tetap bisa dilakukan.
+  const freezeAt = konfig?.tutupPada
+    ? new Date(konfig.tutupPada.getTime() - PERINGKAT_DITUTUP_MENIT * 60_000)
+    : null;
+  const peringkatDitutup = status.open && !!freezeAt && new Date() >= freezeAt;
+  const timsTampil = peringkatDitutup
+    ? tims.map((t) => ({ ...t, totalVote: 0 })).sort((a, b) => a.nama_tim.localeCompare(b.nama_tim))
+    : tims;
+
   return (
     <>
     <section className="max-w-3xl mx-auto py-12 px-4">
@@ -129,11 +143,13 @@ export default async function VotePage({ searchParams }: { searchParams: VoteSea
             <VotingCountdownBanner target={konfig.tutupPada} label="Voting ditutup dalam" tone="tutup" />
           )}
           <VoteForm
-            tims={tims}
+            tims={timsTampil}
             konfig={konfig}
             kategoriList={kategoriList}
             dantonMap={dantonMap}
-            tallyMap={tallyMap}
+            tallyMap={peringkatDitutup ? {} : tallyMap}
+            peringkatDitutup={peringkatDitutup}
+            freezeAt={freezeAt?.toISOString() ?? null}
             linkTimId={searchParams.tim ?? null}
             linkKategori={searchParams.kategori ?? null}
             jenjangAktif={jenjangAktif}

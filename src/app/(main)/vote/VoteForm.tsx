@@ -75,6 +75,8 @@ export default function VoteForm({
   kategoriList,
   dantonMap,
   tallyMap,
+  peringkatDitutup: ditutupServer = false,
+  freezeAt = null,
   linkTimId,
   linkKategori,
   jenjangAktif,
@@ -84,6 +86,11 @@ export default function VoteForm({
   kategoriList: KategoriVoting[];
   dantonMap: Record<string, string>;
   tallyMap: Record<string, Record<string, number>>;
+  // 10 menit terakhir sebelum tutup: server tidak mengirim angka suara.
+  // freezeAt dipakai supaya tampilan ikut tertutup tepat waktu walau halaman
+  // sudah terbuka sejak sebelumnya (lalu refresh ambil data tanpa angka).
+  peringkatDitutup?: boolean;
+  freezeAt?: string | null;
   // Dari link yang dibagikan (/vote?tim=..&kategori=..): tim/orang itu disorot
   // dan ditawarkan di atas. Kode unik TIDAK langsung dipesan — baru saat
   // pendukung menekan Pilih, supaya tiap klik link tidak menghabiskan kode.
@@ -104,6 +111,20 @@ export default function VoteForm({
   const [jumlahVote, setJumlahVote] = useState(1);
   const [qrisDinamis, setQrisDinamis] = useState<string | null>(null);
 
+  const [ditutupLokal, setDitutupLokal] = useState(false);
+  const peringkatDitutup = ditutupServer || ditutupLokal;
+
+  useEffect(() => {
+    if (ditutupServer || !freezeAt) return;
+    const sisa = new Date(freezeAt).getTime() - Date.now();
+    if (sisa > 2_147_000_000) return; // di luar batas setTimeout; refresh berkala yang menangani
+    const t = setTimeout(() => {
+      setDitutupLokal(true);
+      router.refresh();
+    }, Math.max(0, sisa));
+    return () => clearTimeout(t);
+  }, [ditutupServer, freezeAt, router]);
+
   const totalBayar = reserved ? reserved.hargaSatuan * jumlahVote + parseInt(reserved.kodeUnik) : 0;
 
   function getCount(tim: TimVote) {
@@ -119,9 +140,11 @@ export default function VoteForm({
       .filter((t) => activeJenjang === "SEMUA" || t.jenjang === activeJenjang)
       .filter((t) => displayName(t, activeKategori, dantonMap) !== null)
       .slice()
-      .sort((a, b) => getCount(b) - getCount(a));
+      .sort((a, b) =>
+        peringkatDitutup ? a.nama_tim.localeCompare(b.nama_tim) : getCount(b) - getCount(a)
+      );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tims, activeJenjang, activeKategori, dantonMap, tallyMap]);
+  }, [tims, activeJenjang, activeKategori, dantonMap, tallyMap, peringkatDitutup]);
   const top3 = ranked.slice(0, 3);
   const rest = ranked.slice(3);
   const linkTim = linkTimId ? ranked.find((t) => t.id === linkTimId) ?? null : null;
@@ -295,8 +318,8 @@ export default function VoteForm({
             <div className="text-xs font-semibold text-primary-600 uppercase tracking-wide">{activeKategori.label}</div>
             <div className="font-bold text-lg leading-snug">{displayName(linkTim, activeKategori, dantonMap)}</div>
             <div className="text-xs text-gray-500">
-              {activeKategori.unit === "TIM" ? linkTim.asal_sekolah : `${linkTim.nama_tim} — ${linkTim.asal_sekolah}`} ·{" "}
-              {getCount(linkTim)} suara
+              {activeKategori.unit === "TIM" ? linkTim.asal_sekolah : `${linkTim.nama_tim} — ${linkTim.asal_sekolah}`}
+              {!peringkatDitutup && <> · {getCount(linkTim)} suara</>}
             </div>
           </div>
           <button
@@ -310,8 +333,18 @@ export default function VoteForm({
         </div>
       )}
 
+      {peringkatDitutup && (
+        <div className="bg-neutral-900 text-white rounded-2xl p-5 text-center">
+          <div className="font-semibold text-lg">Papan Peringkat Ditutup</div>
+          <p className="text-sm text-white/70 mt-1">
+            Peringkat dan jumlah suara disembunyikan menjelang penutupan voting. Kamu masih bisa memberi dukungan
+            sampai voting ditutup — hasil akhir diumumkan panitia.
+          </p>
+        </div>
+      )}
+
       {/* Papan Peringkat */}
-      {ranked.length > 0 && (
+      {!peringkatDitutup && ranked.length > 0 && (
         <div className="bg-white rounded-2xl border border-gray-200 p-5">
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-semibold text-lg">Papan {activeKategori.label}</h3>
@@ -385,9 +418,11 @@ export default function VoteForm({
             >
               <div className="relative mb-1">
                 <Avatar tim={t} size={80} className="w-20 h-20 rounded-xl border-2 border-white shadow" />
-                <span className="absolute -top-1 -left-1 bg-primary-500 text-white text-xs font-bold w-7 h-7 rounded-full flex items-center justify-center border-2 border-white">
-                  #{i + 1}
-                </span>
+                {!peringkatDitutup && (
+                  <span className="absolute -top-1 -left-1 bg-primary-500 text-white text-xs font-bold w-7 h-7 rounded-full flex items-center justify-center border-2 border-white">
+                    #{i + 1}
+                  </span>
+                )}
               </div>
               <div className="font-bold text-base leading-snug line-clamp-2">
                 {displayName(t, activeKategori, dantonMap)}
@@ -395,7 +430,7 @@ export default function VoteForm({
               <div className="text-xs text-gray-400 -mt-1">
                 {activeKategori.unit === "TIM" ? t.asal_sekolah : `${t.nama_tim} — ${t.asal_sekolah}`}
               </div>
-              <div className="text-sm text-gray-500">{getCount(t)} suara</div>
+              {!peringkatDitutup && <div className="text-sm text-gray-500">{getCount(t)} suara</div>}
               <div className="w-full flex gap-2 mt-1">
                 <button
                   type="button"
