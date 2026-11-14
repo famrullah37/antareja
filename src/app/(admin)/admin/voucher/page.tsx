@@ -3,10 +3,12 @@ export const dynamic = "force-dynamic";
 import prisma from "@/lib/prisma";
 import { H1 } from "@/app/components/global/Text";
 import VoucherClient from "./components/VoucherClient";
-import { bandingkanRanking, nilaiPenentuSeri } from "@/lib/rankingNilai";
+import { findKonfigJuaras } from "@/queries/penghargaan.query";
+import { findKategoriLombas } from "@/queries/penilaianBaru.query";
+import { hitungRankingJuara } from "@/lib/juaraPerJenjang";
 
 export default async function VoucherPage() {
-  const [vouchers, tims, nilai] = await Promise.all([
+  const [vouchers, tims, nilai, konfigs, kategoriLombas] = await Promise.all([
     prisma.voucher.findMany({
       orderBy: { createdAt: "desc" },
       include: {
@@ -18,31 +20,35 @@ export default async function VoucherPage() {
       orderBy: [{ jenjang: "asc" }, { nama_tim: "asc" }],
       select: { id: true, nama_tim: true, asal_sekolah: true, jenjang: true, confirmed: true },
     }),
-    // Urutan sama dengan "Ranking Otomatis" di /admin/penghargaan (nilaiAkhir desc per jenjang).
     prisma.penilaianBaru.findMany({
       select: {
-        timId: true,
-        nilaiAkhir: true,
         tim: { select: { jenjang: true } },
-        nilaiJuri: { select: { nilaiDipilih: true, subKategori: { select: { kategori: true } } } },
+        nilaiJuri: { select: { subKategori: { select: { kategori: true } } } },
       },
     }),
+    findKonfigJuaras(),
+    findKategoriLombas(),
   ]);
 
-  // Nilai sama → PBB lebih tinggi di atas, sama dengan ranking di Penghargaan.
-  const urut = nilai
-    .map((p) => ({ ...p, nilaiPBB: nilaiPenentuSeri(p.nilaiJuri) }))
-    .sort(bandingkanRanking);
+  // Peringkat, Juara Utama 1 & Juara Umum dihitung persis sama dengan
+  // /admin/penghargaan (tim gugur tidak ikut) — dasar preset voucher juara.
+  const { rankingData } = await hitungRankingJuara(konfigs, kategoriLombas, nilai);
   const peringkat = new Map<string, number>();
-  const hitung: Record<string, number> = {};
-  for (const p of urut) {
-    hitung[p.tim.jenjang] = (hitung[p.tim.jenjang] ?? 0) + 1;
-    peringkat.set(p.timId, hitung[p.tim.jenjang]);
+  const juara = new Map<string, ("UTAMA" | "UMUM")[]>();
+  const seriJuara: string[] = [];
+  for (const r of rankingData) {
+    r.ranking.forEach((t, i) => peringkat.set(t.timId, i + 1));
+    if (r.ranking[0]) juara.set(r.ranking[0].timId, ["UTAMA"]);
+    if (r.juaraUmum) juara.set(r.juaraUmum.timId, [...(juara.get(r.juaraUmum.timId) ?? []), "UMUM"]);
+    if (r.juaraUtamaSeri) seriJuara.push(`Juara Utama 1 ${r.jenjang}`);
+    if (r.juaraUmumSeri) seriJuara.push(`Juara Umum ${r.jenjang}`);
   }
 
   // sumberTimId sengaja bukan relasi (tim lama boleh dihapus) — cocokkan manual.
   const namaTim = new Map(tims.map((t) => [t.id, t.nama_tim]));
-  const timPunyaVoucher = new Set(vouchers.map((v) => v.sumberTimId).filter(Boolean));
+  const voucherTim = new Map(
+    vouchers.filter((v) => v.sumberTimId).map((v) => [v.sumberTimId!, { persen: v.persen, nilai: v.nilai, maksPotongan: v.maksPotongan, terpakai: v.jumlahDipakai > 0 }])
+  );
 
   return (
     <div className="py-6 flex flex-col gap-8">
@@ -82,9 +88,11 @@ export default async function VoucherPage() {
         }))}
         tims={tims.map((t) => ({
           ...t,
-          punyaVoucher: timPunyaVoucher.has(t.id),
+          voucher: voucherTim.get(t.id) ?? null,
           peringkat: peringkat.get(t.id) ?? null,
+          juara: juara.get(t.id) ?? [],
         }))}
+        seriJuara={seriJuara}
       />
     </div>
   );

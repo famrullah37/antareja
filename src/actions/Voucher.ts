@@ -6,7 +6,8 @@ import { revalidatePath } from "next/cache";
 import { Jenjang } from "@prisma/client";
 import { getServerSession } from "@/lib/next-auth";
 import { catatLog } from "@/lib/activityLog";
-import { labelNilai, normalisasiKode } from "@/lib/voucher";
+import { hitungPotongan, labelNilai, normalisasiKode } from "@/lib/voucher";
+import { biayaPendaftaran } from "./pembayaran";
 import { sendMailTo } from "@/lib/mailer";
 import { escapeHtml } from "@/lib/escapeHtml";
 
@@ -89,8 +90,11 @@ export async function buatVoucher(data: FormData): Promise<Hasil> {
 }
 
 // Voucher pribadi untuk kegiatan berikutnya: satu kode per tim terpilih,
-// dikunci ke asal sekolah DAN jenjang tim itu, sekali pakai. Tim yang sudah punya voucher
-// pribadi dilewati supaya klik ulang tidak menggandakan voucher.
+// dikunci ke asal sekolah DAN jenjang tim itu, sekali pakai. Satu tim hanya
+// satu voucher: tim yang sudah punya voucher pribadi LEBIH KECIL (dan belum
+// terpakai) dinaikkan ke potongan baru dengan kode yang sama — mis. Juara Umum
+// 25% yang ternyata juga Juara Utama 1 jadi 50%, apa pun urutan pembuatannya.
+// Voucher yang sama/lebih besar atau sudah terpakai dilewati (klik ulang aman).
 export async function buatVoucherMassal(data: FormData): Promise<Hasil> {
   try {
     await requireAdmin();
@@ -113,10 +117,37 @@ export async function buatVoucherMassal(data: FormData): Promise<Hasil> {
           user: { select: { email: true } },
         },
       }),
-      prisma.voucher.findMany({ where: { sumberTimId: { in: timIds } }, select: { sumberTimId: true } }),
+      prisma.voucher.findMany({
+        where: { sumberTimId: { in: timIds } },
+        select: { id: true, sumberTimId: true, persen: true, nilai: true, maksPotongan: true, jumlahDipakai: true },
+      }),
     ]);
-    const lewati = new Set(sudahAda.map((v) => v.sumberTimId));
-    const target = tims.filter((t) => !lewati.has(t.id));
+    const lamaPerTim = new Map(sudahAda.map((v) => [v.sumberTimId!, v]));
+    const target = tims.filter((t) => !lamaPerTim.has(t.id));
+
+    // Bandingkan besar potongan dengan biaya lunas jenjang tim (Rp vs % bisa dibandingkan).
+    const biayaCache = new Map<string, number>();
+    const biayaLunas = async (jenjang: Jenjang) => {
+      if (!biayaCache.has(jenjang)) biayaCache.set(jenjang, await biayaPendaftaran(jenjang, false));
+      return biayaCache.get(jenjang)!;
+    };
+    let dinaikkan = 0;
+    for (const t of tims) {
+      const lama = lamaPerTim.get(t.id);
+      if (!lama || lama.jumlahDipakai > 0) continue;
+      const biaya = await biayaLunas(t.jenjang);
+      if (hitungPotongan(potongan, biaya) <= hitungPotongan(lama, biaya)) continue;
+      await prisma.voucher.update({
+        where: { id: lama.id },
+        data: {
+          ...potongan,
+          keterangan: keterangan ?? `Voucher ${t.nama_tim}`,
+          // Isi voucher berubah — email perlu dikirim ulang.
+          emailTerkirimAt: null,
+        },
+      });
+      dinaikkan++;
+    }
 
     let dibuat = 0;
     for (const t of target) {
@@ -149,13 +180,15 @@ export async function buatVoucherMassal(data: FormData): Promise<Hasil> {
       }
     }
 
-    await catatLog("BUAT_VOUCHER_MASSAL", `${dibuat} voucher pribadi`);
+    await catatLog("BUAT_VOUCHER_MASSAL", `${dibuat} voucher pribadi dibuat, ${dinaikkan} dinaikkan`);
     segarkan();
-    const dilewati = tims.length - target.length;
-    return {
-      success: true,
-      message: `${dibuat} voucher dibuat${dilewati ? `, ${dilewati} tim dilewati karena sudah punya voucher` : ""}`,
-    };
+    const dilewati = tims.length - target.length - dinaikkan;
+    const bagian = [
+      `${dibuat} voucher dibuat`,
+      dinaikkan ? `${dinaikkan} voucher dinaikkan ke ${labelNilai(potongan)} (kirim ulang emailnya)` : "",
+      dilewati ? `${dilewati} tim dilewati karena sudah punya voucher sama/lebih besar atau sudah terpakai` : "",
+    ].filter(Boolean);
+    return { success: true, message: bagian.join(", ") };
   } catch (e) {
     console.error("buatVoucherMassal error:", e);
     return { success: false, message: "Gagal membuat voucher" };

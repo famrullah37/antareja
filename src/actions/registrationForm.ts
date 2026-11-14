@@ -67,9 +67,10 @@ export async function reserveKodePendaftaran(
         voucherGagal = cek.message;
       }
     } else if (voucher?.asalSekolah.trim()) {
-      const v = await cariVoucherSekolah(prisma, voucher.asalSekolah, jenjang);
+      const biayaLunas = await biayaPendaftaran(jenjang, false);
+      const v = await cariVoucherSekolah(prisma, voucher.asalSekolah, jenjang, biayaLunas);
       if (v) {
-        potongan = hitungPotongan(v, await biayaPendaftaran(jenjang, false));
+        potongan = hitungPotongan(v, biayaLunas);
         voucherKode = v.kode;
         voucherOtomatis = true;
       }

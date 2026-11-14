@@ -12,12 +12,14 @@ type KlienVoucher = {
 // official/email tim lama belum tentu dipakai lagi tahun berikutnya (dan Tim/User
 // direset setelah kegiatan), yang pasti sama hanya nama sekolahnya. Kalau satu
 // sekolah punya beberapa voucher (mis. dua tim tahun lalu), dipakai satu per
-// pendaftaran, yang paling lama dibuat lebih dulu. Tabel Voucher kecil, jadi
-// pencocokan nama sekolah (normalisasiSekolah) cukup di JS.
+// pendaftaran, potongan TERBESAR lebih dulu (sama besar → yang paling lama
+// dibuat). Tabel Voucher kecil, jadi pencocokan nama sekolah
+// (normalisasiSekolah) cukup di JS.
 export async function cariVoucherSekolah(
   client: { voucher: Pick<typeof prisma.voucher, "findMany"> },
   asalSekolah: string,
-  jenjang: Jenjang
+  jenjang: Jenjang,
+  biayaLunas: number
 ): Promise<Voucher | null> {
   const kunci = normalisasiSekolah(asalSekolah);
   if (!kunci) return null;
@@ -25,11 +27,12 @@ export async function cariVoucherSekolah(
     where: { aktif: true, asalSekolah: { not: null }, OR: [{ jenjang: null }, { jenjang }] },
     orderBy: { createdAt: "asc" },
   });
-  return (
-    kandidat.find(
-      (v) => normalisasiSekolah(v.asalSekolah!) === kunci && (v.kuota == null || v.jumlahDipakai < v.kuota)
-    ) ?? null
+  const cocok = kandidat.filter(
+    (v) => normalisasiSekolah(v.asalSekolah!) === kunci && (v.kuota == null || v.jumlahDipakai < v.kuota)
   );
+  // sort stabil: urutan createdAt asc dipertahankan untuk potongan yang sama.
+  cocok.sort((a, b) => hitungPotongan(b, biayaLunas) - hitungPotongan(a, biayaLunas));
+  return cocok[0] ?? null;
 }
 
 // Kode voucher tidak peka huruf besar/kecil & spasi — disimpan dan dicocokkan

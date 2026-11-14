@@ -40,20 +40,23 @@ type Tim = {
   asal_sekolah: string;
   jenjang: string;
   confirmed: boolean;
-  punyaVoucher: boolean;
-  peringkat: number | null; // urutan nilai akhir di jenjangnya (penilaian baru)
+  // Voucher pribadi yang sudah dimiliki tim (maks. satu per tim).
+  voucher: { persen: boolean; nilai: number; maksPotongan: number | null; terpakai: boolean } | null;
+  peringkat: number | null; // urutan nilai akhir di jenjangnya, sama dengan /admin/penghargaan
+  juara: ("UTAMA" | "UMUM")[]; // Juara Utama 1 / Juara Umum jenjangnya
 };
 
-// Hadiah voucher sesuai juklak. Tim penerima tetap dipilih manual — penentuan
-// juara (Utama/Umum) diatur di /admin/penghargaan, bukan sekadar peringkat nilai.
-// Aturan juara berlaku sama di SETIAP jenjang: satu Juara Utama 1 dan satu
-// Juara Umum per jenjang (perJenjang → peringatan bila memilih >1 tim di jenjang yang sama).
+// Hadiah voucher sesuai juklak. Memilih preset juara langsung mencentang tim
+// juaranya (dihitung sama dengan /admin/penghargaan); panitia tetap bisa
+// mengubah centang sebelum membuat. Aturan berlaku sama di SETIAP jenjang:
+// satu Juara Utama 1 dan satu Juara Umum per jenjang. Satu tim hanya satu
+// voucher — tim juara ganda mendapat yang terbesar (server menaikkan voucher
+// yang lebih kecil bila belum terpakai, dan melewati bila sudah lebih besar).
 const PRESET_JUKLAK = [
-  { label: "Juara Utama 1 — 50%", persen: true, nilai: 50, keterangan: "Hadiah Juara Utama 1", perJenjang: true },
-  { label: "Juara Umum — 25%", persen: true, nilai: 25, keterangan: "Hadiah Juara Umum", perJenjang: true },
-  // Dibuat TERAKHIR: "Pilih semua" melewati tim yang sudah punya voucher juara.
-  { label: "Peserta lainnya — 5%", persen: true, nilai: 5, keterangan: "Voucher peserta", perJenjang: false },
-];
+  { label: "Juara Utama 1 — 50%", persen: true, nilai: 50, keterangan: "Hadiah Juara Utama 1", perJenjang: true, pilih: "UTAMA" },
+  { label: "Juara Umum — 25%", persen: true, nilai: 25, keterangan: "Hadiah Juara Umum", perJenjang: true, pilih: "UMUM" },
+  { label: "Peserta lainnya — 5%", persen: true, nilai: 5, keterangan: "Voucher peserta", perJenjang: false, pilih: "SEMUA" },
+] as const;
 
 const inputCls =
   "border border-neutral-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400";
@@ -178,7 +181,7 @@ function FormVoucherUmum() {
   );
 }
 
-function FormVoucherMassal({ tims }: { tims: Tim[] }) {
+function FormVoucherMassal({ tims, seriJuara }: { tims: Tim[]; seriJuara: string[] }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [hanyaKonfirmasi, setHanyaKonfirmasi] = useState(true);
@@ -196,7 +199,24 @@ function FormVoucherMassal({ tims }: { tims: Tim[] }) {
   const jenjangGanda = Object.entries(perJenjang)
     .filter(([, n]) => n > 1)
     .map(([j]) => j);
-  const bisaDipilih = tampil.filter((t) => !t.punyaVoucher);
+  const bisaDipilih = tampil.filter((t) => !t.voucher);
+
+  function pilihPreset(i: number) {
+    setPreset(i);
+    const p = PRESET_JUKLAK[i];
+    if (p.pilih === "SEMUA") {
+      setDipilih(new Set(bisaDipilih.map((t) => t.id)));
+    } else {
+      // Tim juara yang sudah punya voucher sama/lebih besar tidak perlu dicentang.
+      setDipilih(
+        new Set(
+          tims
+            .filter((t) => t.juara.includes(p.pilih) && !(t.voucher && (t.voucher.terpakai || (t.voucher.persen && t.voucher.nilai >= p.nilai))))
+            .map((t) => t.id)
+        )
+      );
+    }
+  }
 
   function toggle(id: string) {
     setDipilih((s) => {
@@ -238,7 +258,7 @@ function FormVoucherMassal({ tims }: { tims: Tim[] }) {
           <button
             key={p.label}
             type="button"
-            onClick={() => setPreset(i)}
+            onClick={() => pilihPreset(i)}
             className={cn(
               "px-3 py-1.5 rounded-full border",
               preset === i ? "bg-amber-100 border-amber-400 text-amber-800" : "border-neutral-300"
@@ -248,9 +268,16 @@ function FormVoucherMassal({ tims }: { tims: Tim[] }) {
           </button>
         ))}
         <span className="basis-full text-xs text-gray-500">
-          Berlaku sama di setiap jenjang. Urutan: Juara Utama 1 (centang 1 tim di tiap jenjang) → Juara Umum (1 tim
-          di tiap jenjang) → Peserta lainnya (&quot;Pilih semua&quot;).
+          Memilih preset langsung mencentang tim yang berhak (Juara Utama 1 / Juara Umum diambil dari hasil
+          Penghargaan; Peserta lainnya = semua tim yang belum punya voucher). Periksa centangnya, lalu buat. Urutan
+          disarankan: Juara Utama 1 → Juara Umum → Peserta lainnya. Tim juara ganda otomatis mendapat yang terbesar.
         </span>
+        {seriJuara.length > 0 && (
+          <span className="basis-full text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+            ⚠ Nilai SERI pada {seriJuara.join(", ")} — juara belum pasti, putuskan dulu di Penghargaan sesuai juklak
+            lalu centang tim yang benar secara manual.
+          </span>
+        )}
       </div>
       <FieldPotongan key={`potongan-${preset}`} awal={awal} />
       <div className="flex flex-col gap-1 sm:col-span-2">
@@ -295,9 +322,9 @@ function FormVoucherMassal({ tims }: { tims: Tim[] }) {
           {tampil.map((t) => (
             <label
               key={t.id}
-              className={cn("flex items-center gap-3 px-3 py-2 text-sm", t.punyaVoucher ? "text-gray-400" : "hover:bg-neutral-50 cursor-pointer")}
+              className={cn("flex items-center gap-3 px-3 py-2 text-sm", t.voucher?.terpakai ? "text-gray-400" : "hover:bg-neutral-50 cursor-pointer")}
             >
-              <input type="checkbox" disabled={t.punyaVoucher} checked={dipilih.has(t.id)} onChange={() => toggle(t.id)} />
+              <input type="checkbox" disabled={!!t.voucher?.terpakai} checked={dipilih.has(t.id)} onChange={() => toggle(t.id)} />
               <span className="w-14 shrink-0 text-xs font-semibold">{t.jenjang}</span>
               <span className="flex-1 min-w-0 truncate">
                 {t.nama_tim} — {t.asal_sekolah}
@@ -312,7 +339,17 @@ function FormVoucherMassal({ tims }: { tims: Tim[] }) {
                   Peringkat {t.peringkat}
                 </span>
               )}
-              {t.punyaVoucher && <span className="text-xs">sudah punya voucher</span>}
+              {t.juara.includes("UTAMA") && (
+                <span className="text-xs px-2 py-0.5 rounded-full shrink-0 bg-amber-200 text-amber-900 font-semibold">🏆 Juara Utama 1</span>
+              )}
+              {t.juara.includes("UMUM") && (
+                <span className="text-xs px-2 py-0.5 rounded-full shrink-0 bg-amber-200 text-amber-900 font-semibold">🏆 Juara Umum</span>
+              )}
+              {t.voucher && (
+                <span className="text-xs shrink-0">
+                  {t.voucher.terpakai ? "voucher sudah terpakai" : `punya voucher ${labelNilai(t.voucher)}`}
+                </span>
+              )}
             </label>
           ))}
         </div>
@@ -539,12 +576,20 @@ function DaftarVoucher({ vouchers }: { vouchers: Voucher[] }) {
   );
 }
 
-export default function VoucherClient({ vouchers, tims }: { vouchers: Voucher[]; tims: Tim[] }) {
+export default function VoucherClient({
+  vouchers,
+  tims,
+  seriJuara,
+}: {
+  vouchers: Voucher[];
+  tims: Tim[];
+  seriJuara: string[];
+}) {
   return (
     <div className="flex flex-col gap-6">
       <DaftarVoucher vouchers={vouchers} />
       <FormVoucherUmum />
-      <FormVoucherMassal tims={tims} />
+      <FormVoucherMassal tims={tims} seriJuara={seriJuara} />
     </div>
   );
 }
