@@ -1189,3 +1189,25 @@ model PenarikanFotografer {
 
   @@index([fotograferId])
 }
+
+// ─── Saran & Masukan dari tim ─────────────────────────────────────────────────
+
+// Tanpa FK ke Tim/User: data tim direset tiap selesai kegiatan, sedangkan
+// saran dipakai untuk evaluasi kegiatan berikutnya — identitas tim disimpan
+// sebagai snapshot. timId hanya untuk menampilkan riwayat ke tim pengirimnya.
+model SaranTim {
+  id           String   @id @default(uuid())
+  timId        String?
+  namaTim      String
+  asalSekolah  String
+  jenjang      String
+  pengirim     String
+  kategori     String
+  isi          String
+  rating       Int?
+  dibaca       Boolean  @default(false)
+  tanggapan    String?
+  createdAt    DateTime @default(now())
+
+  @@index([timId])
+}

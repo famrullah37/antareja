@@ -7,7 +7,9 @@ import { usePathname } from "next/navigation";
 import { Fragment, useEffect, useState } from "react";
 import Sidebar from "./components/Sidebar";
 import { HamburgerIcon } from "@/app/components/global/Icons";
-import { protectedRoutes } from "@/utils/protectedRoutes";
+import { menuPerKelompok } from "@/utils/protectedRoutes";
+import { useMenuFolder } from "./components/useMenuFolder";
+import { FaChevronDown } from "react-icons/fa";
 import Image from "next/image";
 import { labelVersi, labelWaktuBuild } from "@/lib/versiAplikasi";
 
@@ -22,9 +24,8 @@ export default function AdminLayout({
   const { signingOut, handleSignOut } = useSignOut();
   const pathnameSplit = pathname.split("/");
   pathnameSplit.shift();
-  const allowedRoutes = protectedRoutes.filter((item) =>
-    item.roles.includes(session?.user?.role!)
-  );
+  const kelompok = menuPerKelompok(session?.user?.role);
+  const menu = useMenuFolder(kelompok, pathname);
   useEffect(() => {
     setIsExpanded(false);
   }, [pathname]);
@@ -69,16 +70,39 @@ export default function AdminLayout({
               : "max-h-0 py-0 opacity-0 invisible pointer-events-none"
           }`}
         >
-          <div className="flex flex-col gap-6 justify-center items-center w-full text-center">
-            {allowedRoutes.map((navOption) => (
-              <Link
-                key={navOption.title}
-                href={navOption.path}
-                className={`rounded-full text-center text-[16px] transition-all duration-300 hover:text-primary-400`}
-                onClick={() => setIsExpanded(false)}
-              >
-                {navOption.title}
-              </Link>
+          <div className="flex flex-col gap-4 justify-center items-center w-full text-center">
+            {kelompok.map((k) => (
+              <div key={k.group} className="w-full flex flex-col items-center gap-3">
+                {menu.lipat ? (
+                  <button
+                    type="button"
+                    onClick={() => menu.toggle(k.group)}
+                    aria-expanded={menu.isOpen(k.group)}
+                    disabled={menu.isAktif(k.group)}
+                    className={`flex items-center gap-2 text-xs font-bold uppercase tracking-wider ${
+                      menu.isAktif(k.group) ? "text-primary-300" : "text-neutral-200"
+                    }`}
+                  >
+                    {k.group} ({k.items.length})
+                    <FaChevronDown className={`transition-transform ${menu.isOpen(k.group) ? "rotate-180" : ""}`} />
+                  </button>
+                ) : (
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-neutral-300">{k.group}</p>
+                )}
+                {menu.isOpen(k.group) && k.items.map((navOption) => (
+                  <Link
+                    key={navOption.path}
+                    href={navOption.path}
+                    aria-current={menu.activePath === navOption.path ? "page" : undefined}
+                    className={`rounded-full text-center text-[16px] transition-all duration-300 hover:text-primary-400 ${
+                      menu.activePath === navOption.path ? "text-primary-300 font-semibold" : ""
+                    }`}
+                    onClick={() => setIsExpanded(false)}
+                  >
+                    {navOption.title}
+                  </Link>
+                ))}
+              </div>
             ))}
             <button
               className={`rounded-full text-center text-primary-500 text-[16px] transition-all duration-300 hover:text-primary-400 disabled:opacity-60`}

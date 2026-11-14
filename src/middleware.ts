@@ -17,10 +17,11 @@ const SIE_LOMBA_ROUTES = [
   "/admin/penghargaan",
   "/admin/sertifikat",
   "/admin/pengumuman",
+  "/admin/saran",
 ];
 // Pelaksanaan acara: jadwal uji coba, akomodasi & ruangan. Sengaja tanpa
 // tim/juri/penilaian — data anggota & nilai bukan urusan Sie Acara.
-const SIE_ACARA_ROUTES = ["/admin/uji-coba", "/admin/menginap", "/admin/basecamp", "/admin/pengumuman", "/admin/makanan"];
+const SIE_ACARA_ROUTES = ["/admin/uji-coba", "/admin/menginap", "/admin/basecamp", "/admin/pengumuman", "/admin/makanan", "/admin/saran"];
 
 const STAFF_ROUTES: Record<string, string[]> = {
   JURI: JURI_ROUTES,

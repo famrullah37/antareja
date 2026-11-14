@@ -22,6 +22,7 @@ import MenuDashboard from "./components/MenuDashboard";
 import TiketWajibSection from "./components/TiketWajibSection";
 import FotoTimSection from "./components/FotoTimSection";
 import VoucherSection from "./components/VoucherSection";
+import SaranSection from "./components/SaranSection";
 import { findTikets } from "@/queries/tiket.query";
 import { statusPerJenis } from "@/lib/tiketWajib";
 import { siapkanPelunasan } from "@/lib/pelunasan";
@@ -125,6 +126,7 @@ export default async function TimDashboard() {
       <SertifikatSection sertifikat={sertifikat as any} />
       <VoucherSection timId={tim.id} />
       <TiketSayaSection transaksis={transaksiTikets as any} />
+      <SaranSection timId={tim.id} />
     </div>
   );
 }

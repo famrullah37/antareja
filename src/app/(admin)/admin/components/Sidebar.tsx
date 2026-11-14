@@ -2,13 +2,14 @@
 
 import { PrimaryButton } from "@/app/components/global/Button";
 import { H3 } from "@/app/components/global/Text";
-import { protectedRoutes } from "@/utils/protectedRoutes";
+import { menuPerKelompok } from "@/utils/protectedRoutes";
 import { Session } from "next-auth";
 import { useSignOut } from "@/app/components/global/useSignOut";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { FaArrowRight } from "react-icons/fa";
 import { labelVersi, labelWaktuBuild } from "@/lib/versiAplikasi";
+import { FaChevronDown } from "react-icons/fa";
+import { useMenuFolder } from "./useMenuFolder";
 
 interface Sidenavprops {
   active: boolean;
@@ -18,15 +19,8 @@ interface Sidenavprops {
 export default function Sidebar({ active, session }: Readonly<Sidenavprops>) {
   const pathname = usePathname();
   const { signingOut, handleSignOut } = useSignOut();
-  const allowedRoutes = protectedRoutes.filter((item) =>
-    item.roles.includes(session?.user?.role!)
-  );
-  // Menu aktif = rute terpanjang yang cocok dengan URL, supaya /admin/tiket/pos
-  // tidak ikut menyalakan "Tiket" & "Scanner Tiket" (dulu dibandingkan per segmen kedua saja).
-  const activePath = allowedRoutes
-    .map((item) => item.path)
-    .filter((p) => pathname === p || pathname.startsWith(p + "/"))
-    .sort((a, b) => b.length - a.length)[0];
+  const kelompok = menuPerKelompok(session?.user?.role);
+  const { activePath, lipat, isOpen, isAktif, toggle } = useMenuFolder(kelompok, pathname);
 
   return (
     <aside
@@ -42,27 +36,48 @@ export default function Sidebar({ active, session }: Readonly<Sidenavprops>) {
             <Link href={"/"} className="block">
               <H3 className="text-[#F70048]">Admin Panel</H3>
             </Link>
-            <ul className="space-y-4 pb-2 mt-8">
-              <p className="font-semibold">Menu</p>
-              {allowedRoutes.map((item) => (
-                <li key={item.path}>
-                  <Link
-                    href={item.path}
-                    className={
-                      (item.path === activePath
-                        ? "bg-red-100 "
-                        : "") +
-                      "group flex items-center rounded-lg p-2 text-base font-normal text-primary-400 hover:bg-red-200 transition-all"
-                    }
-                  >
-                    {/* <div dangerouslySetInnerHTML={{ __html: item.icon }} /> */}
-                    <p className="ml-3 whitespace-nowrap text-primary-400 font-semibold flex gap-3 items-center">
-                      <FaArrowRight /> {item.title}
-                    </p>
-                  </Link>
-                </li>
+            <nav aria-label="Menu admin" className="flex flex-col gap-1 pb-2 mt-8">
+              {kelompok.map((k) => (
+                <div key={k.group}>
+                  {lipat ? (
+                    <button
+                      type="button"
+                      onClick={() => toggle(k.group)}
+                      aria-expanded={isOpen(k.group)}
+                      disabled={isAktif(k.group)}
+                      className={`w-full flex items-center justify-between rounded-lg px-2 py-2 text-xs font-bold uppercase tracking-wider transition-colors ${
+                        isAktif(k.group) ? "text-primary-500 cursor-default" : "text-gray-500 hover:bg-gray-50"
+                      }`}
+                    >
+                      <span>
+                        {k.group} <span className="font-normal text-gray-400">({k.items.length})</span>
+                      </span>
+                      <FaChevronDown className={`transition-transform ${isOpen(k.group) ? "rotate-180" : ""}`} />
+                    </button>
+                  ) : (
+                    <p className="px-2 mb-1 text-[11px] font-bold uppercase tracking-wider text-gray-400">{k.group}</p>
+                  )}
+                  <ul className={`flex flex-col gap-0.5 pl-2 ${isOpen(k.group) ? "mb-2" : "hidden"}`}>
+                    {k.items.map((item) => {
+                      const aktif = item.path === activePath;
+                      return (
+                        <li key={item.path}>
+                          <Link
+                            href={item.path}
+                            aria-current={aktif ? "page" : undefined}
+                            className={`block rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${
+                              aktif ? "bg-red-100 text-primary-600" : "text-gray-600 hover:bg-red-50 hover:text-primary-500"
+                            }`}
+                          >
+                            {item.title}
+                          </Link>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
               ))}
-            </ul>
+            </nav>
             <PrimaryButton
               type="button"
               onClick={handleSignOut}
