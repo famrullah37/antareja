@@ -110,10 +110,30 @@ function FieldPotongan({ awal }: { awal?: { persen: boolean; nilai: number } }) 
   );
 }
 
+// Kalimat ringkas dari isi form, supaya admin yakin voucher yang dibuat sesuai maksud.
+function ringkasVoucherUmum(f: Record<string, string>) {
+  const nilai = Number(f.nilai);
+  if (!nilai) return null;
+  const persen = f.jenis === "PERSEN";
+  const maks = Number(f.maksPotongan);
+  const potongan = persen
+    ? `potongan ${nilai}%${maks ? ` (paling banyak ${rupiah(maks)})` : ""}`
+    : `potongan ${rupiah(nilai)}`;
+  const kode = f.kode?.trim() ? f.kode.trim().toUpperCase() : "(kode acak)";
+  const siapa = [
+    f.jenjang ? `tim ${f.jenjang}` : "tim semua jenjang",
+    f.asalSekolah?.trim() ? `khusus dari ${f.asalSekolah.trim()}` : "dari sekolah mana pun",
+  ].join(" ");
+  const kuota = Number(f.kuota) ? `Maksimal dipakai ${Number(f.kuota)} tim.` : "Tanpa batas jumlah tim.";
+  return `Kode ${kode} memberi ${potongan} biaya pendaftaran untuk ${siapa}. ${kuota} Tim mengetik kode ini saat mendaftar.`;
+}
+
 function FormVoucherUmum() {
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
   const [loading, setLoading] = useState(false);
+  const [isian, setIsian] = useState<Record<string, string>>({});
+  const ringkasan = ringkasVoucherUmum(isian);
 
   async function kirim(data: FormData) {
     setLoading(true);
@@ -125,6 +145,7 @@ function FormVoucherUmum() {
     }
     toast.success(r.message ?? "Voucher dibuat");
     formRef.current?.reset();
+    setIsian({});
     router.refresh();
   }
 
@@ -132,11 +153,22 @@ function FormVoucherUmum() {
     <form
       ref={formRef}
       action={kirim}
+      onChange={(e) => {
+        const el = e.target as HTMLInputElement;
+        if (el.name) setIsian((s) => ({ ...s, [el.name]: el.value }));
+      }}
       className="bg-white rounded-2xl border border-neutral-200 p-6 grid grid-cols-1 sm:grid-cols-3 gap-4"
     >
       <div className="sm:col-span-3">
         <h2 className="font-bold text-lg">Kode Voucher Umum</h2>
-        <p className="text-xs text-gray-500">Mis. EARLYBIRD, ALUMNI. Bisa dipakai tim mana pun yang memenuhi syarat.</p>
+        <p className="text-xs text-gray-500">
+          Kode promo yang diketik tim saat mendaftar, mis. EARLYBIRD atau ALUMNI. Siapa pun yang tahu kodenya dan
+          memenuhi syarat bisa memakainya.
+        </p>
+        <p className="text-xs text-amber-700 bg-amber-50 rounded-lg px-3 py-2 mt-2">
+          Voucher hadiah juklak (Juara Utama 50%, Juara Umum 25%, Peserta 5%) <b>jangan dibuat di sini</b> — pakai
+          form &quot;Voucher Pribadi untuk Kegiatan Berikutnya&quot; di bawah, supaya voucher terkunci ke sekolah peserta dan berlaku otomatis.
+        </p>
       </div>
       <div className="flex flex-col gap-1">
         <label className={labelCls}>Kode (kosongkan = acak)</label>
@@ -159,8 +191,8 @@ function FormVoucherUmum() {
         <input name="kuota" type="number" min="1" step="1" className={inputCls} />
       </div>
       <div className="flex flex-col gap-1">
-        <label className={labelCls}>Khusus sekolah (opsional)</label>
-        <input name="asalSekolah" maxLength={150} placeholder="Semua sekolah" className={inputCls} />
+        <label className={labelCls}>Khusus sekolah (kosongkan = semua sekolah)</label>
+        <input name="asalSekolah" maxLength={150} placeholder="mis. SMP Negeri 1 Malang" className={inputCls} />
       </div>
       <div className="flex flex-col gap-1 sm:col-span-2">
         <label className={labelCls}>Keterangan (opsional)</label>
@@ -169,6 +201,11 @@ function FormVoucherUmum() {
       <label className="flex items-center gap-2 text-sm self-end pb-2">
         <input type="checkbox" name="aktif" defaultChecked /> Langsung aktif
       </label>
+      {ringkasan && (
+        <p className="sm:col-span-3 text-sm bg-primary-50 border border-primary-200 rounded-lg px-3 py-2 text-gray-700">
+          {ringkasan}
+        </p>
+      )}
       <div className="sm:col-span-3 flex justify-end">
         <button
           disabled={loading}
@@ -188,8 +225,20 @@ function FormVoucherMassal({ tims, seriJuara }: { tims: Tim[]; seriJuara: string
   const [dipilih, setDipilih] = useState<Set<string>>(new Set());
   const [preset, setPreset] = useState<number | null>(null);
   const awal = preset != null ? PRESET_JUKLAK[preset] : undefined;
+  // Mode manual: juara dihitung panitia di luar sistem (penilaian sistem tidak
+  // dipakai), jadi hasil/peringkat sistem disembunyikan dan tim dicentang sendiri.
+  // Default manual kalau sistem belum menemukan juara atau hasilnya seri.
+  const [manual, setManual] = useState(() => seriJuara.length > 0 || tims.every((t) => t.juara.length === 0));
+  const [cari, setCari] = useState("");
+  const [filterJenjang, setFilterJenjang] = useState("");
 
-  const tampil = tims.filter((t) => !hanyaKonfirmasi || t.confirmed);
+  const q = cari.trim().toLowerCase();
+  const tampil = tims.filter(
+    (t) =>
+      (!hanyaKonfirmasi || t.confirmed) &&
+      (!filterJenjang || t.jenjang === filterJenjang) &&
+      (!q || `${t.nama_tim} ${t.asal_sekolah}`.toLowerCase().includes(q))
+  );
 
   // Jumlah tim terpilih per jenjang — untuk preset juara (1 tim per jenjang).
   const perJenjang: Record<string, number> = {};
@@ -205,7 +254,11 @@ function FormVoucherMassal({ tims, seriJuara }: { tims: Tim[]; seriJuara: string
     setPreset(i);
     const p = PRESET_JUKLAK[i];
     if (p.pilih === "SEMUA") {
-      setDipilih(new Set(bisaDipilih.map((t) => t.id)));
+      // Semua tim tanpa voucher, tidak terpengaruh kotak cari / filter jenjang.
+      setDipilih(new Set(tims.filter((t) => (!hanyaKonfirmasi || t.confirmed) && !t.voucher).map((t) => t.id)));
+    } else if (manual) {
+      // Hanya mengisi besar potongan & keterangan; tim juara dicentang panitia.
+      setDipilih(new Set());
     } else {
       // Tim juara yang sudah punya voucher sama/lebih besar tidak perlu dicentang.
       setDipilih(
@@ -252,6 +305,22 @@ function FormVoucherMassal({ tims, seriJuara }: { tims: Tim[]; seriJuara: string
           official/email lama. Biarkan nonaktif dulu, lalu aktifkan saat pendaftaran kegiatan berikutnya dibuka.
         </p>
       </div>
+      <label className="sm:col-span-3 flex items-start gap-2 text-sm bg-neutral-50 border border-neutral-200 rounded-lg px-3 py-2">
+        <input
+          type="checkbox"
+          className="mt-1"
+          checked={manual}
+          onChange={(e) => {
+            setManual(e.target.checked);
+            setDipilih(new Set());
+            setPreset(null);
+          }}
+        />
+        <span>
+          <b>Juara ditentukan manual</b> (penilaian dihitung di luar sistem). Hasil &amp; peringkat dari sistem
+          disembunyikan; preset juara hanya mengisi besar potongan, lalu centang sendiri tim juaranya.
+        </span>
+      </label>
       <div className="sm:col-span-3 flex flex-wrap items-center gap-2 text-sm">
         <span className="text-gray-500">Preset juklak:</span>
         {PRESET_JUKLAK.map((p, i) => (
@@ -267,12 +336,21 @@ function FormVoucherMassal({ tims, seriJuara }: { tims: Tim[]; seriJuara: string
             {p.label}
           </button>
         ))}
+        {manual ? (
+          <span className="basis-full text-xs text-gray-500">
+            Langkah: (1) klik <b>Juara Utama 1 — 50%</b>, cari &amp; centang tim Juara Utama 1 tiap jenjang, ubah
+            keterangan bila perlu, klik Buat. (2) Ulangi dengan <b>Juara Umum — 25%</b>. (3) Terakhir{" "}
+            <b>Peserta lainnya — 5%</b> otomatis mencentang semua tim yang belum punya voucher. Tim juara ganda
+            otomatis mendapat yang terbesar.
+          </span>
+        ) : (
         <span className="basis-full text-xs text-gray-500">
           Memilih preset langsung mencentang tim yang berhak (Juara Utama 1 / Juara Umum diambil dari hasil
           Penghargaan; Peserta lainnya = semua tim yang belum punya voucher). Periksa centangnya, lalu buat. Urutan
           disarankan: Juara Utama 1 → Juara Umum → Peserta lainnya. Tim juara ganda otomatis mendapat yang terbesar.
         </span>
-        {seriJuara.length > 0 && (
+        )}
+        {!manual && seriJuara.length > 0 && (
           <span className="basis-full text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
             ⚠ Nilai SERI pada {seriJuara.join(", ")} — juara belum pasti, putuskan dulu di Penghargaan sesuai juklak
             lalu centang tim yang benar secara manual.
@@ -311,6 +389,22 @@ function FormVoucherMassal({ tims, seriJuara }: { tims: Tim[]; seriJuara: string
             Kosongkan
           </button>
         </div>
+        <div className="flex flex-wrap gap-2">
+          <input
+            value={cari}
+            onChange={(e) => setCari(e.target.value)}
+            placeholder="Cari nama tim / sekolah..."
+            className={cn(inputCls, "flex-1 min-w-[180px]")}
+          />
+          <select value={filterJenjang} onChange={(e) => setFilterJenjang(e.target.value)} className={inputCls}>
+            <option value="">Semua jenjang</option>
+            {JENJANG.map((j) => (
+              <option key={j} value={j}>
+                {j}
+              </option>
+            ))}
+          </select>
+        </div>
         {awal?.perJenjang && jenjangGanda.length > 0 && (
           <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
             Preset {awal.label.split(" — ")[0]} biasanya 1 tim per jenjang, tapi jenjang {jenjangGanda.join(", ")}{" "}
@@ -318,7 +412,9 @@ function FormVoucherMassal({ tims, seriJuara }: { tims: Tim[]; seriJuara: string
           </p>
         )}
         <div className="max-h-72 overflow-y-auto border border-neutral-200 rounded-lg divide-y">
-          {tampil.length === 0 && <p className="p-3 text-sm text-gray-500">Belum ada tim.</p>}
+          {tampil.length === 0 && (
+            <p className="p-3 text-sm text-gray-500">{tims.length === 0 ? "Belum ada tim." : "Tidak ada tim yang cocok."}</p>
+          )}
           {tampil.map((t) => (
             <label
               key={t.id}
@@ -329,7 +425,7 @@ function FormVoucherMassal({ tims, seriJuara }: { tims: Tim[]; seriJuara: string
               <span className="flex-1 min-w-0 truncate">
                 {t.nama_tim} — {t.asal_sekolah}
               </span>
-              {t.peringkat != null && (
+              {!manual && t.peringkat != null && (
                 <span
                   className={cn(
                     "text-xs px-2 py-0.5 rounded-full shrink-0",
@@ -339,10 +435,10 @@ function FormVoucherMassal({ tims, seriJuara }: { tims: Tim[]; seriJuara: string
                   Peringkat {t.peringkat}
                 </span>
               )}
-              {t.juara.includes("UTAMA") && (
+              {!manual && t.juara.includes("UTAMA") && (
                 <span className="text-xs px-2 py-0.5 rounded-full shrink-0 bg-amber-200 text-amber-900 font-semibold">🏆 Juara Utama 1</span>
               )}
-              {t.juara.includes("UMUM") && (
+              {!manual && t.juara.includes("UMUM") && (
                 <span className="text-xs px-2 py-0.5 rounded-full shrink-0 bg-amber-200 text-amber-900 font-semibold">🏆 Juara Umum</span>
               )}
               {t.voucher && (

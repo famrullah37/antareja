@@ -68,7 +68,10 @@ export async function buatVoucher(data: FormData): Promise<Hasil> {
     const kuota = angkaOpsional(data, "kuota");
     if (kuota != null && (!Number.isInteger(kuota) || kuota < 1))
       return { success: false, message: "Kuota harus bilangan bulat positif" };
-    const asalSekolah = teks(data, "asalSekolah") || null;
+    // "Semua sekolah" / "semua" / "-" diketik admin = tidak dikunci ke sekolah
+    // (kalau tersimpan apa adanya, voucher tidak akan cocok dengan sekolah mana pun).
+    const sekolahDiketik = teks(data, "asalSekolah");
+    const asalSekolah = /^(semua( sekolah)?|all|-+)$/i.test(sekolahDiketik) ? null : sekolahDiketik || null;
     const keterangan = teks(data, "keterangan").slice(0, 200) || null;
 
     let kode = normalisasiKode(teks(data, "kode"));
