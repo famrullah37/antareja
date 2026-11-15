@@ -19,7 +19,7 @@ export async function addSertifikat(data: FormData) {
   await requireAdmin();
   const timId = data.get("timId") as string;
   const namaAnggota = (data.get("namaAnggota") as string) || null;
-  const namaJuara = (data.get("namaJuara") as string) || null;
+  const namaJuara = String(data.get("namaJuara") ?? "").trim().slice(0, 100) || null;
   const files = data.getAll("files") as File[];
 
   // Tim mundur / tidak hadir tidak mendapat sertifikat (lib/gugurTim.ts).

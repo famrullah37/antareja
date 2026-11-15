@@ -10,7 +10,10 @@ type SertifikatData = {
   fileUrl: string;
 };
 
-function SertifikatCard({ s }: { s: SertifikatData }) {
+function SertifikatCard({ s: asli }: { s: SertifikatData }) {
+  // Upload lama menyimpan label perkiraan sistem "(SERI — tunggu keputusan panitia)";
+  // juara diputuskan manual, jadi label semacam itu tidak ditampilkan ke tim.
+  const s = { ...asli, namaJuara: asli.namaJuara?.includes("tunggu keputusan") ? null : asli.namaJuara };
   const isPdf = s.fileUrl.toLowerCase().includes(".pdf") || s.fileUrl.includes("/raw/");
 
   return (

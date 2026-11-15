@@ -31,7 +31,9 @@ export default function SertifikatForm({ tim, sertifikats, juaraLabel }: Props) 
 
   async function handleAdd(data: FormData) {
     data.append("timId", tim.id);
-    if (juaraLabel) data.append("namaJuara", juaraLabel);
+    // Juara ditentukan manual oleh panitia (tertulis di file sertifikatnya) —
+    // label perkiraan sistem TIDAK ikut disimpan/ditampilkan ke tim. Keterangan
+    // hanya tersimpan kalau panitia mengetiknya sendiri.
     setLoading(true);
     const toastId = toast.loading("Mengupload...");
     const result = await addSertifikat(data);
@@ -82,6 +84,9 @@ export default function SertifikatForm({ tim, sertifikats, juaraLabel }: Props) 
             <span className="inline-flex items-center gap-1 mt-1 text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full font-medium">
               <FaTrophy className="text-[10px]" /> {juaraLabel}
             </span>
+          )}
+          {juaraLabel && (
+            <p className="text-[10px] text-gray-400 mt-0.5">Perkiraan sistem — hanya terlihat panitia, tidak ikut ke sertifikat.</p>
           )}
           <span className="ml-1 text-xs text-gray-400">{sertifikats.length} file</span>
         </div>
@@ -154,6 +159,18 @@ export default function SertifikatForm({ tim, sertifikats, juaraLabel }: Props) 
               type="text"
               name="namaAnggota"
               placeholder="Nama anggota penerima sertifikat"
+              className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
+            />
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium text-gray-600">
+              Keterangan <span className="font-normal text-gray-400">(opsional, tampil di dashboard tim)</span>
+            </label>
+            <input
+              type="text"
+              name="namaJuara"
+              placeholder="Mis. Juara Bina 3 — kosongkan bila belum diputuskan"
               className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
             />
           </div>
