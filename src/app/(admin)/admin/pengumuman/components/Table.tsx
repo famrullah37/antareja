@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import DataTable, { TableColumn } from "react-data-table-component";
 import { FaRegTrashCan } from "react-icons/fa6";
 import { toast } from "sonner";
+import { labelTipePengumuman } from "@/lib/pengumuman";
 
 export default function PengumumanTable({ data }: { data: Pengumuman[] }) {
   const [loader, setLoader] = useState(true);
@@ -29,6 +30,21 @@ export default function PengumumanTable({ data }: { data: Pengumuman[] }) {
           minute: "2-digit",
           timeZone: "Asia/Jakarta",
         }),
+      sortable: true,
+    },
+    {
+      name: "Tipe",
+      selector: (row: Pengumuman) => row.tipe,
+      cell: (row: Pengumuman) => (
+        <span
+          className={`text-xs font-semibold rounded-full px-2.5 py-0.5 ${
+            row.tipe === "SESUDAH" ? "bg-emerald-100 text-emerald-700" : "bg-sky-100 text-sky-700"
+          }`}
+        >
+          {labelTipePengumuman(row.tipe)}
+        </span>
+      ),
+      width: "150px",
       sortable: true,
     },
     {

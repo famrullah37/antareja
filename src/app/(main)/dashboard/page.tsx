@@ -76,7 +76,7 @@ export default async function TimDashboard() {
   return (
     // scroll-mt: anchor menu tidak tertutup navbar yang fixed di atas
     <div className="[&_section]:scroll-mt-28">
-      <Heading />
+      <Heading ikutLomba={tim.confirmed && !tim.gugurAt} />
       <MenuDashboard
         adaPelunasan={!!pelunasan}
         adaTiket={transaksiTikets.length > 0}

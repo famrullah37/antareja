@@ -795,6 +795,9 @@ model Pengumuman {
   id        String   @id @default(uuid())
   createdAt DateTime @default(now())
   content   String
+  // SEBELUM = sebelum lomba (semua tim terdaftar); SESUDAH = setelah lomba
+  // (hanya tim yang ikut lomba). Lihat src/lib/pengumuman.ts.
+  tipe      String   @default("SEBELUM")
 }
 
 // ─── Konfigurasi Umum (singleton) ────────────────────────────────────────────

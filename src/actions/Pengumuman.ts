@@ -3,6 +3,7 @@
 import { getServerSession } from "@/lib/next-auth";
 import { revalidatePath } from "next/cache";
 import { createPengumuman, deletePengumuman } from "@/queries/pengumuman.query";
+import { isTipePengumuman } from "@/lib/pengumuman";
 
 async function requireAdmin() {
   const session = await getServerSession();
@@ -12,9 +13,10 @@ async function requireAdmin() {
 export async function createPengumumanForm(data: FormData) {
   await requireAdmin();
   const content = ((data.get("content") as string) ?? "").trim().slice(0, 3000);
-  if (!content) return { success: false };
+  const tipe = data.get("tipe");
+  if (!content || !isTipePengumuman(tipe)) return { success: false };
   try {
-    await createPengumuman({ content });
+    await createPengumuman({ content, tipe });
     revalidatePath("/", "layout");
     return { success: true };
   } catch {

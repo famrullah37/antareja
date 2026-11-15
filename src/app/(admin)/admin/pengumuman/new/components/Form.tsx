@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { createPengumumanForm } from "@/actions/Pengumuman";
 import type { Pengumuman } from "@prisma/client";
+import { TIPE_PENGUMUMAN } from "@/lib/pengumuman";
 
 export default function UserForm({ data }: { data?: Pengumuman }) {
   const router = useRouter();
@@ -24,6 +25,30 @@ export default function UserForm({ data }: { data?: Pengumuman }) {
   return (
     <form action={Create}>
       <div className="flex flex-col gap-5">
+        <fieldset className="flex flex-col gap-2">
+          <legend className="text-[16px] mb-2">Tipe Pengumuman</legend>
+          <div className="grid sm:grid-cols-2 gap-3">
+            {TIPE_PENGUMUMAN.map((t) => (
+              <label
+                key={t.key}
+                className="flex items-start gap-3 border border-[#E4E6EA] rounded-[14px] p-4 cursor-pointer has-[:checked]:border-primary-400 has-[:checked]:bg-primary-50"
+              >
+                <input
+                  type="radio"
+                  name="tipe"
+                  value={t.key}
+                  required
+                  defaultChecked={(data?.tipe ?? "SEBELUM") === t.key}
+                  className="mt-1"
+                />
+                <span>
+                  <span className="block font-semibold">{t.label}</span>
+                  <span className="block text-sm text-gray-500">{t.keterangan}</span>
+                </span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
         {/* Multi-baris: pengumuman (mis. daftar juara per jenjang) tampil dengan baris baru di dashboard peserta. */}
         <div className="flex flex-col gap-2">
           <label htmlFor="content" className="text-[16px]">
