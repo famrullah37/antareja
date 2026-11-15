@@ -4,6 +4,7 @@ import {
   buatVoucher,
   buatVoucherMassal,
   hapusVoucher,
+  hapusVoucherMassal,
   kirimEmailVoucher,
   setAktifVoucher,
   ubahSekolahVoucher,
@@ -496,6 +497,17 @@ function DaftarVoucher({ vouchers }: { vouchers: Voucher[] }) {
     router.refresh();
   }
 
+  async function hapusMassal(ids: string[]) {
+    const ketik = prompt(
+      `Hapus ${ids.length} voucher yang tampil? Tidak bisa dibatalkan.\nKetik HAPUS untuk melanjutkan.`
+    );
+    if (ketik?.trim().toUpperCase() !== "HAPUS") return;
+    const r = await hapusVoucherMassal(ids);
+    if (!r.success) return toast.error(r.message ?? "Gagal menghapus");
+    toast.success(r.message ?? "Voucher dihapus");
+    router.refresh();
+  }
+
   async function ubahSekolah(v: Voucher) {
     const nama = prompt(`Nama sekolah untuk voucher ${v.kode}:`, v.asalSekolah ?? "");
     if (nama == null || nama.trim() === (v.asalSekolah ?? "")) return;
@@ -542,6 +554,7 @@ function DaftarVoucher({ vouchers }: { vouchers: Voucher[] }) {
 
   const nonaktif = daftar.filter((v) => !v.aktif).map((v) => v.id);
   const aktif = daftar.filter((v) => v.aktif).map((v) => v.id);
+  const bisaDihapus = daftar.filter((v) => v.dirujukPembayaran === 0).map((v) => v.id);
   const belumEmail = daftar.filter((v) => v.pribadi && v.penerimaEmail && !v.emailTerkirimAt).map((v) => v.id);
 
   return (
@@ -586,6 +599,15 @@ function DaftarVoucher({ vouchers }: { vouchers: Voucher[] }) {
           <button onClick={salinCsv} className="px-3 py-1.5 rounded-lg border border-neutral-300">
             Salin daftar
           </button>
+          {bisaDihapus.length > 0 && (
+            <button
+              onClick={() => hapusMassal(bisaDihapus)}
+              className="px-3 py-1.5 rounded-lg border border-red-300 text-red-600 hover:bg-red-50 sm:ml-auto"
+              title="Pakai kotak cari untuk menyaring dulu; voucher yang sudah dipakai tim tidak ikut terhapus"
+            >
+              Hapus {bisaDihapus.length} voucher yang tampil
+            </button>
+          )}
         </div>
       )}
 

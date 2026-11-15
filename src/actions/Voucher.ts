@@ -298,3 +298,31 @@ export async function hapusVoucher(id: string): Promise<Hasil> {
     return { success: false, message: "Gagal menghapus voucher" };
   }
 }
+
+// Hapus banyak sekaligus (mis. voucher yang salah dibuat). Voucher yang sudah
+// dipakai pembayaran tim dilewati — nonaktifkan saja.
+export async function hapusVoucherMassal(ids: string[]): Promise<Hasil> {
+  try {
+    await requireAdmin();
+    const daftar = [...new Set(ids.filter((i) => typeof i === "string"))].slice(0, 1000);
+    if (daftar.length === 0) return { success: false, message: "Tidak ada voucher dipilih" };
+    const dipakai = await prisma.pembayaran.findMany({
+      where: { voucherId: { in: daftar } },
+      select: { voucherId: true },
+      distinct: ["voucherId"],
+    });
+    const terkunci = new Set(dipakai.map((p) => p.voucherId));
+    const boleh = daftar.filter((i) => !terkunci.has(i));
+    const { count } = await prisma.voucher.deleteMany({ where: { id: { in: boleh } } });
+    await catatLog("HAPUS_VOUCHER", `Hapus massal ${count} voucher`);
+    segarkan();
+    const dilewati = daftar.length - count;
+    return {
+      success: true,
+      message: `${count} voucher dihapus${dilewati ? `, ${dilewati} dilewati (sudah dipakai tim)` : ""}`,
+    };
+  } catch (e) {
+    console.error("hapusVoucherMassal error:", e);
+    return { success: false, message: "Gagal menghapus voucher" };
+  }
+}
